@@ -17,6 +17,7 @@ export default function App() {
   const [descuentoContado, setDescuentoContado] = useState(30);
   const [descuentoM2, setDescuentoM2] = useState(0);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); // Nuevo estado para descuento al contado sin límite
   const [aplicarBonoInicial, setAplicarBonoInicial] = useState(false);
 
   // Estados de Inicial
@@ -27,7 +28,7 @@ export default function App() {
   const [años, setAños] = useState("");
   const [resultado, setResultado] = useState(null);
 
-  // Inyectar fuente cursiva para la firma
+  // Inyectar fuente cursiva
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap';
@@ -35,20 +36,20 @@ export default function App() {
     document.head.appendChild(link);
   }, []);
 
-  // Lógica Automática de Proyectos (Intacta)
+  // Lógica Automática de Proyectos
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños("");
     setResultado(null); setProyectoPersonalizado("");
 
     if (proyecto === "MUYURINA" || proyecto === "SANTA FE") {
-      setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setAplicarBonoInicial(false);
+      setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
     } else if (proyecto === "EL RENACER") {
-      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(2); setDescuentoInicial(0); setAplicarBonoInicial(false);
+      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(2); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
     } else if (proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") {
-      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(1); setDescuentoInicial(0); setAplicarBonoInicial(true); 
+      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(1); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(true); 
     } else if (proyecto === "OTRO") {
-      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(0); setDescuentoInicial(0); setAplicarBonoInicial(false);
+      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
     }
   }, [proyecto]);
 
@@ -69,6 +70,7 @@ export default function App() {
     const descCreditoPct = Number(descuentoCredito) / 100;
     const descContadoPct = Number(descuentoContado) / 100;
     const descM2Val = Number(descuentoM2);
+    const descContadoM2Val = Number(descuentoContadoM2);
 
     if (!sup || !prec || ans <= 0) {
       setResultado(null);
@@ -100,8 +102,10 @@ export default function App() {
        descIniVal = Math.min(Number(descuentoInicial), 500);
     }
 
+    // Cálculo del Precio Contado agregando el nuevo descuento x m2 (sin límite)
+    const monto_desc_contado_m2 = sup * descContadoM2Val;
     const monto_desc_contado_pct = valor_post_desc_m2 * descContadoPct;
-    const monto_descuento_total_contado = monto_descuento_m2 + monto_desc_contado_pct;
+    const monto_descuento_total_contado = monto_descuento_m2 + monto_desc_contado_pct + monto_desc_contado_m2;
     const valor_contado = valor_original - monto_descuento_total_contado;
 
     const monto_descuento_total_credito = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
@@ -148,6 +152,7 @@ export default function App() {
       valorContadoBs: formatMoney(valor_contado * TIPO_CAMBIO),
       ahorroContado: formatMoney(monto_descuento_total_contado),
       porcentajeContado: descuentoContado,
+      descuentoContadoM2: descContadoM2Val,
       
       valorCredito: formatMoney(valor_credito),
       valorCreditoBs: formatMoney(valor_credito * TIPO_CAMBIO),
@@ -170,9 +175,9 @@ export default function App() {
 
   useEffect(() => {
     calcular();
-  }, [modoInicial, aplicarBonoInicial, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial]);
+  }, [modoInicial, aplicarBonoInicial, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2]);
 
-  // Mensaje de WhatsApp EXACTAMENTE igual al aprobado
+  // Mensaje de WhatsApp
   const enviarWhatsApp = () => {
     if (!resultado) return;
 
@@ -210,6 +215,7 @@ export default function App() {
   const showDescPorcentaje = ["MUYURINA", "SANTA FE", "OTRO"].includes(proyecto);
   const showDescM2 = ["EL RENACER", "LOS JARDINES", "CAÑAVERAL", "OTRO"].includes(proyecto);
   const showBonoInicial = ["LOS JARDINES", "CAÑAVERAL", "OTRO"].includes(proyecto);
+  const showDescContadoM2 = ["LOS JARDINES", "CAÑAVERAL"].includes(proyecto);
 
   return (
     <div className="min-h-screen bg-[#e8eef2] relative font-sans text-slate-800 overflow-hidden selection:bg-indigo-200">
@@ -344,6 +350,13 @@ export default function App() {
                         {(proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Tope $500 en sistema</p>}
                       </div>
                     )}
+                    {showDescContadoM2 && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">Contado x m² ($us)</label>
+                        <input type="number" step="0.01" min="0" value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder="Ej. 2" className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
+                        <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Sin límite</p>
+                      </div>
+                    )}
                     {showBonoInicial && proyecto === "OTRO" && (
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500">Bono Inicial ($us)</label>
@@ -403,8 +416,20 @@ export default function App() {
                       <Calendar className="w-3 h-3 text-indigo-500" /> Plazo
                     </label>
                     <div className="relative">
-                      <input type="number" required value={años} onChange={e => setAños(e.target.value)} placeholder="Ej. 10" className="w-full bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl p-3 outline-none focus:bg-white/80 focus:ring-2 focus:ring-indigo-400/50 transition-all font-bold text-slate-700 pr-10 shadow-sm" />
-                      <span className="absolute right-3 top-3.5 text-xs text-slate-400 font-bold uppercase">Años</span>
+                      <select 
+                        required 
+                        value={años} 
+                        onChange={e => setAños(e.target.value)} 
+                        className="w-full bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl p-3 outline-none focus:bg-white/80 focus:ring-2 focus:ring-indigo-400/50 transition-all font-bold text-slate-700 shadow-sm appearance-none pr-8 cursor-pointer"
+                      >
+                        <option value="" disabled hidden>Selec.</option>
+                        {[...Array(14)].map((_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-500/70">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                      </div>
                     </div>
                   </div>
                 </div>
