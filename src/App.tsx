@@ -17,7 +17,7 @@ export default function App() {
   const [descuentoContado, setDescuentoContado] = useState(30);
   const [descuentoM2, setDescuentoM2] = useState(0);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); // Nuevo estado para descuento al contado sin límite
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
   const [aplicarBonoInicial, setAplicarBonoInicial] = useState(false);
 
   // Estados de Inicial
@@ -46,8 +46,18 @@ export default function App() {
       setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
     } else if (proyecto === "EL RENACER") {
       setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(2); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
-    } else if (proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") {
-      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(1); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(true); 
+    } else if (proyecto === "LOS JARDINES") {
+      setDescuentoCredito(0); setDescuentoContado(0); 
+      setDescuentoM2(1); // 1$ por m2 crédito
+      setDescuentoInicial(0); 
+      setDescuentoContadoM2(2); // 2$ por m2 contado
+      setAplicarBonoInicial(true); // Opciones habilitadas
+    } else if (proyecto === "CAÑAVERAL") {
+      setDescuentoCredito(0); setDescuentoContado(0); 
+      setDescuentoM2(1); // 1$ por m2 crédito
+      setDescuentoInicial(0); 
+      setDescuentoContadoM2(4); // 4$ por m2 contado
+      setAplicarBonoInicial(true); // Opciones habilitadas
     } else if (proyecto === "OTRO") {
       setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
     }
@@ -79,9 +89,10 @@ export default function App() {
 
     const valor_original = sup * prec;
 
+    // --- CÁLCULO DE CRÉDITO ---
     let monto_descuento_m2 = sup * descM2Val;
     if ((proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && descM2Val > 0) {
-      monto_descuento_m2 = Math.min(monto_descuento_m2, 500);
+      monto_descuento_m2 = Math.min(monto_descuento_m2, 500); // Tope de $500
     }
     const valor_post_desc_m2 = valor_original - monto_descuento_m2;
 
@@ -97,20 +108,34 @@ export default function App() {
 
     let descIniVal = 0;
     if ((proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && aplicarBonoInicial) {
-       descIniVal = Math.min(cuota_inicial, 500);
+       descIniVal = Math.min(cuota_inicial, 500); // Tope Bono Inicial $500
     } else if (proyecto === "OTRO") {
        descIniVal = Math.min(Number(descuentoInicial), 500);
     }
 
-    // Cálculo del Precio Contado agregando el nuevo descuento x m2 (sin límite)
-    const monto_desc_contado_m2 = sup * descContadoM2Val;
-    const monto_desc_contado_pct = valor_post_desc_m2 * descContadoPct;
-    const monto_descuento_total_contado = monto_descuento_m2 + monto_desc_contado_pct + monto_desc_contado_m2;
-    const valor_contado = valor_original - monto_descuento_total_contado;
-
     const monto_descuento_total_credito = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
     const valor_credito = valor_original - monto_descuento_total_credito;
     
+
+    // --- CÁLCULO DE CONTADO ---
+    let monto_desc_contado_m2 = sup * descContadoM2Val;
+    if (proyecto === "CAÑAVERAL" && descContadoM2Val > 0) {
+      monto_desc_contado_m2 = Math.min(monto_desc_contado_m2, 1200); // Nuevo Tope Exclusivo $1,200 para Cañaveral
+    }
+    // Para LOS JARDINES no hay tope (sin límite)
+
+    let monto_descuento_total_contado = 0;
+    if (proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") {
+      const monto_desc_contado_pct = valor_original * descContadoPct;
+      monto_descuento_total_contado = monto_desc_contado_m2 + monto_desc_contado_pct;
+    } else {
+      const monto_desc_contado_pct = valor_post_desc_m2 * descContadoPct;
+      monto_descuento_total_contado = monto_descuento_m2 + monto_desc_contado_pct + monto_desc_contado_m2;
+    }
+    const valor_contado = valor_original - monto_descuento_total_contado;
+
+
+    // --- MATEMÁTICA DEL PRÉSTAMO ---
     const saldo = valor_credito - cuota_inicial;
     const meses = ans * 12;
     
@@ -186,29 +211,40 @@ export default function App() {
     const nombreProyectoCapitalizado = resultado.proyecto.charAt(0).toUpperCase() + resultado.proyecto.slice(1).toLowerCase();
     const ubicacion = `📍 *Proyecto ${nombreProyectoCapitalizado || 'S/N'}*\nUV ${resultado.uv || '-'} | MZN ${resultado.mzn || '-'} | Lote ${resultado.lote || '-'} (${resultado.superficie} m²)\n\n`;
 
-    let precioTexto = `💎 *Precio de Contado:* $ ${resultado.valorCredito} (Bs. ${resultado.valorCreditoBs})\n`;
+    const precioLista = `💎 *Precio:* $ ${resultado.valorOriginal} (Bs. ${resultado.valorOriginalBs})\n\n`;
     
-    let descCreditoArr = [];
-    if (resultado.porcentajeCredito > 0) descCreditoArr.push(`${resultado.porcentajeCredito}%`);
-    if (resultado.descuentoM2 > 0) descCreditoArr.push(`$${resultado.descuentoM2}/m²`);
-    if (resultado.descuentoInicial > 0) descCreditoArr.push(`Bono Inicial Doble de $${resultado.descuentoInicial}`);
+    // --- Sección Contado ---
+    let arrContado = [];
+    if (resultado.porcentajeContado > 0) arrContado.push(`${resultado.porcentajeContado}%`);
     
-    if (descCreditoArr.length > 0) {
-         let joined = descCreditoArr.join(' y ');
-         precioTexto += `_Incluye descuento exclusivo del ${joined} y Seguro de Vida_\n\n`;
-    } else {
-         precioTexto += `_Incluye Seguro de Vida_\n\n`;
+    // Seleccionar el descuento correcto por m2 para mostrar en contado
+    let isJardinesOrCanaveral = resultado.proyecto.toUpperCase() === "LOS JARDINES" || resultado.proyecto.toUpperCase() === "CAÑAVERAL";
+    let descM2ContadoVal = isJardinesOrCanaveral ? Number(resultado.descuentoContadoM2 || 0) : Number(resultado.descuentoM2 || 0) + Number(resultado.descuentoContadoM2 || 0);
+    
+    if (descM2ContadoVal > 0) {
+        arrContado.push(`$${descM2ContadoVal}/m²`);
     }
 
-    let financiamiento = `📊 *Plan de Financiamiento:*\n` +
-      `▪ *Cuota Inicial:* $ ${resultado.inicial} (Bs. ${resultado.inicialBs})\n` +
-      `▪ *Cuota Mensual:* $ ${resultado.mensual} (Bs. ${resultado.mensualBs})\n` +
-      `▪ *Plazo:* ${resultado.plazo} años\n\n`;
+    let textoDescContado = arrContado.length > 0 ? ` - ¡Con ${arrContado.join(' + ')} de descuento!` : "";
+    const contadoStr = `💰 *Contado${textoDescContado}*\n*Inversión:* $${resultado.valorContado} (Bs. ${resultado.valorContadoBs})\n\n`;
 
-    const cierre = `✔️ Una oportunidad estratégica de alta valorización.\n\n` +
-      `¿Le gustaría agendar una visita al terreno o prefiere una breve llamada para coordinar el cierre? Quedo a su disposición. 🤝`;
+    // --- Sección Crédito ---
+    let arrCredito = [];
+    if (resultado.porcentajeCredito > 0) arrCredito.push(`${resultado.porcentajeCredito}%`);
+    if (resultado.descuentoM2 > 0) arrCredito.push(`$${resultado.descuentoM2}/m²`);
+    if (resultado.descuentoInicial > 0) arrCredito.push(`Bono Inicial Doble`);
+    
+    let textoDescCredito = arrCredito.length > 0 ? ` - ¡Con ${arrCredito.join(' + ')} de descuento!` : "";
+    const creditoStr = `✅ *Crédito${textoDescCredito}*\n*Inversión:* $ ${resultado.valorCredito} (Bs. ${resultado.valorCreditoBs})\n\n`;
 
-    const mensaje = saludo + ubicacion + precioTexto + financiamiento + cierre;
+    // --- Plan de Financiamiento ---
+    const financiamiento = `📊 *Plan de Financiamiento* (${resultado.plazo} años)\n` +
+      `*Cuota inicial:* $${resultado.inicial} (Bs. ${resultado.inicialBs})\n` +
+      `*Cuota mensual:* $${resultado.mensual} (Bs. ${resultado.mensualBs})\n\n`;
+
+    const cierre = `¿Le gustaría agendar una visita al terreno o prefiere una breve llamada para coordinar el cierre? Quedo a su disposición. 🤝`;
+
+    const mensaje = saludo + ubicacion + precioLista + contadoStr + creditoStr + financiamiento + cierre;
     window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
@@ -236,21 +272,14 @@ export default function App() {
         
         {/* CABECERA */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
-          
-          {/* Espaciador invisible para mantener el título centrado */}
-          <div className="hidden md:block w-32">
-          </div>
-
+          <div className="hidden md:block w-32"></div>
           <div className="text-center flex-1">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-blue-600 to-teal-500 drop-shadow-sm uppercase">
               Cotizador
             </h1>
             <p className="text-slate-500 text-sm md:text-base mt-2 font-medium tracking-wide">Plataforma Inteligente de Cierres | Diseñado por Oscar Saravia®</p>
           </div>
-
-          {/* Espaciador invisible derecho para mantener el título centrado */}
-          <div className="hidden md:block w-32">
-          </div>
+          <div className="hidden md:block w-32"></div>
         </div>
 
         <div className="grid lg:grid-cols-12 gap-8 items-start">
@@ -345,16 +374,20 @@ export default function App() {
                     )}
                     {showDescM2 && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">Desc. x m² ($us)</label>
+                        <label className="text-[10px] font-bold text-slate-500">
+                          {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) ? "Crédito x m² ($us)" : "Desc. x m² ($us)"}
+                        </label>
                         <input type="number" step="0.01" value={descuentoM2} onChange={e=>setDescuentoM2(e.target.value)} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
-                        {(proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Tope $500 en sistema</p>}
+                        {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) && <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Tope $500</p>}
                       </div>
                     )}
                     {showDescContadoM2 && (
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500">Contado x m² ($us)</label>
-                        <input type="number" step="0.01" min="0" value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder="Ej. 2" className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
-                        <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Sin límite</p>
+                        <input type="number" step="0.01" min="0" value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={proyecto === "LOS JARDINES" ? "Ej. 2" : "Ej. 4"} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
+                        <p className="text-[9px] text-emerald-600/80 font-bold mt-1">
+                          {proyecto === "CAÑAVERAL" ? "Tope $1,200" : "Sin límite"}
+                        </p>
                       </div>
                     )}
                     {showBonoInicial && proyecto === "OTRO" && (
@@ -377,7 +410,7 @@ export default function App() {
                           onChange={e => setAplicarBonoInicial(e.target.checked)} 
                           className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500/50"
                         />
-                        <span className="text-[11px] font-bold text-slate-700 leading-tight uppercase tracking-wider">Aplicar Bono Inicial Doble</span>
+                        <span className="text-[11px] font-bold text-slate-700 leading-tight uppercase tracking-wider">Aplicar Bono Inicial Doble (Tope $500)</span>
                       </label>
                     </div>
                   )}
