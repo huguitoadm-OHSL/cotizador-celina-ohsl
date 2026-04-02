@@ -20,6 +20,13 @@ export default function App() {
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
   const [aplicarBonoInicial, setAplicarBonoInicial] = useState(false);
 
+  // NUEVOS ESTADOS PARA ACTIVAR/DESACTIVAR DESCUENTOS
+  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(true);
+  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(true);
+  const [aplicarDescM2, setAplicarDescM2] = useState(true);
+  const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(true);
+  const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(true);
+
   // Estados de Inicial
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
@@ -41,6 +48,13 @@ export default function App() {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños("");
     setResultado(null); setProyectoPersonalizado("");
+
+    // Resetear activadores de descuento al cambiar de proyecto
+    setAplicarDescContadoPct(true);
+    setAplicarDescCreditoPct(true);
+    setAplicarDescM2(true);
+    setAplicarDescContadoM2(true);
+    setAplicarBonoInicialOtro(true);
 
     if (proyecto === "MUYURINA" || proyecto === "SANTA FE") {
       setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
@@ -77,10 +91,11 @@ export default function App() {
     const prec = Number(precio);
     const ans = Number(años);
     
-    const descCreditoPct = Number(descuentoCredito) / 100;
-    const descContadoPct = Number(descuentoContado) / 100;
-    const descM2Val = Number(descuentoM2);
-    const descContadoM2Val = Number(descuentoContadoM2);
+    // Condicionar los valores según si el checkbox está activado o no
+    const descCreditoPct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
+    const descContadoPct = aplicarDescContadoPct ? (Number(descuentoContado) / 100) : 0;
+    const descM2Val = aplicarDescM2 ? Number(descuentoM2) : 0;
+    const descContadoM2Val = aplicarDescContadoM2 ? Number(descuentoContadoM2) : 0;
 
     if (!sup || !prec || ans <= 0) {
       setResultado(null);
@@ -109,7 +124,7 @@ export default function App() {
     let descIniVal = 0;
     if ((proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && aplicarBonoInicial) {
        descIniVal = Math.min(cuota_inicial, 500); // Tope Bono Inicial $500
-    } else if (proyecto === "OTRO") {
+    } else if (proyecto === "OTRO" && aplicarBonoInicialOtro) {
        descIniVal = Math.min(Number(descuentoInicial), 500);
     }
 
@@ -175,15 +190,15 @@ export default function App() {
       valorContado: formatMoney(valor_contado),
       valorContadoBs: formatMoney(valor_contado * TIPO_CAMBIO),
       ahorroContado: formatMoney(monto_descuento_total_contado),
-      porcentajeContado: descuentoContado,
-      descuentoContadoM2: descContadoM2Val,
+      porcentajeContado: aplicarDescContadoPct ? descuentoContado : 0,
+      descuentoContadoM2: aplicarDescContadoM2 ? descContadoM2Val : 0,
       
       valorCredito: formatMoney(valor_credito),
       valorCreditoBs: formatMoney(valor_credito * TIPO_CAMBIO),
       ahorroCredito: formatMoney(monto_descuento_total_credito),
-      porcentajeCredito: descuentoCredito,
+      porcentajeCredito: aplicarDescCreditoPct ? descuentoCredito : 0,
       
-      descuentoM2: descM2Val,
+      descuentoM2: aplicarDescM2 ? descM2Val : 0,
       descuentoInicial: descIniVal,
       
       inicial: formatMoney(cuota_inicial),
@@ -199,7 +214,7 @@ export default function App() {
 
   useEffect(() => {
     calcular();
-  }, [modoInicial, aplicarBonoInicial, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2]);
+  }, [modoInicial, aplicarBonoInicial, aplicarBonoInicialOtro, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2]);
 
   // Mensaje de WhatsApp
   const enviarWhatsApp = () => {
@@ -224,8 +239,11 @@ export default function App() {
         arrContado.push(`$${descM2ContadoVal}/m²`);
     }
 
-    let textoDescContado = arrContado.length > 0 ? ` - ¡Con ${arrContado.join(' + ')} de descuento!` : "";
-    const contadoStr = `💰 *Contado${textoDescContado}*\n*Inversión:* $${resultado.valorContado} (Bs. ${resultado.valorContadoBs})\n\n`;
+    let contadoStr = "";
+    if (arrContado.length > 0) {
+        let textoDescContado = ` - ¡Con ${arrContado.join(' + ')} de descuento!`;
+        contadoStr = `💰 *Contado${textoDescContado}*\n*Inversión:* $${resultado.valorContado} (Bs. ${resultado.valorContadoBs})\n\n`;
+    }
 
     // --- Sección Crédito ---
     let arrCredito = [];
@@ -233,8 +251,11 @@ export default function App() {
     if (resultado.descuentoM2 > 0) arrCredito.push(`$${resultado.descuentoM2}/m²`);
     if (resultado.descuentoInicial > 0) arrCredito.push(`Bono Inicial Doble`);
     
-    let textoDescCredito = arrCredito.length > 0 ? ` - ¡Con ${arrCredito.join(' + ')} de descuento!` : "";
-    const creditoStr = `✅ *Crédito${textoDescCredito}*\n*Inversión:* $ ${resultado.valorCredito} (Bs. ${resultado.valorCreditoBs})\n\n`;
+    let creditoStr = "";
+    if (arrCredito.length > 0) {
+        let textoDescCredito = ` - ¡Con ${arrCredito.join(' + ')} de descuento!`;
+        creditoStr = `✅ *Crédito${textoDescCredito}*\n*Inversión:* $ ${resultado.valorCredito} (Bs. ${resultado.valorCreditoBs})\n\n`;
+    }
 
     // --- Plan de Financiamiento ---
     const financiamiento = `📊 *Plan de Financiamiento* (${resultado.plazo} años)\n` +
@@ -243,6 +264,7 @@ export default function App() {
 
     const cierre = `¿Le gustaría agendar una visita al terreno o prefiere una breve llamada para coordinar el cierre? Quedo a su disposición. 🤝`;
 
+    // Solo se concatenarán las secciones que no estén vacías
     const mensaje = saludo + ubicacion + precioLista + contadoStr + creditoStr + financiamiento + cierre;
     window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
@@ -362,41 +384,54 @@ export default function App() {
                     {showDescPorcentaje && (
                       <>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">A Contado (%)</label>
-                          <input type="number" step="0.01" value={descuentoContado} onChange={e=>setDescuentoContado(e.target.value)} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
+                          <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
+                            <input type="checkbox" checked={aplicarDescContadoPct} onChange={e => setAplicarDescContadoPct(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
+                            A Contado (%)
+                          </label>
+                          <input type="number" step="0.01" disabled={!aplicarDescContadoPct} value={descuentoContado} onChange={e=>setDescuentoContado(e.target.value)} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoPct ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500">A Crédito (%)</label>
-                          <input type="number" step="0.01" value={descuentoCredito} onChange={e=>setDescuentoCredito(e.target.value)} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
+                          <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
+                            <input type="checkbox" checked={aplicarDescCreditoPct} onChange={e => setAplicarDescCreditoPct(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
+                            A Crédito (%)
+                          </label>
+                          <input type="number" step="0.01" disabled={!aplicarDescCreditoPct} value={descuentoCredito} onChange={e=>setDescuentoCredito(e.target.value)} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescCreditoPct ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
                         </div>
                       </>
                     )}
                     {showDescM2 && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
+                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
                           {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) ? "Crédito x m² ($us)" : "Desc. x m² ($us)"}
                         </label>
-                        <input type="number" step="0.01" value={descuentoM2} onChange={e=>setDescuentoM2(e.target.value)} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
-                        {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) && <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Tope $500</p>}
+                        <input type="number" step="0.01" disabled={!aplicarDescM2} value={descuentoM2} onChange={e=>setDescuentoM2(e.target.value)} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
+                        {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) && <p className={`text-[9px] font-bold mt-1 ${aplicarDescM2 ? 'text-emerald-600/80' : 'text-slate-400'}`}>Tope $500</p>}
                       </div>
                     )}
                     {showDescContadoM2 && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">Contado x m² ($us)</label>
-                        <input type="number" step="0.01" min="0" value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={proyecto === "LOS JARDINES" ? "Ej. 2" : "Ej. 4"} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
-                        <p className="text-[9px] text-emerald-600/80 font-bold mt-1">
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
+                          Contado x m² ($us)
+                        </label>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={proyecto === "LOS JARDINES" ? "Ej. 2" : "Ej. 4"} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] font-bold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-600/80' : 'text-slate-400'}`}>
                           {proyecto === "CAÑAVERAL" ? "Tope $1,200" : "Sin límite"}
                         </p>
                       </div>
                     )}
                     {showBonoInicial && proyecto === "OTRO" && (
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">Bono Inicial ($us)</label>
-                        <input type="number" step="0.01" max="500" value={descuentoInicial} onChange={e=>{
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
+                          <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
+                          Bono Inicial ($us)
+                        </label>
+                        <input type="number" step="0.01" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={e=>{
                           let v = Number(e.target.value);
                           setDescuentoInicial(v > 500 ? 500 : v);
-                        }} className="w-full bg-white/60 border border-white/60 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all font-bold text-slate-700 text-sm shadow-sm" />
-                        <p className="text-[9px] text-emerald-600/80 font-bold mt-1">Máx. permitido $500</p>
+                        }} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] font-bold mt-1 ${aplicarBonoInicialOtro ? 'text-emerald-600/80' : 'text-slate-400'}`}>Máx. permitido $500</p>
                       </div>
                     )}
                   </div>
@@ -455,7 +490,7 @@ export default function App() {
                         className="w-full bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl p-3 outline-none focus:bg-white/80 focus:ring-2 focus:ring-indigo-400/50 transition-all font-bold text-slate-700 shadow-sm appearance-none pr-8 cursor-pointer"
                       >
                         <option value="" disabled hidden>Selec.</option>
-                        {[...Array(14)].map((_, i) => (
+                        {[...Array(10)].map((_, i) => (
                           <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>
                         ))}
                       </select>
