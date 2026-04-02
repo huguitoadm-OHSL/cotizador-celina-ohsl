@@ -153,15 +153,14 @@ export default function App() {
     const baseSeguro = {
       1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38
     };
-    const baseCBDI = {
-      1: -76.012, 2: -40.519, 3: -28.763, 4: -22.941, 5: -19.493, 6: -17.233, 7: -15.650, 8: -14.492, 9: -13.616, 10: -12.937
-    };
 
     const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1) / refSaldo;
-    const factorCBDI = baseCBDI[ans] ? (baseCBDI[ans] / refSaldo) : (-12.937 / refSaldo);
 
     const seguro = saldo * factorSeguro;
-    const cbdi = saldo * factorCBDI;
+    
+    // FÓRMULA EXACTA DEL CRM CELINA (Extraída del Excel: =(Amortización + Seguro) * 0.0032041199359121)
+    const cbdi = (pago_puro + seguro) * 0.0032041199359121;
+    
     const cuota_final = pago_puro + seguro + cbdi;
 
     const TIPO_CAMBIO = 6.97;
