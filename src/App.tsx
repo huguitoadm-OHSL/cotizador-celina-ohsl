@@ -166,10 +166,7 @@ export default function App() {
 
     // --- CÁLCULO DE CONTADO ---
     let monto_desc_contado_m2 = sup * descContadoM2Val;
-    if (proyecto === "CAÑAVERAL" && descContadoM2Val > 0) {
-      monto_desc_contado_m2 = Math.min(monto_desc_contado_m2, 1200); // Tope 1200 Cañaveral
-    }
-    // Para LOS JARDINES y EL RENACER no hay tope (sin límite)
+    // Eliminado el tope de 1200 para Cañaveral. Ahora todos son sin límite.
 
     let monto_descuento_total_contado = 0;
     if (["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto)) {
@@ -448,7 +445,7 @@ export default function App() {
                         </label>
                         <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={["LOS JARDINES", "EL RENACER"].includes(proyecto) ? "Ej. 3" : "Ej. 4"} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
                         <p className={`text-[9px] font-bold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-600/80' : 'text-slate-400'}`}>
-                          {proyecto === "CAÑAVERAL" ? "Tope $1,200" : "Sin límite"}
+                          Sin límite
                         </p>
                       </div>
                     )}
