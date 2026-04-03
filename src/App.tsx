@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calculator, Send, Map, DollarSign, Percent, Calendar, CheckCircle2, Building2, ChevronRight, FileText, Tag, MapPin, Gift, Sparkles } from "lucide-react";
+import { Calculator, Send, Map, DollarSign, Percent, Calendar, CheckCircle2, Building2, ChevronRight, FileText, Tag, MapPin, Gift } from "lucide-react";
 
 export default function App() {
   const [proyecto, setProyecto] = useState("MUYURINA");
@@ -18,9 +18,8 @@ export default function App() {
   const [descuentoM2, setDescuentoM2] = useState(0);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
-  const [aplicarBonoInicial, setAplicarBonoInicial] = useState(false);
 
-  // NUEVOS ESTADOS PARA ACTIVAR/DESACTIVAR DESCUENTOS
+  // Estados para ACTIVAR/DESACTIVAR DESCUENTOS
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(true);
   const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(true);
   const [aplicarDescM2, setAplicarDescM2] = useState(true);
@@ -57,25 +56,62 @@ export default function App() {
     setAplicarBonoInicialOtro(true);
 
     if (proyecto === "MUYURINA" || proyecto === "SANTA FE") {
-      setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
-    } else if (proyecto === "EL RENACER") {
-      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(2); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
-    } else if (proyecto === "LOS JARDINES") {
+      setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0);
+    } else if (proyecto === "EL RENACER" || proyecto === "LOS JARDINES") {
       setDescuentoCredito(0); setDescuentoContado(0); 
-      setDescuentoM2(1); // 1$ por m2 crédito
+      setDescuentoM2(1); // 1$ por m2 crédito base
       setDescuentoInicial(0); 
-      setDescuentoContadoM2(2); // 2$ por m2 contado
-      setAplicarBonoInicial(true); // Opciones habilitadas
+      setDescuentoContadoM2(3); // 3$ por m2 contado para Jardines y Renacer
     } else if (proyecto === "CAÑAVERAL") {
       setDescuentoCredito(0); setDescuentoContado(0); 
-      setDescuentoM2(1); // 1$ por m2 crédito
+      setDescuentoM2(1); // 1$ por m2 crédito base
       setDescuentoInicial(0); 
       setDescuentoContadoM2(4); // 4$ por m2 contado
-      setAplicarBonoInicial(true); // Opciones habilitadas
     } else if (proyecto === "OTRO") {
-      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0); setAplicarBonoInicial(false);
+      setDescuentoCredito(0); setDescuentoContado(0); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0);
     }
   }, [proyecto]);
+
+  // EFECTO DINÁMICO: Ajuste automático de descuento a crédito según % o Monto Fijo de Cuota Inicial
+  useEffect(() => {
+    let pct = 0;
+
+    if (modoInicial === 'porcentaje') {
+      pct = Number(inicialPorcentaje);
+    } else {
+      // Calcular el porcentaje equivalente si el usuario escribe el Monto en Dólares ($us)
+      const sup = Number(superficie);
+      const prec = Number(precio);
+      const monto = Number(inicialMonto);
+
+      if (sup > 0 && prec > 0 && monto > 0) {
+        const val_orig = sup * prec;
+        const desc_m2_val = aplicarDescM2 ? Number(descuentoM2) : 0;
+        const m_desc_m2 = sup * desc_m2_val;
+        const val_post_desc_m2 = val_orig - m_desc_m2;
+        
+        const desc_cred_pct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
+        const m_desc_cred = val_post_desc_m2 * desc_cred_pct;
+        const base = val_post_desc_m2 - m_desc_cred;
+
+        if (base > 0) {
+          pct = (monto / base) * 100;
+        }
+      }
+    }
+
+    if (pct > 0) {
+      if (proyecto === "MUYURINA" || proyecto === "SANTA FE") {
+        // Se usa 4.99 por tolerancia de decimales en montos fijos
+        if (pct >= 4.99) setDescuentoCredito(23);
+        else setDescuentoCredito(20);
+      } else if (["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto)) {
+        // Se usa 2.99 por tolerancia de decimales en montos fijos
+        if (pct >= 2.99) setDescuentoM2(2);
+        else setDescuentoM2(1);
+      }
+    }
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, descuentoM2, descuentoCredito, aplicarDescM2, aplicarDescCreditoPct]);
 
   const formatMoney = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -106,9 +142,7 @@ export default function App() {
 
     // --- CÁLCULO DE CRÉDITO ---
     let monto_descuento_m2 = sup * descM2Val;
-    if ((proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && descM2Val > 0) {
-      monto_descuento_m2 = Math.min(monto_descuento_m2, 500); // Tope de $500
-    }
+    // Eliminado el tope de $500 para descuento m2 a crédito
     const valor_post_desc_m2 = valor_original - monto_descuento_m2;
 
     const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
@@ -122,9 +156,7 @@ export default function App() {
     }
 
     let descIniVal = 0;
-    if ((proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && aplicarBonoInicial) {
-       descIniVal = Math.min(cuota_inicial, 500); // Tope Bono Inicial $500
-    } else if (proyecto === "OTRO" && aplicarBonoInicialOtro) {
+    if (proyecto === "OTRO" && aplicarBonoInicialOtro) {
        descIniVal = Math.min(Number(descuentoInicial), 500);
     }
 
@@ -135,12 +167,12 @@ export default function App() {
     // --- CÁLCULO DE CONTADO ---
     let monto_desc_contado_m2 = sup * descContadoM2Val;
     if (proyecto === "CAÑAVERAL" && descContadoM2Val > 0) {
-      monto_desc_contado_m2 = Math.min(monto_desc_contado_m2, 1200); // Nuevo Tope Exclusivo $1,200 para Cañaveral
+      monto_desc_contado_m2 = Math.min(monto_desc_contado_m2, 1200); // Tope 1200 Cañaveral
     }
-    // Para LOS JARDINES no hay tope (sin límite)
+    // Para LOS JARDINES y EL RENACER no hay tope (sin límite)
 
     let monto_descuento_total_contado = 0;
-    if (proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") {
+    if (["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto)) {
       const monto_desc_contado_pct = valor_original * descContadoPct;
       monto_descuento_total_contado = monto_desc_contado_m2 + monto_desc_contado_pct;
     } else {
@@ -173,7 +205,7 @@ export default function App() {
 
     const seguro = saldo * factorSeguro;
     
-    // FÓRMULA EXACTA DEL CRM CELINA (Extraída del Excel: =(Amortización + Seguro) * 0.0032041199359121)
+    // FÓRMULA EXACTA DEL CRM CELINA
     const cbdi = (pago_puro + seguro) * 0.0032041199359121;
     
     const cuota_final = pago_puro + seguro + cbdi;
@@ -214,7 +246,7 @@ export default function App() {
 
   useEffect(() => {
     calcular();
-  }, [modoInicial, aplicarBonoInicial, aplicarBonoInicialOtro, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2]);
+  }, [modoInicial, aplicarBonoInicialOtro, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2]);
 
   // Mensaje de WhatsApp
   const enviarWhatsApp = () => {
@@ -231,9 +263,8 @@ export default function App() {
     let arrContado = [];
     if (resultado.porcentajeContado > 0) arrContado.push(`${resultado.porcentajeContado}%`);
     
-    // Seleccionar el descuento correcto por m2 para mostrar en contado
-    let isJardinesOrCanaveral = resultado.proyecto.toUpperCase() === "LOS JARDINES" || resultado.proyecto.toUpperCase() === "CAÑAVERAL";
-    let descM2ContadoVal = isJardinesOrCanaveral ? Number(resultado.descuentoContadoM2 || 0) : Number(resultado.descuentoM2 || 0) + Number(resultado.descuentoContadoM2 || 0);
+    let isProyectosEspeciales = ["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(resultado.proyecto.toUpperCase());
+    let descM2ContadoVal = isProyectosEspeciales ? Number(resultado.descuentoContadoM2 || 0) : Number(resultado.descuentoM2 || 0) + Number(resultado.descuentoContadoM2 || 0);
     
     if (descM2ContadoVal > 0) {
         arrContado.push(`$${descM2ContadoVal}/m²`);
@@ -271,8 +302,8 @@ export default function App() {
 
   const showDescPorcentaje = ["MUYURINA", "SANTA FE", "OTRO"].includes(proyecto);
   const showDescM2 = ["EL RENACER", "LOS JARDINES", "CAÑAVERAL", "OTRO"].includes(proyecto);
-  const showBonoInicial = ["LOS JARDINES", "CAÑAVERAL", "OTRO"].includes(proyecto);
-  const showDescContadoM2 = ["LOS JARDINES", "CAÑAVERAL"].includes(proyecto);
+  const showBonoInicial = ["OTRO"].includes(proyecto); // Solo aplica para OTRO
+  const showDescContadoM2 = ["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto);
 
   return (
     <div className="min-h-screen bg-[#e8eef2] relative font-sans text-slate-800 overflow-hidden selection:bg-indigo-200">
@@ -403,10 +434,10 @@ export default function App() {
                       <div className="space-y-1">
                         <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700 transition-colors">
                           <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
-                          {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) ? "Crédito x m² ($us)" : "Desc. x m² ($us)"}
+                          {["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto) ? "Crédito x m² ($us)" : "Desc. x m² ($us)"}
                         </label>
                         <input type="number" step="0.01" disabled={!aplicarDescM2} value={descuentoM2} onChange={e=>setDescuentoM2(e.target.value)} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
-                        {["LOS JARDINES", "CAÑAVERAL"].includes(proyecto) && <p className={`text-[9px] font-bold mt-1 ${aplicarDescM2 ? 'text-emerald-600/80' : 'text-slate-400'}`}>Tope $500</p>}
+                        {["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto) && <p className={`text-[9px] font-bold mt-1 ${aplicarDescM2 ? 'text-emerald-600/80' : 'text-slate-400'}`}>Sin límite</p>}
                       </div>
                     )}
                     {showDescContadoM2 && (
@@ -415,7 +446,7 @@ export default function App() {
                           <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-3.5 h-3.5 rounded border-slate-300 accent-emerald-500 cursor-pointer" />
                           Contado x m² ($us)
                         </label>
-                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={proyecto === "LOS JARDINES" ? "Ej. 2" : "Ej. 4"} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={["LOS JARDINES", "EL RENACER"].includes(proyecto) ? "Ej. 3" : "Ej. 4"} className={`w-full border rounded-lg p-2.5 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-white/60 border-white/60 text-slate-700 focus:ring-2 focus:ring-emerald-400/50' : 'bg-slate-100/50 border-slate-200/50 text-slate-400 opacity-60 cursor-not-allowed'}`} />
                         <p className={`text-[9px] font-bold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-600/80' : 'text-slate-400'}`}>
                           {proyecto === "CAÑAVERAL" ? "Tope $1,200" : "Sin límite"}
                         </p>
@@ -435,19 +466,6 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  {showBonoInicial && (proyecto === "LOS JARDINES" || proyecto === "CAÑAVERAL") && (
-                    <div className="pt-2 border-t border-white/40">
-                      <label className="flex items-center gap-2.5 cursor-pointer bg-white/50 backdrop-blur-sm p-3 rounded-xl border border-white/60 hover:bg-white/70 transition-colors shadow-sm">
-                        <input 
-                          type="checkbox" 
-                          checked={aplicarBonoInicial} 
-                          onChange={e => setAplicarBonoInicial(e.target.checked)} 
-                          className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500/50"
-                        />
-                        <span className="text-[11px] font-bold text-slate-700 leading-tight uppercase tracking-wider">Aplicar Bono Inicial Doble (Tope $500)</span>
-                      </label>
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-12 gap-4 mt-2">
