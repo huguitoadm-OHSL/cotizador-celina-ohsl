@@ -55,7 +55,7 @@ export default function App() {
     };
   }, []);
 
-  // Lógica Automática de Proyectos
+  // Lógica Automática de Proyectos (Actualizado Convenios 2026)
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños("");
@@ -69,16 +69,16 @@ export default function App() {
     setAplicarDescContadoM2(true);
     setAplicarBonoInicialOtro(true);
 
-    if (proyecto === "MUYURINA" || proyecto === "SANTA FE") {
+    if (proyecto === "MUYURINA") {
       setDescuentoCredito(20); setDescuentoContado(30); setDescuentoM2(0); setDescuentoInicial(0); setDescuentoContadoM2(0);
-    } else if (proyecto === "EL RENACER" || proyecto === "LOS JARDINES") {
+    } else if (proyecto === "EL RENACER" || proyecto === "LOS JARDINES" || proyecto === "SANTA FE" || proyecto === "RANCHO NUEVO") {
       setDescuentoCredito(0); setDescuentoContado(0); 
-      setDescuentoM2(1); // 1$ por m2 crédito base
+      setDescuentoM2(1); // 1$ por m2 crédito base (1.5% a 4.9%)
       setDescuentoInicial(0); 
-      setDescuentoContadoM2(3); // 3$ por m2 contado para Jardines y Renacer
+      setDescuentoContadoM2(3); // 3$ por m2 contado (Sin límite)
     } else if (proyecto === "CAÑAVERAL") {
       setDescuentoCredito(0); setDescuentoContado(0); 
-      setDescuentoM2(1); // 1$ por m2 crédito base
+      setDescuentoM2(1); // 1$ por m2 crédito base (1.5% a 4.9%)
       setDescuentoInicial(0); 
       setDescuentoContadoM2(4); // 4$ por m2 contado
     } else if (proyecto === "OTRO") {
@@ -114,12 +114,12 @@ export default function App() {
     }
 
     if (pct > 0) {
-      if (proyecto === "MUYURINA" || proyecto === "SANTA FE") {
+      if (proyecto === "MUYURINA") {
         if (pct >= 4.99) setDescuentoCredito(23);
         else setDescuentoCredito(20);
-      } else if (["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto)) {
-        if (pct >= 2.99) setDescuentoM2(2);
-        else setDescuentoM2(1);
+      } else if (["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "CAÑAVERAL"].includes(proyecto)) {
+        if (pct >= 5) setDescuentoM2(2); // De 5% en adelante -> $2 de descuento
+        else setDescuentoM2(1);          // De 1.5% al 4.9% -> $1 de descuento
       }
     }
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, descuentoM2, descuentoCredito, aplicarDescM2, aplicarDescCreditoPct]);
@@ -177,7 +177,7 @@ export default function App() {
     let monto_desc_contado_m2 = sup * descContadoM2Val;
 
     let monto_descuento_total_contado = 0;
-    if (["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto)) {
+    if (["SANTA FE", "LOS JARDINES", "CAÑAVERAL", "EL RENACER", "RANCHO NUEVO"].includes(proyecto)) {
       const monto_desc_contado_pct = valor_original * descContadoPct;
       monto_descuento_total_contado = monto_desc_contado_m2 + monto_desc_contado_pct;
     } else {
@@ -287,7 +287,7 @@ export default function App() {
     let arrContado = [];
     if (resultado.porcentajeContado > 0) arrContado.push(`${resultado.porcentajeContado}%`);
     
-    let isProyectosEspeciales = ["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(resultado.proyecto.toUpperCase());
+    let isProyectosEspeciales = ["SANTA FE", "LOS JARDINES", "CAÑAVERAL", "EL RENACER", "RANCHO NUEVO"].includes(resultado.proyecto.toUpperCase());
     let descM2ContadoVal = isProyectosEspeciales ? Number(resultado.descuentoContadoM2 || 0) : Number(resultado.descuentoM2 || 0) + Number(resultado.descuentoContadoM2 || 0);
     
     if (descM2ContadoVal > 0) {
@@ -335,10 +335,10 @@ export default function App() {
     }, 150);
   };
 
-  const showDescPorcentaje = ["MUYURINA", "SANTA FE", "OTRO"].includes(proyecto);
-  const showDescM2 = ["EL RENACER", "LOS JARDINES", "CAÑAVERAL", "OTRO"].includes(proyecto);
+  const showDescPorcentaje = ["MUYURINA", "OTRO"].includes(proyecto);
+  const showDescM2 = ["SANTA FE", "EL RENACER", "LOS JARDINES", "CAÑAVERAL", "RANCHO NUEVO", "OTRO"].includes(proyecto);
   const showBonoInicial = ["OTRO"].includes(proyecto);
-  const showDescContadoM2 = ["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto);
+  const showDescContadoM2 = ["SANTA FE", "LOS JARDINES", "CAÑAVERAL", "EL RENACER", "RANCHO NUEVO"].includes(proyecto);
 
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-200 overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -483,6 +483,7 @@ export default function App() {
                     <option value="EL RENACER">EL RENACER</option>
                     <option value="LOS JARDINES">LOS JARDINES</option>
                     <option value="CAÑAVERAL">CAÑAVERAL</option>
+                    <option value="RANCHO NUEVO">RANCHO NUEVO</option>
                     <option value="OTRO">OTRO...</option>
                   </select>
                   {proyecto === "OTRO" && (
@@ -561,10 +562,10 @@ export default function App() {
                       <div className="space-y-1.5">
                         <label className="flex items-center gap-2 text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
                           <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" />
-                          {["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto) ? "Crédito x m² ($us)" : "Desc. x m² ($us)"}
+                          {["SANTA FE", "LOS JARDINES", "CAÑAVERAL", "EL RENACER", "RANCHO NUEVO"].includes(proyecto) ? "Crédito x m² ($us)" : "Desc. x m² ($us)"}
                         </label>
                         <input type="number" step="0.01" disabled={!aplicarDescM2} value={descuentoM2} onChange={e=>setDescuentoM2(e.target.value)} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                        {["LOS JARDINES", "CAÑAVERAL", "EL RENACER"].includes(proyecto) && <p className={`text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Sin límite</p>}
+                        {["SANTA FE", "LOS JARDINES", "CAÑAVERAL", "EL RENACER", "RANCHO NUEVO"].includes(proyecto) && <p className={`text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Sin límite</p>}
                       </div>
                     )}
                     {showDescContadoM2 && (
@@ -573,7 +574,7 @@ export default function App() {
                           <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" />
                           Contado x m² ($us)
                         </label>
-                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={["LOS JARDINES", "EL RENACER"].includes(proyecto) ? "Ej. 3" : "Ej. 4"} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder={["SANTA FE", "LOS JARDINES", "EL RENACER", "RANCHO NUEVO"].includes(proyecto) ? "Ej. 3" : "Ej. 4"} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
                         <p className={`text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Sin límite</p>
                       </div>
                     )}
