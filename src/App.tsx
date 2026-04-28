@@ -95,6 +95,7 @@ export default function App() {
   const [resultado, setResultado] = useState(null);
   const [mostrarPlan, setMostrarPlan] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [copiado, setCopiado] = useState(false);
   
   const resultadosRef = useRef(null);
 
@@ -339,6 +340,9 @@ export default function App() {
   const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 
   const calcular = () => {
+    // Si se ingreso porcentaje, el monto es opcional. Si se ingreso monto, el porcentaje es opcional.
+    let cuota_inicial = 0;
+    let descIniVal = 0;
     const sup = Number(superficie); const prec = Number(precio); const ans = Number(años);
     const descCreditoPct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
     const descContadoPct = aplicarDescContadoPct ? (Number(descuentoContado) / 100) : 0;
@@ -353,8 +357,13 @@ export default function App() {
     const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
     const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
     
-    let cuota_inicial = modoInicial === 'porcentaje' ? base_para_inicial * (Number(inicialPorcentaje) / 100) : Number(inicialMonto);
-    let descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min(Number(descuentoInicial), 500) : 0;
+    if (modoInicial === 'porcentaje') {
+       cuota_inicial = base_para_inicial * (Number(inicialPorcentaje) / 100);
+    } else {
+       cuota_inicial = Number(inicialMonto);
+    }
+
+    descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min(Number(descuentoInicial), 500) : 0;
 
     const monto_descuento_total_credito = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
     const valor_credito = valor_original - monto_descuento_total_credito;
@@ -407,10 +416,15 @@ export default function App() {
       plazo: ans, planPagos: planPagosArreglo,
       timestampId: new Date().getTime()
     });
+    setCopiado(false); // Resetear estado de copiado al recalcular
   };
 
-  const enviarWhatsApp = () => {
-    if (!resultado) return;
+  useEffect(() => {
+    if(años && precio && superficie) calcular();
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2, categoria, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, aplicarBonoInicialOtro]);
+
+  const getTextToCopy = () => {
+    if (!resultado) return "";
     const saludo = "Estimado cliente, un gusto saludarle. Presento la propuesta de inversión:\n\n";
     const nombreProyectoCapitalizado = resultado.proyecto.charAt(0).toUpperCase() + resultado.proyecto.slice(1).toLowerCase();
     const catStr = resultado.categoria && resultado.categoria !== "ESTÁNDAR" ? `\n🏷️ ${resultado.categoria}` : '';
@@ -434,7 +448,43 @@ export default function App() {
     const financiamiento = `📊 *Plan de Financiamiento* (${resultado.plazo} años)\n*Cuota inicial:* $${resultado.inicial} (Bs. ${resultado.inicialBs})\n*Cuota mensual:* $${resultado.mensual} (Bs. ${resultado.mensualBs})\n\n`;
     const cierre = `¿Le gustaría agendar una visita al terreno o prefiere una breve llamada para coordinar el cierre? Quedo a su disposición. 🤝`;
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(saludo + ubicacion + precioLista + contadoStr + creditoStr + financiamiento + cierre)}`, '_blank');
+    return saludo + ubicacion + precioLista + contadoStr + creditoStr + financiamiento + cierre;
+  };
+
+  const enviarWhatsApp = () => {
+    if (!resultado) return;
+    const mensaje = getTextToCopy();
+    window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
+  };
+
+  const copiarTexto = () => {
+    if (!resultado) return;
+    const mensaje = getTextToCopy();
+    // Intenta usar la API moderna del portapapeles, si falla usa el método clásico
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(mensaje).then(() => {
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 2000);
+        });
+    } else {
+        // Fallback para entornos menos seguros o iframes
+        let textArea = document.createElement("textarea");
+        textArea.value = mensaje;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 2000);
+        } catch (error) {
+            console.error('No se pudo copiar al portapapeles', error);
+        }
+        textArea.remove();
+    }
   };
 
   const handleProcesar = (e) => {
@@ -942,10 +992,16 @@ export default function App() {
                   </div>
 
                   <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-700/80">
-                    <button onClick={enviarWhatsApp} className="w-full bg-gradient-to-r from-[#20bd5a] to-[#25D366] hover:from-[#1da850] hover:to-[#20bd5a] text-slate-900 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:shadow-[0_0_35px_rgba(37,211,102,0.6)] hover:-translate-y-1 text-sm sm:text-lg uppercase tracking-wider relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-white/30 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
-                      <Send className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" /> <span className="relative z-10">Enviar Propuesta por WhatsApp</span>
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button onClick={copiarTexto} className="w-full sm:w-1/3 bg-transparent hover:bg-slate-800 border border-[#48b5db] text-[#48b5db] font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden group">
+                          {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 relative z-10" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />}
+                          <span className="relative z-10">{copiado ? 'COPIADO' : 'COPIAR TODO'}</span>
+                        </button>
+                        <button onClick={enviarWhatsApp} className="w-full sm:w-2/3 bg-gradient-to-r from-[#20bd5a] to-[#25D366] hover:from-[#1da850] hover:to-[#20bd5a] text-slate-900 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:shadow-[0_0_35px_rgba(37,211,102,0.6)] hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden group">
+                          <div className="absolute inset-0 bg-white/30 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
+                          <Send className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" /> <span className="relative z-10">Enviar Propuesta por WhatsApp</span>
+                        </button>
+                    </div>
                   </div>
                 </div>
               </div>
