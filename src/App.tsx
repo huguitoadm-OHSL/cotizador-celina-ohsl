@@ -61,16 +61,16 @@ const descGroup7_15PCT = ["ROSA DE RODALI"];
 
 
 export default function App() {
-  // Inicialización por defecto en MONTERO y MUYURINA
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
   
-  // Estado para almacenar los lotes descargados del JSON
+  // Estado para la Base de Datos
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
+  const [usarBD, setUsarBD] = useState(true);
 
-  // Inicializados vacíos
+  // Inicializados
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
@@ -78,9 +78,6 @@ export default function App() {
   const [precio, setPrecio] = useState("");
   const [categoria, setCategoria] = useState("ESTÁNDAR");
   
-  // Estado para la Base de Datos
-  const [usarBD, setUsarBD] = useState(true);
-
   // Estados de Descuentos
   const [descuentoCredito, setDescuentoCredito] = useState(20);
   const [descuentoContado, setDescuentoContado] = useState(30);
@@ -88,7 +85,7 @@ export default function App() {
   const [descuentoInicial, setDescuentoInicial] = useState(0);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
 
-  // Estados para ACTIVAR/DESACTIVAR DESCUENTOS
+  // Activadores
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(true);
   const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(true);
   const [aplicarDescM2, setAplicarDescM2] = useState(true);
@@ -104,11 +101,10 @@ export default function App() {
   const [resultado, setResultado] = useState(null);
   const [mostrarPlan, setMostrarPlan] = useState(false);
   
-  // Referencia para auto-scroll
   const resultadosRef = useRef(null);
 
   // ==========================================================================
-  // CARGA DE BASE DE DATOS (JSON) ROBUSTA
+  // CARGA Y LIMPIEZA DE BASE DE DATOS (JSON)
   // ==========================================================================
   useEffect(() => {
     const cargarLotes = async () => {
@@ -119,20 +115,29 @@ export default function App() {
           if (!response.ok) throw new Error('Fallo la ruta local');
           rawData = await response.json();
         } catch (e) {
-          const githubRawUrl = 'https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json';
+          // Usamos un timestamp para burlar el caché de GitHub y traer siempre la última versión
+          const timestamp = new Date().getTime();
+          const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
           const fallbackResponse = await fetch(githubRawUrl);
           if (!fallbackResponse.ok) throw new Error('No se pudo descargar desde GitHub');
           rawData = await fallbackResponse.json();
         }
 
-        // Normalización extendida para incluir la columna "Categoría"
+        // Función para arreglar comas por puntos en los números
+        const parseNum = (val) => {
+            if (val === undefined || val === null) return 0;
+            if (typeof val === 'number') return val;
+            const strVal = String(val).replace(',', '.').replace(/[^0-9.-]/g, '');
+            return Number(strVal) || 0;
+        };
+
         const normalizedData = rawData.map(item => ({
             proyecto: String(item.Proyecto || item.proyecto || item.PROYECTO || "").trim().toUpperCase(),
-            uv: String(item.uv || item.Uv || item.UV || "").trim(),
+            uv: String(item.uv || item.Uv || item.UV || "").trim() || "S/N", // Si está vacío, le ponemos S/N
             mzn: String(item.mzn || item.Mzn || item.MZN || "").trim(),
             lote: String(item.lote || item.Lote || item.LOTE || "").trim(),
-            superficie: Number(item.superficie || item.Superficie || item.SUPERFICIE || 0),
-            precio: Number(item.precio || item.Precio || item.PRECIO || 0),
+            superficie: parseNum(item.superficie || item.Superficie || item.SUPERFICIE),
+            precio: parseNum(item.precio || item.Precio || item.PRECIO),
             estado: String(item.estado || item.Estado || item.ESTADO || "LIBRE").trim().toUpperCase(),
             categoria: String(item.categoria || item.Categoria || item.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
         }));
@@ -153,7 +158,6 @@ export default function App() {
     cargarLotes();
   }, []);
 
-  // Inyectar fuente y animaciones CSS
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
@@ -162,14 +166,13 @@ export default function App() {
     return () => document.head.removeChild(link);
   }, []);
 
-  // Actualizar proyectos al cambiar de regional (Evitar sobreescritura si ya es Montero/Muyurina en carga inicial)
   useEffect(() => {
     if (!proyectosPorRegional[regional].includes(proyecto)) {
       setProyecto(proyectosPorRegional[regional]?.[0] || "OTRO");
     }
   }, [regional]);
 
-  // Lógica Automática Inicial según grupo
+  // Reset al cambiar de proyecto
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("ESTÁNDAR");
@@ -198,55 +201,75 @@ export default function App() {
   }, [proyecto]);
 
   // ==========================================================================
-  // AUTO-COMPLETAR CON BD
+  // AUTO-COMPLETAR CON BD EN CASCADA (UV -> MZN -> LOTE)
   // ==========================================================================
   const lotesDelProyecto = baseDeDatosLotes.filter(l => 
     l.proyecto === proyecto || 
     l.proyecto === `CELINA ${proyecto}` ||
-    (proyecto === "CELINA 5" && l.proyecto === "CELINA V") ||
-    (proyecto === "CELINA 4" && l.proyecto === "CELINA IV") ||
-    (proyecto === "CELINA 3" && l.proyecto === "CELINA III")
+    l.proyecto.includes(proyecto) || // Coincidencia parcial amplia
+    (proyecto === "CELINA 5" && (l.proyecto === "CELINA V" || l.proyecto.includes("CELINA V"))) ||
+    (proyecto === "CELINA 4" && (l.proyecto === "CELINA IV" || l.proyecto.includes("CELINA IV"))) ||
+    (proyecto === "CELINA 3" && (l.proyecto === "CELINA III" || l.proyecto.includes("CELINA III")))
   );
+  
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
-  const mznsDisponibles = [...new Set(lotesDelProyecto.map(l => l.mzn))].sort((a,b)=> Number(a) - Number(b));
-  const lotesDisponibles = lotesDelProyecto.filter(l => l.mzn === mzn).map(l => l.lote).sort((a,b)=> Number(a) - Number(b));
+  // Extraer UVs, MZN y Lotes de forma segura
+  const uvsDisponibles = [...new Set(lotesDelProyecto.map(l => l.uv))].sort((a,b)=> Number(a) - Number(b));
+  
+  useEffect(() => {
+    if (modoBD && uvsDisponibles.length > 0 && (!uv || !uvsDisponibles.includes(uv))) {
+      setUv(uvsDisponibles[0]);
+    }
+  }, [modoBD, uvsDisponibles, uv]);
+
+  const mznsDisponibles = [...new Set(lotesDelProyecto.filter(l => l.uv === uv).map(l => l.mzn))].sort((a,b)=> {
+    const numA = Number(a.replace(/[^0-9]/g, ''));
+    const numB = Number(b.replace(/[^0-9]/g, ''));
+    return numA - numB;
+  });
 
   useEffect(() => {
-    if (modoBD && mznsDisponibles.length > 0 && !mznsDisponibles.includes(mzn)) setMzn(mznsDisponibles[0]);
-  }, [modoBD, mznsDisponibles, mzn]);
+    if (modoBD && mznsDisponibles.length > 0 && (!mzn || !mznsDisponibles.includes(mzn))) {
+      setMzn(mznsDisponibles[0]);
+    }
+  }, [modoBD, mznsDisponibles, mzn, uv]);
+
+  const lotesDisponibles = lotesDelProyecto.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort((a,b)=> {
+    const numA = Number(a.replace(/[^0-9]/g, ''));
+    const numB = Number(b.replace(/[^0-9]/g, ''));
+    return numA - numB;
+  });
 
   useEffect(() => {
-    if (modoBD && mzn && lotesDisponibles.length > 0 && !lotesDisponibles.includes(lote)) setLote(lotesDisponibles[0]);
-  }, [modoBD, mzn, lotesDisponibles, lote]);
+    if (modoBD && lotesDisponibles.length > 0 && (!lote || !lotesDisponibles.includes(lote))) {
+      setLote(lotesDisponibles[0]);
+    }
+  }, [modoBD, lotesDisponibles, lote, mzn, uv]);
 
+  // Rellenar Superficie y Precio Final
   useEffect(() => {
-    if (modoBD && mzn && lote) {
-      const loteEncontrado = lotesDelProyecto.find(l => l.mzn === mzn && l.lote === lote);
+    if (modoBD && uv && mzn && lote) {
+      const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
         setPrecio(loteEncontrado.precio.toString());
-        if(loteEncontrado.uv) setUv(loteEncontrado.uv);
         if(loteEncontrado.categoria) setCategoria(loteEncontrado.categoria);
       }
     }
-  }, [modoBD, mzn, lote, lotesDelProyecto]);
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
 
   // ==========================================================================
-  // EFECTO DINÁMICO E INTELIGENTE: Descuentos por Categoría de Lote
+  // EFECTO DINÁMICO: Descuentos
   // ==========================================================================
   useEffect(() => {
     let pct = 0;
-
     if (modoInicial === 'porcentaje') {
       pct = Number(inicialPorcentaje);
     } else {
-      const sup = Number(superficie);
-      const prec = Number(precio);
-      const monto = Number(inicialMonto);
-
+      const sup = Number(superficie); const prec = Number(precio); const monto = Number(inicialMonto);
       if (sup > 0 && prec > 0 && monto > 0) {
         const val_orig = sup * prec;
         const desc_m2_val = aplicarDescM2 ? Number(descuentoM2) : 0;
@@ -284,15 +307,10 @@ export default function App() {
     }
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, descuentoM2, descuentoCredito, aplicarDescM2, aplicarDescCreditoPct]);
 
-  const formatMoney = (amount) => {
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-  };
+  const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 
   const calcular = () => {
-    const sup = Number(superficie);
-    const prec = Number(precio);
-    const ans = Number(años);
-    
+    const sup = Number(superficie); const prec = Number(precio); const ans = Number(años);
     const descCreditoPct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
     const descContadoPct = aplicarDescContadoPct ? (Number(descuentoContado) / 100) : 0;
     const descM2Val = aplicarDescM2 ? Number(descuentoM2) : 0;
@@ -301,8 +319,6 @@ export default function App() {
     if (!sup || !prec || ans <= 0) { setResultado(null); return; }
 
     const valor_original = sup * prec;
-
-    // CRÉDITO
     let monto_descuento_m2 = sup * descM2Val;
     const valor_post_desc_m2 = valor_original - monto_descuento_m2;
     const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
@@ -314,7 +330,6 @@ export default function App() {
     const monto_descuento_total_credito = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
     const valor_credito = valor_original - monto_descuento_total_credito;
     
-    // CONTADO
     let monto_desc_contado_m2 = sup * descContadoM2Val;
     let monto_descuento_total_contado = 0;
     if (descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto)) {
@@ -324,14 +339,10 @@ export default function App() {
     }
     const valor_contado = valor_original - monto_descuento_total_contado;
 
-    // MATEMÁTICA
     const saldo = valor_credito - cuota_inicial;
     const meses = ans * 12;
-    const tasa_anual = 0.121733; 
-    const tasa = tasa_anual / 12;
-
+    const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
     let pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
-
     const refSaldo = 34278.00;
     const baseSeguro = { 1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38 };
     const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1) / refSaldo;
@@ -339,11 +350,9 @@ export default function App() {
     const seguro = saldo * factorSeguro;
     const cbdi = 0;
     const cuota_final = pago_puro + seguro + cbdi;
-
     const TIPO_CAMBIO = 6.97;
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
 
-    // PLAN DE PAGOS (10 A 1 AÑOS)
     let planPagosArreglo = [];
     for (let i = 10; i >= 1; i--) {
       const m_i = i * 12;
@@ -416,7 +425,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-200 overflow-x-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
       
-      {/* Estilos para animaciones custom y Dark Glassmorphism */}
       <style>{`
         @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
         @keyframes shimmer { 100% { transform: translateX(100%); } }
@@ -431,7 +439,7 @@ export default function App() {
         select option { background: #0f172a; color: #f8fafc; }
       `}</style>
 
-      {/* DIBUJO DESCOMUNAL: Mapa Isométrico */}
+      {/* MAPA ISOMÉTRICO */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.25] flex items-center justify-center mix-blend-screen animate-float">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]" xmlns="http://www.w3.org/2000/svg">
           <g transform="translate(500, 400) scale(1.6)">
@@ -452,21 +460,18 @@ export default function App() {
         </svg>
       </div>
 
-      {/* BACKGROUND ORBS */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-emerald-900/40 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
         <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-teal-800/30 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
         <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-cyan-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
       </div>
 
-      {/* Marca de Agua */}
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0">
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800/80 font-black tracking-[0.5em] text-3xl select-none">CELINA PREMIUM</div>
       </div>
 
       <div className="max-w-[1280px] mx-auto py-10 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10">
         
-        {/* CABECERA */}
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative">
           <div className="hidden md:block w-32"></div>
           <div className="text-center flex-1 flex flex-col items-center">
@@ -502,88 +507,75 @@ export default function App() {
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <Map className="w-4 h-4 text-teal-400" /> Regional
                   </label>
-                  <select 
-                    value={regional}
-                    onChange={e => setRegional(e.target.value)} 
-                    className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none" 
-                  >
-                    {Object.keys(proyectosPorRegional).map(reg => (
-                      <option key={reg} value={reg}>{reg}</option>
-                    ))}
+                  <select value={regional} onChange={e => setRegional(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
+                    {Object.keys(proyectosPorRegional).map(reg => <option key={reg} value={reg}>{reg}</option>)}
                   </select>
                 </div>
                 
                 {/* PROYECTO */}
-                <div className="space-y-2.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-teal-400" /> Proyecto
-                  </label>
-                  <select 
-                    value={proyecto}
-                    onChange={e => setProyecto(e.target.value)} 
-                    className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none" 
-                  >
-                    {proyectosPorRegional[regional]?.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
+                <div className="space-y-2.5 relative">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-teal-400" /> Proyecto
+                    </label>
+                    {cargandoBD ? (
+                      <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1 rounded-full bg-amber-500/10">
+                        <div className="w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin"></div> Cargando BD...
+                      </span>
+                    ) : tieneBD ? (
+                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-[#0f2c3a] text-[#48b5db] border border-[#1e5875] shadow-[0_0_10px_rgba(72,181,219,0.2)]' : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}>
+                        {usarBD ? <Database className="w-3 h-3 text-[#48b5db]"/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
+                      </button>
+                    ) : null}
+                  </div>
+                  <select value={proyecto} onChange={e => setProyecto(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
+                    {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
                     <option value="OTRO">OTRO...</option>
                   </select>
-                  {proyecto === "OTRO" && (
-                    <input 
-                      type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} 
-                      className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-semibold mt-3" 
-                      placeholder="Escribe el nombre del proyecto..."
-                    />
-                  )}
-                </div>
-
-                {/* CONTROLES BD */}
-                <div className="flex items-center justify-between mt-5 sm:mt-6 mb-3 pt-4 border-t border-slate-700/50">
-                  <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1 sm:gap-2">
-                    <MapPin className="w-4 h-4 text-teal-400" /> Ubicación del Lote
-                  </label>
-                  {cargandoBD ? (
-                    <span className="text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                      <div className="w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin"></div>
-                      Cargando Inventario...
-                    </span>
-                  ) : tieneBD ? (
-                    <button 
-                      type="button"
-                      onClick={() => setUsarBD(!usarBD)}
-                      className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}
-                    >
-                      {usarBD ? <Database className="w-3 h-3"/> : <Edit2 className="w-3 h-3"/>}
-                      {usarBD ? 'Usando Base de Datos' : 'Ingreso Manual'}
-                    </button>
-                  ) : null}
+                  {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-semibold mt-3" placeholder="Escribe el nombre del proyecto..." />}
                 </div>
 
                 {/* UV / MZN / LOTE */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                  <div className="space-y-2 text-center group">
-                    <label className="text-[9px] sm:text-[10px] font-bold text-slate-500 group-hover:text-emerald-400 transition-colors uppercase tracking-widest">UV</label>
-                    <input type="text" value={uv} onChange={e => setUv(e.target.value)} placeholder="Ej. 49" className="w-full glass-input rounded-2xl p-3 sm:p-3.5 text-center text-sm sm:text-base font-bold transition-all placeholder-slate-600" />
-                  </div>
-                  <div className="space-y-2 text-center group">
-                    <label className="text-[9px] sm:text-[10px] font-bold text-slate-500 group-hover:text-emerald-400 transition-colors uppercase tracking-widest">MZN</label>
-                    {modoBD ? (
-                       <select value={mzn} onChange={e => setMzn(e.target.value)} className="w-full glass-input rounded-2xl p-3 sm:p-3.5 text-center text-sm sm:text-base font-bold appearance-none cursor-pointer bg-emerald-950/20 border-emerald-500/30 text-emerald-100">
-                         {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-                       </select>
-                    ) : (
-                       <input type="text" value={mzn} onChange={e => setMzn(e.target.value)} placeholder="Ej. 6" className="w-full glass-input rounded-2xl p-3 sm:p-3.5 text-center text-sm sm:text-base font-bold transition-all placeholder-slate-600" />
-                    )}
-                  </div>
-                  <div className="space-y-2 text-center group">
-                    <label className="text-[9px] sm:text-[10px] font-bold text-slate-500 group-hover:text-emerald-400 transition-colors uppercase tracking-widest">LOTE</label>
-                    {modoBD ? (
-                       <select value={lote} onChange={e => setLote(e.target.value)} className="w-full glass-input rounded-2xl p-3 sm:p-3.5 text-center text-sm sm:text-base font-bold appearance-none cursor-pointer bg-emerald-950/20 border-emerald-500/30 text-emerald-100">
-                         {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
-                       </select>
-                    ) : (
-                       <input type="text" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej. 9" className="w-full glass-input rounded-2xl p-3 sm:p-3.5 text-center text-sm sm:text-base font-bold transition-all placeholder-slate-600" />
-                    )}
+                <div className="pt-3 border-t border-slate-700/50">
+                  <div className="bg-[#0b172a] border border-[#1e3a5f] rounded-[1.5rem] p-4 flex flex-col gap-3 relative shadow-inner">
+                    
+                    <div className="flex items-center gap-2 mb-1">
+                      <MapPin className="w-4 h-4 text-[#48b5db]" />
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                      <div className="space-y-1.5 text-center flex flex-col">
+                        <label className="text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">UV</label>
+                        {modoBD ? (
+                           <select value={uv} onChange={e => setUv(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
+                           </select>
+                        ) : (
+                           <input type="text" value={uv} onChange={e => setUv(e.target.value)} placeholder="Ej. 49" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                        )}
+                      </div>
+                      <div className="space-y-1.5 text-center flex flex-col">
+                        <label className="text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">MZN</label>
+                        {modoBD ? (
+                           <select value={mzn} onChange={e => setMzn(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
+                           </select>
+                        ) : (
+                           <input type="text" value={mzn} onChange={e => setMzn(e.target.value)} placeholder="Ej. 6" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                        )}
+                      </div>
+                      <div className="space-y-1.5 text-center flex flex-col">
+                        <label className="text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">LOTE</label>
+                        {modoBD ? (
+                           <select value={lote} onChange={e => setLote(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+                           </select>
+                        ) : (
+                           <input type="text" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej. 9" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -601,14 +593,14 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5"><Map className="w-4 h-4 text-emerald-400" /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
                     </label>
-                    <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-600 ${modoBD ? 'bg-slate-800/80 border border-emerald-500/30 text-emerald-50' : 'glass-input'}`} />
+                    <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-600 ${modoBD ? 'bg-[#0d1f36] border border-[#1e3a5f] text-[#48b5db] shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]' : 'glass-input'}`} />
                   </div>
 
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-emerald-400" /> Precio <span className="text-slate-600 normal-case">/ m²</span></span>
                     </label>
-                    <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-600 ${modoBD ? 'bg-slate-800/80 border border-emerald-500/30 text-emerald-50' : 'glass-input'}`} />
+                    <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-600 ${modoBD ? 'bg-[#0d1f36] border border-[#1e3a5f] text-[#48b5db] shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]' : 'glass-input'}`} />
                   </div>
                 </div>
 
