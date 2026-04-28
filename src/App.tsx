@@ -22,8 +22,7 @@ const proyectosPorRegional = {
     "TAMARINDO",
     "JARDINES DEL BOSQUE",
     "EL PORVENIR",
-    "EL PORVENIR FASE 2",
-    "PARAÍSO DEL NORTE"
+    "EL PORVENIR FASE 2"
   ],
   "MONTERO": [
     "MUYURINA",
@@ -50,14 +49,14 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// AGRUPACIONES POR REGLAS DE DESCUENTOS (Según Promociones 2026)
+// AGRUPACIONES POR REGLAS DE DESCUENTOS
 // ============================================================================
 const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2"];
 const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3"];
 const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
 const descGroup4_30PCT = ["MUYURINA", "CELINA VII FASE 1", "CELINA VII FASE 2", "CELINA X", "TAMARINDO", "CLARA CHUCHIO", "URUBÓ NORTE", "CELINA 8"];
 const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "CELINA PAILÓN", "VILLA BELLA VIVIENDAS"];
-const descGroup6_20PCT = ["PRADERAS DEL NORTE", "PARAÍSO DEL NORTE"];
+const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
 
 export default function App() {
@@ -65,12 +64,10 @@ export default function App() {
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
   
-  // Estado para la Base de Datos
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
 
-  // Inicializados VACÍOS
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
@@ -78,14 +75,12 @@ export default function App() {
   const [precio, setPrecio] = useState("");
   const [categoria, setCategoria] = useState("");
   
-  // Estados de Descuentos
   const [descuentoCredito, setDescuentoCredito] = useState(20);
   const [descuentoContado, setDescuentoContado] = useState(30);
   const [descuentoM2, setDescuentoM2] = useState(0);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
 
-  // Activadores
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(true);
   const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(true);
   const [aplicarDescM2, setAplicarDescM2] = useState(true);
@@ -104,7 +99,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   // ==========================================================================
-  // CARGA Y LIMPIEZA EXTREMA DE BASE DE DATOS (JSON)
+  // CARGA DE BASE DE DATOS
   // ==========================================================================
   useEffect(() => {
     const cargarLotes = async () => {
@@ -131,7 +126,7 @@ export default function App() {
 
         const normalizedData = rawData.map(item => ({
             proyecto: String(item.Proyecto || item.proyecto || item.PROYECTO || "").trim().toUpperCase(),
-            uv: String(item.uv || item.Uv || item.UV || "").trim().toUpperCase() || "SN", // Convertimos a mayúsculas "sn" -> "SN"
+            uv: String(item.uv || item.Uv || item.UV || "").trim().toUpperCase() || "SN", 
             mzn: String(item.mzn || item.Mzn || item.MZN || "").trim().toUpperCase(),
             lote: String(item.lote || item.Lote || item.LOTE || "").trim().toUpperCase(),
             superficie: parseNum(item.superficie || item.Superficie || item.SUPERFICIE),
@@ -170,7 +165,7 @@ export default function App() {
     }
   }, [regional]);
 
-  // Manejadores de cascada (Limpian hacia adelante)
+  // Manejadores de cascada
   const handleUvChange = (e) => {
     setUv(e.target.value);
     setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
@@ -185,7 +180,7 @@ export default function App() {
     setLote(e.target.value);
   };
 
-  // Reset TOTAL al cambiar de proyecto (Garantiza que inicie vacío)
+  // Reset TOTAL al cambiar de proyecto
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
@@ -214,7 +209,7 @@ export default function App() {
   }, [proyecto]);
 
   // ==========================================================================
-  // MOTOR INTELIGENTE DE ALIAS Y BÚSQUEDA ALFANUMÉRICA
+  // MOTOR INTELIGENTE DE ALIAS
   // ==========================================================================
   const getAlias = (p) => {
     const aliases = [p, `CELINA ${p}`];
@@ -250,14 +245,12 @@ export default function App() {
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
-  // Ordenamiento Alfanumérico Inteligente (Lee correctamente 'SF3', 'JB', '118')
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   
   const uvsDisponibles = [...new Set(lotesDelProyecto.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesDelProyecto.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesDelProyecto.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
 
-  // Evitar auto-selección (Asegura que si cambia el proyecto o el padre, el hijo se borre si ya no es válido)
   useEffect(() => {
     if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv("");
   }, [modoBD, uvsDisponibles, uv]);
@@ -270,7 +263,7 @@ export default function App() {
     if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote("");
   }, [modoBD, lotesDisponibles, lote]);
 
-  // Rellenar Superficie y Precio Final CUANDO los 3 están llenos
+  // Rellenar Superficie y Precio Final
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
@@ -284,8 +277,24 @@ export default function App() {
 
 
   // ==========================================================================
-  // EFECTO DINÁMICO E INTELIGENTE: Descuentos Automáticos por Categoría
+  // LÓGICA DE DESCUENTOS Y RESTRICCIONES PREMIUM
   // ==========================================================================
+  // Identificar si el lote es premium para activar el candado visual e interno
+  const isPremiumLote = categoria.toUpperCase().includes('AVENIDA') || categoria.toUpperCase().includes('PARQUE') || categoria.toUpperCase().includes('RADIAL');
+  
+  // Calcular el monto en dólares exacto que representa el 5% mínimo (Para bloquear la casilla de monto)
+  let minMontoPremium = 0;
+  if (isPremiumLote && superficie && precio) {
+      const sup = Number(superficie); const prec = Number(precio);
+      const val_orig = sup * prec;
+      const desc_m2_val = aplicarDescM2 ? Number(descuentoM2) : 0;
+      const val_post_desc_m2 = val_orig - (sup * desc_m2_val);
+      const m_desc_cred = val_post_desc_m2 * (aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0);
+      const base = val_post_desc_m2 - m_desc_cred;
+      if (base > 0) minMontoPremium = base * 0.05;
+  }
+
+  // Efecto que distribuye las recompensas si se alcanza el 5%
   useEffect(() => {
     let pct = 0;
     if (modoInicial === 'porcentaje') {
@@ -303,18 +312,17 @@ export default function App() {
     }
 
     if (pct >= 0) {
-      const isPremium = categoria.includes('AVENIDA') || categoria.includes('PARQUE') || categoria.includes('RADIAL');
-
+      // 🚀 CAMBIO PRO: La recompensa del 23% / 28% y $2 aplica a CUALQUIER categoría que logre el 5%
       if (descGroup4_30PCT.includes(proyecto)) {
-        if (pct >= 5 && isPremium) setDescuentoCredito(23);
+        if (pct >= 4.99) setDescuentoCredito(23);
         else setDescuentoCredito(20);
       } 
       else if (descGroup5_32PCT.includes(proyecto)) {
-        if (pct >= 5 && isPremium) setDescuentoCredito(28);
+        if (pct >= 4.99) setDescuentoCredito(28);
         else setDescuentoCredito(25);
       } 
       else if (descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto)) {
-        if (pct >= 5) setDescuentoM2(2);
+        if (pct >= 4.99) setDescuentoM2(2);
         else setDescuentoM2(1);
       } 
       else if (descGroup3_7USD.includes(proyecto)) {
@@ -327,7 +335,7 @@ export default function App() {
         setDescuentoCredito(10);
       }
     }
-  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, descuentoM2, descuentoCredito, aplicarDescM2, aplicarDescCreditoPct]);
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, descuentoM2, descuentoCredito, aplicarDescM2, aplicarDescCreditoPct]);
 
   const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 
@@ -401,10 +409,6 @@ export default function App() {
       timestampId: new Date().getTime()
     });
   };
-
-  useEffect(() => {
-    if(años && precio && superficie) calcular();
-  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2, categoria, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, aplicarBonoInicialOtro]);
 
   const enviarWhatsApp = () => {
     if (!resultado) return;
@@ -732,29 +736,47 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* INICIAL & PLAZO */}
+                {/* INICIAL & PLAZO CON CANDADO PREMIUM */}
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4">
-                  <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 backdrop-blur-sm">
+                  <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 backdrop-blur-sm relative">
+                    
                     <div className="space-y-2">
                       <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
                         <Percent className="w-3.5 h-3.5" /> Inicial (%)
                       </label>
                       <input 
-                        type="number" step="0.01" value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
+                        type="number" step="0.01" 
+                        min={isPremiumLote && modoInicial === 'porcentaje' ? "5" : "0"} 
+                        required
+                        value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
+                        onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'}
-                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-bold text-white text-sm sm:text-base shadow-inner placeholder-slate-600" 
+                        className={`w-full bg-slate-900/80 border ${isPremiumLote && modoInicial === 'porcentaje' && Number(inicialPorcentaje) > 0 && Number(inicialPorcentaje) < 5 ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-slate-700'} rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-bold text-white text-sm sm:text-base shadow-inner placeholder-slate-600`} 
                       />
                     </div>
+                    
                     <div className="space-y-2">
                       <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5" /> Monto ($us)
                       </label>
                       <input 
-                        type="number" step="0.01" value={modoInicial === 'monto' ? inicialMonto : ''} onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
+                        type="number" step="0.01" 
+                        min={isPremiumLote && modoInicial === 'monto' ? minMontoPremium.toFixed(2) : "0"}
+                        required
+                        value={modoInicial === 'monto' ? inicialMonto : ''} 
+                        onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'}
-                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-black text-amber-400 text-sm sm:text-base shadow-inner placeholder-slate-600" 
+                        className={`w-full bg-slate-900/80 border ${isPremiumLote && modoInicial === 'monto' && Number(inicialMonto) > 0 && Number(inicialMonto) < minMontoPremium ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-slate-700'} rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-black text-amber-400 text-sm sm:text-base shadow-inner placeholder-slate-600`} 
                       />
                     </div>
+
+                    {/* Banner de Advertencia Premium */}
+                    {isPremiumLote && (
+                      <div className="col-span-1 sm:col-span-2 mt-1 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center gap-2 shadow-inner animate-pop">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        Lote Premium ({categoria}): La política exige un mínimo del 5% de Cuota Inicial.
+                      </div>
+                    )}
                   </div>
                   
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
