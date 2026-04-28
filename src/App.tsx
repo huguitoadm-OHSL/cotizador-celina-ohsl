@@ -22,15 +22,12 @@ const proyectosPorRegional = {
     "TAMARINDO",
     "JARDINES DEL BOSQUE",
     "EL PORVENIR",
-    "EL PORVENIR FASE 2",
-    "PARAÍSO DEL NORTE"
+    "EL PORVENIR FASE 2"
   ],
   "MONTERO": [
     "MUYURINA",
     "LOS JARDINES",
     "EL RENACER",
-    "CELINA 1",
-    "CELINA 2",
     "CELINA 3",
     "CELINA 4",
     "CELINA 5",
@@ -58,8 +55,8 @@ const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO
 const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3"];
 const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
 const descGroup4_30PCT = ["MUYURINA", "CELINA VII FASE 1", "CELINA VII FASE 2", "CELINA X", "TAMARINDO", "CLARA CHUCHIO", "URUBÓ NORTE", "CELINA 8"];
-const descGroup5_32PCT = ["CELINA 1", "CELINA 2", "CELINA 3", "CELINA 4", "CELINA 5", "CELINA PAILÓN", "VILLA BELLA VIVIENDAS"];
-const descGroup6_20PCT = ["PRADERAS DEL NORTE", "PARAÍSO DEL NORTE"];
+const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "CELINA PAILÓN", "VILLA BELLA VIVIENDAS"];
+const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
 
 export default function App() {
@@ -228,8 +225,6 @@ export default function App() {
     if (p === "SANTA ROSA - FASE 2") aliases.push("SANTA ROSA FASE 2", "SANTA ROSA 2");
     if (p === "SANTA ROSA - FASE 3") aliases.push("SANTA ROSA FASE 3", "SANTA ROSA 3");
     if (p === "EL PORVENIR FASE 2") aliases.push("EL PORVENIR 2", "EL PORVENIR FASE II");
-    if (p === "CELINA 1") aliases.push("CELINA I");
-    if (p === "CELINA 2") aliases.push("CELINA II");
     if (p === "CELINA 3") aliases.push("CELINA III");
     if (p === "CELINA 4") aliases.push("CELINA IV");
     if (p === "CELINA 5") aliases.push("CELINA V");
@@ -392,6 +387,10 @@ export default function App() {
       timestampId: new Date().getTime()
     });
   };
+
+  useEffect(() => {
+    if(años && precio && superficie) calcular();
+  }, [modoInicial, aplicarBonoInicialOtro, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2, categoria]);
 
   const enviarWhatsApp = () => {
     if (!resultado) return;
