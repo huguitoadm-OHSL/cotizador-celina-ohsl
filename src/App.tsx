@@ -3,7 +3,7 @@ import {
   Calculator, Send, Map, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
-  Database, Edit2, LayoutTemplate
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle
 } from "lucide-react";
 
 // ============================================================================
@@ -100,6 +100,7 @@ export default function App() {
   const [años, setAños] = useState("");
   const [resultado, setResultado] = useState(null);
   const [mostrarPlan, setMostrarPlan] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   
   const resultadosRef = useRef(null);
 
@@ -201,16 +202,26 @@ export default function App() {
   }, [proyecto]);
 
   // ==========================================================================
-  // AUTO-COMPLETAR CON BD EN CASCADA (UV -> MZN -> LOTE)
+  // AUTO-COMPLETAR CON BD EN CASCADA (MOTOR INTELIGENTE DE BÚSQUEDA)
   // ==========================================================================
-  const lotesDelProyecto = baseDeDatosLotes.filter(l => 
-    l.proyecto === proyecto || 
-    l.proyecto === `CELINA ${proyecto}` ||
-    l.proyecto.includes(proyecto) || // Coincidencia parcial amplia
-    (proyecto === "CELINA 5" && (l.proyecto === "CELINA V" || l.proyecto.includes("CELINA V"))) ||
-    (proyecto === "CELINA 4" && (l.proyecto === "CELINA IV" || l.proyecto.includes("CELINA IV"))) ||
-    (proyecto === "CELINA 3" && (l.proyecto === "CELINA III" || l.proyecto.includes("CELINA III")))
-  );
+  const cleanDbName = (name) => {
+    if (!name) return "";
+    let n = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    n = n.replace(/^CELINA\s+/g, ''); // Quita "CELINA " del principio
+    // Unificar números romanos a decimales para evitar conflictos
+    n = n.replace(/\bVIII\b/g, '8').replace(/\bVII\b/g, '7').replace(/\bVI\b/g, '6')
+         .replace(/\bV\b/g, '5').replace(/\bIV\b/g, '4').replace(/\bIII\b/g, '3').replace(/\bII\b/g, '2');
+    n = n.replace(/\s+/g, ''); // Quita todos los espacios
+    return n;
+  };
+
+  const currentProjectCleaned = cleanDbName(proyecto);
+
+  const lotesDelProyecto = baseDeDatosLotes.filter(l => {
+    const dbProjectCleaned = cleanDbName(l.proyecto);
+    // Coincidencia exacta o si la BD incluye el nombre limpio del proyecto del UI
+    return dbProjectCleaned === currentProjectCleaned || dbProjectCleaned.includes(currentProjectCleaned) || currentProjectCleaned.includes(dbProjectCleaned);
+  });
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
@@ -375,7 +386,8 @@ export default function App() {
       inicial: formatMoney(cuota_inicial), inicialBs: formatMoney(cuota_inicial * TIPO_CAMBIO),
       pagoAmortizacion: formatMoney(pago_puro), seguro: formatMoney(seguro), cbdi: formatMoney(cbdi),
       mensual: formatMoney(cuota_final), mensualBs: formatMoney(cuota_final * TIPO_CAMBIO),
-      plazo: ans, planPagos: planPagosArreglo
+      plazo: ans, planPagos: planPagosArreglo,
+      timestampId: new Date().getTime() // Identificador único para reiniciar animaciones
     });
   };
 
@@ -413,8 +425,16 @@ export default function App() {
 
   const handleProcesar = (e) => {
     e.preventDefault();
-    calcular();
-    setTimeout(() => { if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 150);
+    setIsCalculating(true);
+    
+    // Animación PRO: Simulamos un proceso de cálculo rápido para dar sensación tecnológica
+    setTimeout(() => {
+      calcular();
+      setIsCalculating(false);
+      if (resultadosRef.current) {
+        resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 400);
   };
 
   const showDescPorcentaje = descGroup4_30PCT.includes(proyecto) || descGroup5_32PCT.includes(proyecto) || descGroup6_20PCT.includes(proyecto) || descGroup7_15PCT.includes(proyecto) || proyecto === "OTRO";
@@ -429,10 +449,14 @@ export default function App() {
         @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
         @keyframes shimmer { 100% { transform: translateX(100%); } }
         @keyframes float { 0%, 100% { transform: translateY(0) scale(1.2); } 50% { transform: translateY(-20px) scale(1.2); } }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        
         .animate-blob { animation: blob 10s infinite alternate; }
         .animate-float { animation: float 15s ease-in-out infinite; }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .animation-delay-2000 { animation-delay: 2s; }
         .animation-delay-4000 { animation-delay: 4s; }
+        
         .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(16, 185, 129, 0.15); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255,255,255,0.05); }
         .glass-input { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); color: #f8fafc; }
         .glass-input:focus { background: rgba(15, 23, 42, 0.8); border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), inset 0 2px 4px 0 rgba(0, 0, 0, 0.05); }
@@ -490,16 +514,32 @@ export default function App() {
         <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start">
           
           {/* PANEL IZQUIERDO: FORMULARIO */}
-          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:shadow-[0_25px_50px_-12px_rgba(16,185,129,0.15)]">
-            <div className="bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 p-5 sm:p-6 text-white flex items-center gap-3 relative overflow-hidden border-b border-emerald-500/10">
+          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:shadow-[0_25px_50px_-12px_rgba(16,185,129,0.15)] flex flex-col">
+            <div className="bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 p-5 sm:p-6 text-white flex items-center justify-between gap-3 relative overflow-hidden border-b border-emerald-500/10">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-              <div className="bg-emerald-500/10 p-2.5 rounded-xl backdrop-blur-md relative z-10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                <FileText className="w-5 h-5 text-emerald-400" />
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="bg-emerald-500/10 p-2.5 rounded-xl backdrop-blur-md border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                  <FileText className="w-5 h-5 text-emerald-400" />
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white">Datos de Inversión</h2>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold tracking-wide relative z-10 text-white">Datos de Inversión</h2>
+              
+              {/* Badge de estado de BD */}
+              <div className="relative z-10">
+                {!cargandoBD && baseDeDatosLotes.length > 0 && (
+                   <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/50 border border-emerald-500/30 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider">
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> BD Online
+                   </span>
+                )}
+                {!cargandoBD && baseDeDatosLotes.length === 0 && (
+                   <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-950/50 border border-rose-500/30 rounded-full text-[9px] font-bold text-rose-400 tracking-wider">
+                     <AlertCircle className="w-3 h-3" /> BD Offline
+                   </span>
+                )}
+              </div>
             </div>
             
-            <div className="p-5 sm:p-8">
+            <div className="p-5 sm:p-8 flex-1">
               <form onSubmit={handleProcesar} className="space-y-5 sm:space-y-6">
 
                 {/* REGIONAL */}
@@ -507,72 +547,93 @@ export default function App() {
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <Map className="w-4 h-4 text-teal-400" /> Regional
                   </label>
-                  <select value={regional} onChange={e => setRegional(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
-                    {Object.keys(proyectosPorRegional).map(reg => <option key={reg} value={reg}>{reg}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select value={regional} onChange={e => setRegional(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
+                      {Object.keys(proyectosPorRegional).map(reg => <option key={reg} value={reg}>{reg}</option>)}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-emerald-500"><ChevronDown className="w-5 h-5" /></div>
+                  </div>
                 </div>
                 
-                {/* PROYECTO */}
+                {/* PROYECTO & BÚSQUEDA INTELIGENTE */}
                 <div className="space-y-2.5 relative">
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-teal-400" /> Proyecto
                     </label>
                     {cargandoBD ? (
-                      <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1 rounded-full bg-amber-500/10">
-                        <div className="w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin"></div> Cargando BD...
+                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1.5 rounded-full bg-amber-500/10">
+                        <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-[#0f2c3a] text-[#48b5db] border border-[#1e5875] shadow-[0_0_10px_rgba(72,181,219,0.2)]' : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}>
+                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-[#0f2c3a] text-[#48b5db] border border-[#1e5875] shadow-[0_0_10px_rgba(72,181,219,0.3)] hover:bg-[#13384a]' : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}>
                         {usarBD ? <Database className="w-3 h-3 text-[#48b5db]"/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
                     ) : null}
                   </div>
-                  <select value={proyecto} onChange={e => setProyecto(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
-                    {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
-                    <option value="OTRO">OTRO...</option>
-                  </select>
-                  {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-semibold mt-3" placeholder="Escribe el nombre del proyecto..." />}
+                  
+                  <div className="relative">
+                    <select value={proyecto} onChange={e => setProyecto(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
+                      {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
+                      <option value="OTRO">OTRO...</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-emerald-500"><ChevronDown className="w-5 h-5" /></div>
+                  </div>
+                  {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-semibold mt-3 animate-pop" placeholder="Escribe el nombre del proyecto..." />}
                 </div>
 
                 {/* UV / MZN / LOTE */}
-                <div className="pt-3 border-t border-slate-700/50">
-                  <div className="bg-[#0b172a] border border-[#1e3a5f] rounded-[1.5rem] p-4 flex flex-col gap-3 relative shadow-inner">
+                <div className="pt-2 sm:pt-3">
+                  <div className="bg-[#0b172a]/80 backdrop-blur-md border border-[#1e3a5f] rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)]">
                     
-                    <div className="flex items-center gap-2 mb-1">
-                      <MapPin className="w-4 h-4 text-[#48b5db]" />
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-[#48b5db]" />
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase tracking-widest">Ubicación del Lote</span>
+                      </div>
+                      {!usarBD && tieneBD && (
+                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1"><Edit2 className="w-3 h-3"/> Ingreso Manual</span>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className="text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">UV</label>
+                        <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">UV</label>
                         {modoBD ? (
-                           <select value={uv} onChange={e => setUv(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
-                             {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
-                           </select>
+                           <div className="relative">
+                             <select value={uv} onChange={e => setUv(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                               {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
+                           </div>
                         ) : (
-                           <input type="text" value={uv} onChange={e => setUv(e.target.value)} placeholder="Ej. 49" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={uv} onChange={e => setUv(e.target.value)} placeholder="Ej. 49" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className="text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">MZN</label>
+                        <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">MZN</label>
                         {modoBD ? (
-                           <select value={mzn} onChange={e => setMzn(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
-                             {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-                           </select>
+                           <div className="relative">
+                             <select value={mzn} onChange={e => setMzn(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                               {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
+                           </div>
                         ) : (
-                           <input type="text" value={mzn} onChange={e => setMzn(e.target.value)} placeholder="Ej. 6" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={mzn} onChange={e => setMzn(e.target.value)} placeholder="Ej. 6" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className="text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">LOTE</label>
+                        <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">LOTE</label>
                         {modoBD ? (
-                           <select value={lote} onChange={e => setLote(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
-                             {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
-                           </select>
+                           <div className="relative">
+                             <select value={lote} onChange={e => setLote(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                               {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
+                           </div>
                         ) : (
-                           <input type="text" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej. 9" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej. 9" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
                         )}
                       </div>
                     </div>
@@ -584,7 +645,7 @@ export default function App() {
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <LayoutTemplate className="w-3 h-3 text-emerald-500" /> Categoría del Lote
                     </label>
-                    <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className="w-full glass-input rounded-xl p-3 text-xs sm:text-sm font-semibold transition-all placeholder-slate-600" />
+                    <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold transition-all placeholder-slate-600 ${modoBD ? 'bg-emerald-950/20 border border-emerald-500/30 text-emerald-100 shadow-inner' : 'glass-input'}`} />
                 </div>
 
                 {/* SUP & PRECIO */}
@@ -697,9 +758,15 @@ export default function App() {
                   </div>
                 </div>
 
-                <button type="submit" className="w-full mt-6 sm:mt-8 bg-gradient-to-r from-[#059669] via-[#10b981] to-[#059669] hover:from-[#047857] hover:via-[#059669] hover:to-[#047857] text-white font-extrabold py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:shadow-[0_0_35px_rgba(16,185,129,0.6)] hover:-translate-y-1 border border-emerald-400/50 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group">
+                <button type="submit" disabled={isCalculating} className={`w-full mt-6 sm:mt-8 bg-gradient-to-r from-[#059669] via-[#10b981] to-[#059669] hover:from-[#047857] hover:via-[#059669] hover:to-[#047857] text-white font-extrabold py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(16,185,129,0.4)] border border-emerald-400/50 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:shadow-[0_0_35px_rgba(16,185,129,0.6)] hover:-translate-y-1'}`}>
                   <div className="absolute inset-0 bg-white/20 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
-                  <span className="relative z-10 flex items-center gap-2 sm:gap-3">Procesar Cotización <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" /></span>
+                  <span className="relative z-10 flex items-center gap-2 sm:gap-3">
+                    {isCalculating ? (
+                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" /> Procesando...</>
+                    ) : (
+                      <>Procesar Cotización <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" /></>
+                    )}
+                  </span>
                 </button>
               </form>
             </div>
@@ -707,16 +774,20 @@ export default function App() {
 
           {/* PANEL DERECHO: RESULTADOS */}
           <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6">
-            {!resultado ? (
+            {!resultado || isCalculating ? (
               <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-400 p-6 sm:p-10 text-center transition-all duration-500">
                 <div className="relative">
                   <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl animate-pulse"></div>
                   <div className="bg-slate-800 p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-[0_0_30px_rgba(16,185,129,0.2)] border border-emerald-500/30 relative z-10">
-                    <Calculator className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-400" />
+                    {isCalculating ? <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-400 animate-spin" /> : <Calculator className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-400" />}
                   </div>
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2 sm:mb-3">Plataforma Activa</h3>
-                <p className="text-sm sm:text-base max-w-md text-slate-400 font-medium leading-relaxed px-2">Completa los parámetros de inversión a la izquierda para generar una propuesta financiera detallada y lista para el cliente.</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2 sm:mb-3">
+                  {isCalculating ? "Calculando Propuesta..." : "Plataforma Activa"}
+                </h3>
+                <p className="text-sm sm:text-base max-w-md text-slate-400 font-medium leading-relaxed px-2">
+                  {isCalculating ? "Aplicando promociones e inteligencia artificial de precios." : "Completa los parámetros de inversión a la izquierda para generar una propuesta financiera detallada y lista para el cliente."}
+                </p>
               </div>
             ) : (
               <div className="glass-panel rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-10 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-[0_20px_50px_-15px_rgba(0,0,0,0.5)] border border-emerald-500/20">
@@ -745,15 +816,15 @@ export default function App() {
                         </div>
                         <div>
                           <div className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 sm:mb-1">Desarrollo Urbanístico</div>
-                          <div className="text-white font-black text-lg sm:text-xl uppercase leading-none tracking-tight">{resultado.proyecto || 'S/N'}</div>
-                          {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && <div className="text-[8px] sm:text-[9px] text-amber-400 font-bold mt-1 tracking-wider">{resultado.categoria}</div>}
+                          <div key={`proj-${resultado.timestampId}`} className="text-white font-black text-lg sm:text-xl uppercase leading-none tracking-tight animate-pop">{resultado.proyecto || 'S/N'}</div>
+                          {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && <div key={`cat-${resultado.timestampId}`} className="text-[8px] sm:text-[9px] text-amber-400 font-bold mt-1 tracking-wider animate-pop">{resultado.categoria}</div>}
                         </div>
                       </div>
                       
                       <div className="flex flex-wrap justify-center sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
-                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">UV</div><div className="text-emerald-400 font-black text-base sm:text-lg leading-none">{resultado.uv || '-'}</div></div>
-                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">MZN</div><div className="text-emerald-400 font-black text-base sm:text-lg leading-none">{resultado.mzn || '-'}</div></div>
-                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-emerald-500 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400"><div className="text-[8px] sm:text-[9px] font-extrabold text-emerald-950 uppercase tracking-widest mb-1">LOTE</div><div className="text-slate-900 font-black text-base sm:text-lg leading-none">{resultado.lote || '-'}</div></div>
+                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">UV</div><div key={`uv-${resultado.timestampId}`} className="text-emerald-400 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '100ms'}}>{resultado.uv || '-'}</div></div>
+                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">MZN</div><div key={`mzn-${resultado.timestampId}`} className="text-emerald-400 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '150ms'}}>{resultado.mzn || '-'}</div></div>
+                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-emerald-500 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400"><div className="text-[8px] sm:text-[9px] font-extrabold text-emerald-950 uppercase tracking-widest mb-1">LOTE</div><div key={`lt-${resultado.timestampId}`} className="text-slate-900 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '200ms'}}>{resultado.lote || '-'}</div></div>
                       </div>
                     </div>
                   )}
@@ -763,14 +834,14 @@ export default function App() {
                     <div className="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-emerald-500/10 to-transparent pointer-events-none transition-opacity duration-500 opacity-0 group-hover:opacity-100"></div>
                     <div className="text-center sm:text-left">
                       <span className="text-slate-400 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2 mb-1 sm:mb-2">Precio de Lista Original</span>
-                      <div className="text-3xl sm:text-4xl font-black text-white tracking-tighter drop-shadow-md">$ {resultado.valorOriginal}</div>
-                      <div className="text-xs sm:text-sm font-bold text-slate-500 mt-1 sm:mt-1.5">Bs. {resultado.valorOriginalBs}</div>
+                      <div key={`po-${resultado.timestampId}`} className="text-3xl sm:text-4xl font-black text-white tracking-tighter drop-shadow-md animate-pop">$ {resultado.valorOriginal}</div>
+                      <div key={`pobs-${resultado.timestampId}`} className="text-xs sm:text-sm font-bold text-slate-500 mt-1 sm:mt-1.5 animate-pop">Bs. {resultado.valorOriginalBs}</div>
                     </div>
                     
                     {resultado.ahorroContado !== "0.00" && (
                       <div className="bg-emerald-950/60 backdrop-blur-md text-emerald-400 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)] relative z-10 w-full sm:w-auto text-center">
                         <div className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest mb-1 text-emerald-300 flex items-center justify-center gap-1.5"><Tag className="w-3 h-3"/> Oferta al Contado</div>
-                        <div className="text-xl sm:text-2xl font-black tracking-tight text-white">$ {resultado.valorContado}</div>
+                        <div key={`pc-${resultado.timestampId}`} className="text-xl sm:text-2xl font-black tracking-tight text-white animate-pop">$ {resultado.valorContado}</div>
                       </div>
                     )}
                   </div>
@@ -779,17 +850,17 @@ export default function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     <div className="bg-slate-800/50 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-700/50 shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(16,185,129,0.2)] hover:border-emerald-500/30 text-center sm:text-left">
                       <span className="text-teal-400 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest">Total a Financiar</span>
-                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 sm:mt-2">$ {resultado.valorCredito}</div>
+                      <div key={`pcr-${resultado.timestampId}`} className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 sm:mt-2 animate-pop">$ {resultado.valorCredito}</div>
                       {resultado.ahorroCredito !== "0.00" && (
-                          <div className="mt-2 sm:mt-3 text-[9px] sm:text-[10px] text-amber-400 font-extrabold bg-amber-950/30 inline-block px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-amber-500/30 uppercase tracking-widest shadow-sm">
+                          <div key={`ac-${resultado.timestampId}`} className="mt-2 sm:mt-3 text-[9px] sm:text-[10px] text-amber-400 font-extrabold bg-amber-950/30 inline-block px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-amber-500/30 uppercase tracking-widest shadow-sm animate-pop">
                             Ahorro Incluido: $ {resultado.ahorroCredito}
                           </div>
                       )}
                     </div>
                     <div className="bg-slate-800/50 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-700/50 shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(16,185,129,0.2)] hover:border-emerald-500/30 text-center sm:text-left">
                       <span className="text-emerald-400 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest">Cuota Inicial</span>
-                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 sm:mt-2">$ {resultado.inicial}</div>
-                      <div className="text-xs sm:text-sm font-bold text-slate-400 mt-1">Bs. {resultado.inicialBs}</div>
+                      <div key={`ini-${resultado.timestampId}`} className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 sm:mt-2 animate-pop">$ {resultado.inicial}</div>
+                      <div key={`inibs-${resultado.timestampId}`} className="text-xs sm:text-sm font-bold text-slate-400 mt-1 animate-pop">Bs. {resultado.inicialBs}</div>
                     </div>
                   </div>
 
@@ -802,8 +873,8 @@ export default function App() {
                       <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,1)] animate-pulse"></div> Cuota Mensual Fija ({resultado.plazo} Años)
                     </span>
                     <div className="flex flex-wrap items-baseline gap-2 sm:gap-4 mt-2 sm:mt-3 relative z-10">
-                      <div className="text-[2.5rem] leading-none sm:text-7xl font-black text-white tracking-tighter drop-shadow-lg break-all">$ {resultado.mensual}</div>
-                      <div className="text-xl sm:text-3xl font-bold text-emerald-300 mt-1 sm:mt-0">Bs. {resultado.mensualBs}</div>
+                      <div key={`c-${resultado.timestampId}`} className="text-[2.5rem] leading-none sm:text-7xl font-black text-white tracking-tighter drop-shadow-lg break-all animate-pop">$ {resultado.mensual}</div>
+                      <div key={`cbs-${resultado.timestampId}`} className="text-xl sm:text-3xl font-bold text-emerald-300 mt-1 sm:mt-0 animate-pop" style={{animationDelay: '100ms'}}>Bs. {resultado.mensualBs}</div>
                     </div>
                     <div className="text-[10px] sm:text-xs text-emerald-200/60 mt-4 sm:mt-6 font-semibold tracking-widest relative z-10 flex flex-wrap gap-2 sm:gap-4 border-t border-emerald-500/30 pt-3 sm:pt-4 uppercase">
                       <span>Amort. ${resultado.pagoAmortizacion}</span><span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 my-auto hidden sm:block"></span>
