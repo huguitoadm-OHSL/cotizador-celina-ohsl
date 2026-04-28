@@ -312,7 +312,6 @@ export default function App() {
     }
 
     if (pct >= 0) {
-      // 🚀 CAMBIO PRO: La recompensa del 23% / 28% y $2 aplica a CUALQUIER categoría que logre el 5%
       if (descGroup4_30PCT.includes(proyecto)) {
         if (pct >= 4.99) setDescuentoCredito(23);
         else setDescuentoCredito(20);
@@ -747,7 +746,7 @@ export default function App() {
                       <input 
                         type="number" step="0.01" 
                         min={isPremiumLote && modoInicial === 'porcentaje' ? "5" : "0"} 
-                        required
+                        required={modoInicial === 'porcentaje'}
                         value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'}
@@ -762,7 +761,7 @@ export default function App() {
                       <input 
                         type="number" step="0.01" 
                         min={isPremiumLote && modoInicial === 'monto' ? minMontoPremium.toFixed(2) : "0"}
-                        required
+                        required={modoInicial === 'monto'}
                         value={modoInicial === 'monto' ? inicialMonto : ''} 
                         onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'}
