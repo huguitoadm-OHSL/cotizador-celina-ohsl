@@ -7,27 +7,30 @@ import {
 } from "lucide-react";
 
 // ============================================================================
-// BASE DE DATOS DE REGIONALES Y PROYECTOS
+// BASE DE DATOS DE REGIONALES Y PROYECTOS (Ajustado exactamente a tus imágenes)
 // ============================================================================
 const proyectosPorRegional = {
   "SANTA CRUZ": [
     "URUBÓ NORTE",
-    "ROSA DE RODALI",
+    "ROSA RODALI",
     "CELINA PAILÓN",
     "EL ENCANTO",
-    "EL ENCANTO 2",
-    "SANTA ROSA FASE 1",
-    "SANTA ROSA FASE 2",
-    "SANTA ROSA FASE 3",
+    "EL ENCANTO FASE 2",
+    "SANTA ROSA - FASE 1",
+    "SANTA ROSA - FASE 2",
+    "SANTA ROSA - FASE 3",
     "TAMARINDO",
     "JARDINES DEL BOSQUE",
     "EL PORVENIR",
-    "EL PORVENIR 2"
+    "EL PORVENIR FASE 2",
+    "PARAÍSO DEL NORTE"
   ],
   "MONTERO": [
     "MUYURINA",
     "LOS JARDINES",
     "EL RENACER",
+    "CELINA 1",
+    "CELINA 2",
     "CELINA 3",
     "CELINA 4",
     "CELINA 5",
@@ -35,7 +38,7 @@ const proyectosPorRegional = {
     "CELINA X",
     "CAÑAVERAL",
     "SANTA FE",
-    "VILLA BELLA"
+    "VILLA BELLA VIVIENDAS"
   ],
   "SATÉLITE NORTE": [
     "CELINA 7 FASE 3",
@@ -51,14 +54,13 @@ const proyectosPorRegional = {
 // ============================================================================
 // AGRUPACIONES POR REGLAS DE DESCUENTOS (Según Promociones 2026)
 // ============================================================================
-const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA FASE 1", "SANTA ROSA FASE 2", "SANTA ROSA FASE 3", "EL ENCANTO 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR 2"];
+const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2"];
 const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3"];
 const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
 const descGroup4_30PCT = ["MUYURINA", "CELINA VII FASE 1", "CELINA VII FASE 2", "CELINA X", "TAMARINDO", "CLARA CHUCHIO", "URUBÓ NORTE", "CELINA 8"];
-const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "CELINA PAILÓN", "VILLA BELLA"];
-const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
-const descGroup7_15PCT = ["ROSA DE RODALI"];
-
+const descGroup5_32PCT = ["CELINA 1", "CELINA 2", "CELINA 3", "CELINA 4", "CELINA 5", "CELINA PAILÓN", "VILLA BELLA VIVIENDAS"];
+const descGroup6_20PCT = ["PRADERAS DEL NORTE", "PARAÍSO DEL NORTE"];
+const descGroup7_15PCT = ["ROSA RODALI"];
 
 export default function App() {
   const [regional, setRegional] = useState("MONTERO");
@@ -70,13 +72,13 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
 
-  // Inicializados
+  // Inicializados (Vacíos para que no salga ningún dato al abrir)
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
   const [superficie, setSuperficie] = useState("");
   const [precio, setPrecio] = useState("");
-  const [categoria, setCategoria] = useState("ESTÁNDAR");
+  const [categoria, setCategoria] = useState("");
   
   // Estados de Descuentos
   const [descuentoCredito, setDescuentoCredito] = useState(20);
@@ -92,7 +94,6 @@ export default function App() {
   const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(true);
   const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(true);
 
-  // Estados de Inicial
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
   const [inicialMonto, setInicialMonto] = useState(""); 
@@ -105,7 +106,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   // ==========================================================================
-  // CARGA Y LIMPIEZA DE BASE DE DATOS (JSON)
+  // CARGA Y LIMPIEZA EXTREMA DE BASE DE DATOS (JSON)
   // ==========================================================================
   useEffect(() => {
     const cargarLotes = async () => {
@@ -116,7 +117,6 @@ export default function App() {
           if (!response.ok) throw new Error('Fallo la ruta local');
           rawData = await response.json();
         } catch (e) {
-          // Usamos un timestamp para burlar el caché de GitHub y traer siempre la última versión
           const timestamp = new Date().getTime();
           const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
           const fallbackResponse = await fetch(githubRawUrl);
@@ -124,7 +124,6 @@ export default function App() {
           rawData = await fallbackResponse.json();
         }
 
-        // Función para arreglar comas por puntos en los números
         const parseNum = (val) => {
             if (val === undefined || val === null) return 0;
             if (typeof val === 'number') return val;
@@ -134,7 +133,7 @@ export default function App() {
 
         const normalizedData = rawData.map(item => ({
             proyecto: String(item.Proyecto || item.proyecto || item.PROYECTO || "").trim().toUpperCase(),
-            uv: String(item.uv || item.Uv || item.UV || "").trim() || "S/N", // Si está vacío, le ponemos S/N
+            uv: String(item.uv || item.Uv || item.UV || "").trim() || "S/N", 
             mzn: String(item.mzn || item.Mzn || item.MZN || "").trim(),
             lote: String(item.lote || item.Lote || item.LOTE || "").trim(),
             superficie: parseNum(item.superficie || item.Superficie || item.SUPERFICIE),
@@ -173,10 +172,25 @@ export default function App() {
     }
   }, [regional]);
 
+  // Manejadores de cascada para limpiar datos hacia adelante
+  const handleUvChange = (e) => {
+    setUv(e.target.value);
+    setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
+  };
+
+  const handleMznChange = (e) => {
+    setMzn(e.target.value);
+    setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
+  };
+
+  const handleLoteChange = (e) => {
+    setLote(e.target.value);
+  };
+
   // Reset al cambiar de proyecto
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
-    setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("ESTÁNDAR");
+    setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
     setResultado(null); setProyectoPersonalizado(""); setMostrarPlan(false);
 
     setAplicarDescContadoPct(true); setAplicarDescCreditoPct(true); setAplicarDescM2(true);
@@ -202,78 +216,66 @@ export default function App() {
   }, [proyecto]);
 
   // ==========================================================================
-  // AUTO-COMPLETAR CON BD EN CASCADA (MOTOR INTELIGENTE DE BÚSQUEDA)
+  // MOTOR INTELIGENTE DE ALIAS (Para conectar la UI con el JSON exacto)
   // ==========================================================================
-  const cleanDbName = (name) => {
-    if (!name) return "";
-    let n = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-    n = n.replace(/^CELINA\s+/g, ''); // Quita "CELINA " del principio
-    // Unificar números romanos a decimales para evitar conflictos
-    n = n.replace(/\bVIII\b/g, '8').replace(/\bVII\b/g, '7').replace(/\bVI\b/g, '6')
-         .replace(/\bV\b/g, '5').replace(/\bIV\b/g, '4').replace(/\bIII\b/g, '3').replace(/\bII\b/g, '2');
-    n = n.replace(/\s+/g, ''); // Quita todos los espacios
-    return n;
+  const getAlias = (p) => {
+    const aliases = [p, `CELINA ${p}`];
+    if (p === "URUBÓ NORTE") aliases.push("CELINA URUBO DEL NORTE", "URUBO NORTE");
+    if (p === "ROSA RODALI") aliases.push("ROSA DE RODALI", "CELINA ROSA RODALI");
+    if (p === "CELINA PAILÓN") aliases.push("CELINA PAILON", "PAILON");
+    if (p === "EL ENCANTO FASE 2") aliases.push("EL ENCANTO 2", "EL ENCANTO FASE II");
+    if (p === "SANTA ROSA - FASE 1") aliases.push("SANTA ROSA FASE 1", "SANTA ROSA 1");
+    if (p === "SANTA ROSA - FASE 2") aliases.push("SANTA ROSA FASE 2", "SANTA ROSA 2");
+    if (p === "SANTA ROSA - FASE 3") aliases.push("SANTA ROSA FASE 3", "SANTA ROSA 3");
+    if (p === "EL PORVENIR FASE 2") aliases.push("EL PORVENIR 2", "EL PORVENIR FASE II");
+    if (p === "CELINA 1") aliases.push("CELINA I");
+    if (p === "CELINA 2") aliases.push("CELINA II");
+    if (p === "CELINA 3") aliases.push("CELINA III");
+    if (p === "CELINA 4") aliases.push("CELINA IV");
+    if (p === "CELINA 5") aliases.push("CELINA V");
+    if (p === "CELINA X") aliases.push("CELINA 10");
+    if (p === "RANCHO NUEVO") aliases.push("CELINA - RANCHO NUEVO", "CELINA RANCHO NUEVO");
+    if (p === "MUYURINA") aliases.push("CELINA MUYURINA");
+    if (p === "SANTA FE") aliases.push("CELINA SANTA FE");
+    if (p === "VILLA BELLA VIVIENDAS") aliases.push("VILLA BELLA");
+    if (p === "CELINA 7 FASE 3") aliases.push("CELINA VII FASE 3");
+    if (p === "CELINA VII FASE 1") aliases.push("CELINA 7 FASE 1");
+    if (p === "CELINA VII FASE 2") aliases.push("CELINA 7 FASE 2");
+    if (p === "CLARA CHUCHIO") aliases.push("CELINA CLARA CHUCHIO");
+    return aliases;
   };
 
-  const currentProjectCleaned = cleanDbName(proyecto);
+  const currentAliases = getAlias(proyecto);
 
-  const lotesDelProyecto = baseDeDatosLotes.filter(l => {
-    const dbProjectCleaned = cleanDbName(l.proyecto);
-    // Coincidencia exacta o si la BD incluye el nombre limpio del proyecto del UI
-    return dbProjectCleaned === currentProjectCleaned || dbProjectCleaned.includes(currentProjectCleaned) || currentProjectCleaned.includes(dbProjectCleaned);
-  });
+  const lotesDelProyecto = baseDeDatosLotes.filter(l => 
+    currentAliases.some(alias => l.proyecto.includes(alias)) || currentAliases.includes(l.proyecto)
+  );
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
-  // Extraer UVs, MZN y Lotes de forma segura
-  const uvsDisponibles = [...new Set(lotesDelProyecto.map(l => l.uv))].sort((a,b)=> Number(a) - Number(b));
+  // Extraer listas de forma segura y ordenarlas numéricamente
+  const sortNumeric = (a, b) => Number(a.replace(/[^0-9]/g, '')) - Number(b.replace(/[^0-9]/g, ''));
   
-  useEffect(() => {
-    if (modoBD && uvsDisponibles.length > 0 && (!uv || !uvsDisponibles.includes(uv))) {
-      setUv(uvsDisponibles[0]);
-    }
-  }, [modoBD, uvsDisponibles, uv]);
+  const uvsDisponibles = [...new Set(lotesDelProyecto.map(l => l.uv))].sort(sortNumeric);
+  const mznsDisponibles = [...new Set(lotesDelProyecto.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortNumeric);
+  const lotesDisponibles = lotesDelProyecto.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortNumeric);
 
-  const mznsDisponibles = [...new Set(lotesDelProyecto.filter(l => l.uv === uv).map(l => l.mzn))].sort((a,b)=> {
-    const numA = Number(a.replace(/[^0-9]/g, ''));
-    const numB = Number(b.replace(/[^0-9]/g, ''));
-    return numA - numB;
-  });
-
-  useEffect(() => {
-    if (modoBD && mznsDisponibles.length > 0 && (!mzn || !mznsDisponibles.includes(mzn))) {
-      setMzn(mznsDisponibles[0]);
-    }
-  }, [modoBD, mznsDisponibles, mzn, uv]);
-
-  const lotesDisponibles = lotesDelProyecto.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort((a,b)=> {
-    const numA = Number(a.replace(/[^0-9]/g, ''));
-    const numB = Number(b.replace(/[^0-9]/g, ''));
-    return numA - numB;
-  });
-
-  useEffect(() => {
-    if (modoBD && lotesDisponibles.length > 0 && (!lote || !lotesDisponibles.includes(lote))) {
-      setLote(lotesDisponibles[0]);
-    }
-  }, [modoBD, lotesDisponibles, lote, mzn, uv]);
-
-  // Rellenar Superficie y Precio Final
+  // Rellenar Superficie y Precio Final CUANDO los 3 están llenos
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
         setPrecio(loteEncontrado.precio.toString());
-        if(loteEncontrado.categoria) setCategoria(loteEncontrado.categoria);
+        setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
       }
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
 
   // ==========================================================================
-  // EFECTO DINÁMICO: Descuentos
+  // EFECTO DINÁMICO E INTELIGENTE: Descuentos Automáticos por Categoría
   // ==========================================================================
   useEffect(() => {
     let pct = 0;
@@ -387,13 +389,9 @@ export default function App() {
       pagoAmortizacion: formatMoney(pago_puro), seguro: formatMoney(seguro), cbdi: formatMoney(cbdi),
       mensual: formatMoney(cuota_final), mensualBs: formatMoney(cuota_final * TIPO_CAMBIO),
       plazo: ans, planPagos: planPagosArreglo,
-      timestampId: new Date().getTime() // Identificador único para reiniciar animaciones
+      timestampId: new Date().getTime()
     });
   };
-
-  useEffect(() => {
-    if(años && precio && superficie) calcular();
-  }, [modoInicial, aplicarBonoInicialOtro, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, superficie, precio, inicialPorcentaje, inicialMonto, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2, categoria]);
 
   const enviarWhatsApp = () => {
     if (!resultado) return;
@@ -427,7 +425,6 @@ export default function App() {
     e.preventDefault();
     setIsCalculating(true);
     
-    // Animación PRO: Simulamos un proceso de cálculo rápido para dar sensación tecnológica
     setTimeout(() => {
       calcular();
       setIsCalculating(false);
@@ -601,39 +598,42 @@ export default function App() {
                         <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">UV</label>
                         {modoBD ? (
                            <div className="relative">
-                             <select value={uv} onChange={e => setUv(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             <select value={uv} onChange={handleUvChange} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                               <option value="" disabled hidden></option>
                                {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
                              </select>
                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
                            </div>
                         ) : (
-                           <input type="text" value={uv} onChange={e => setUv(e.target.value)} placeholder="Ej. 49" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">MZN</label>
                         {modoBD ? (
                            <div className="relative">
-                             <select value={mzn} onChange={e => setMzn(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             <select value={mzn} onChange={handleMznChange} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                               <option value="" disabled hidden></option>
                                {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                              </select>
                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
                            </div>
                         ) : (
-                           <input type="text" value={mzn} onChange={e => setMzn(e.target.value)} placeholder="Ej. 6" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">LOTE</label>
                         {modoBD ? (
                            <div className="relative">
-                             <select value={lote} onChange={e => setLote(e.target.value)} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             <select value={lote} onChange={handleLoteChange} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                               <option value="" disabled hidden></option>
                                {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
                              </select>
                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
                            </div>
                         ) : (
-                           <input type="text" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej. 9" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
                         )}
                       </div>
                     </div>
