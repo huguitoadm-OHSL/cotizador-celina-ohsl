@@ -278,20 +278,8 @@ export default function App() {
 
 
   // ==========================================================================
-  // LÓGICA DE DESCUENTOS Y RESTRICCIONES PREMIUM
+  // LÓGICA DE DESCUENTOS
   // ==========================================================================
-  const isPremiumLote = categoria.toUpperCase().includes('AVENIDA') || categoria.toUpperCase().includes('PARQUE') || categoria.toUpperCase().includes('RADIAL');
-  
-  let minMontoPremium = 0;
-  if (isPremiumLote && superficie && precio) {
-      const sup = Number(superficie); const prec = Number(precio);
-      const val_orig = sup * prec;
-      const desc_m2_val = aplicarDescM2 ? Number(descuentoM2) : 0;
-      const val_post_desc_m2 = val_orig - (sup * desc_m2_val);
-      const m_desc_cred = val_post_desc_m2 * (aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0);
-      const base = val_post_desc_m2 - m_desc_cred;
-      if (base > 0) minMontoPremium = base * 0.05;
-  }
 
   // --- NUEVA LÓGICA: Calcular los límites MÁXIMOS permitidos ---
   const calcularLimitesMaximos = () => {
@@ -826,7 +814,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* INICIAL & PLAZO CON CANDADO PREMIUM */}
+                {/* INICIAL & PLAZO */}
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 backdrop-blur-sm relative">
                     
@@ -836,12 +824,12 @@ export default function App() {
                       </label>
                       <input 
                         type="number" step="0.01" 
-                        min={isPremiumLote && modoInicial === 'porcentaje' ? "5" : "0"} 
+                        min="0" 
                         required={modoInicial === 'porcentaje'}
                         value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'}
-                        className={`w-full bg-slate-900/80 border ${isPremiumLote && modoInicial === 'porcentaje' && Number(inicialPorcentaje) > 0 && Number(inicialPorcentaje) < 5 ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-slate-700'} rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-bold text-white text-sm sm:text-base shadow-inner placeholder-slate-600`} 
+                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-bold text-white text-sm sm:text-base shadow-inner placeholder-slate-600" 
                       />
                     </div>
                     
@@ -851,22 +839,14 @@ export default function App() {
                       </label>
                       <input 
                         type="number" step="0.01" 
-                        min={isPremiumLote && modoInicial === 'monto' ? minMontoPremium.toFixed(2) : "0"}
+                        min="0"
                         required={modoInicial === 'monto'}
                         value={modoInicial === 'monto' ? inicialMonto : ''} 
                         onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'}
-                        className={`w-full bg-slate-900/80 border ${isPremiumLote && modoInicial === 'monto' && Number(inicialMonto) > 0 && Number(inicialMonto) < minMontoPremium ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-slate-700'} rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-black text-amber-400 text-sm sm:text-base shadow-inner placeholder-slate-600`} 
+                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-black text-amber-400 text-sm sm:text-base shadow-inner placeholder-slate-600" 
                       />
                     </div>
-
-                    {/* Banner de Advertencia Premium */}
-                    {isPremiumLote && (
-                      <div className="col-span-1 sm:col-span-2 mt-1 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-[10px] sm:text-[11px] text-amber-400 font-bold flex items-center gap-2 shadow-inner animate-pop">
-                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        Lote Premium ({categoria}): La política exige un mínimo del 5% de Cuota Inicial.
-                      </div>
-                    )}
                   </div>
                   
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
