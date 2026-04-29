@@ -318,10 +318,10 @@ export default function App() {
 
     if (descGroup4_30PCT.includes(proyecto)) {
       maxContadoPct = 30;
-      maxCreditoPct = (pct >= 4.99 && isPremiumLote) ? 23 : 20;
+      maxCreditoPct = (pct >= 4.99) ? 23 : 20; // SIN RESTRICCIÓN DE PREMIUM LOTE PARA EL PREMIO
     } else if (descGroup5_32PCT.includes(proyecto)) {
       maxContadoPct = 32;
-      maxCreditoPct = (pct >= 4.99 && isPremiumLote) ? 28 : 25;
+      maxCreditoPct = (pct >= 4.99) ? 28 : 25; // SIN RESTRICCIÓN DE PREMIUM LOTE PARA EL PREMIO
     } else if (descGroup1_3USD.includes(proyecto)) {
       maxContadoM2 = 3;
       maxDescM2 = (pct >= 4.99) ? 2 : 1;
@@ -342,19 +342,13 @@ export default function App() {
     return { maxCreditoPct, maxContadoPct, maxDescM2, maxContadoM2, maxBonoInicial };
   };
 
-  // Efecto que auto-aplica los descuentos máximos si cambian las condiciones base (proyecto, inicial, categoría)
+  // Efecto que auto-aplica los descuentos máximos
   useEffect(() => {
     const limites = calcularLimitesMaximos();
-    
-    // Solo auto-actualizamos si el usuario NO ha modificado manualmente hacia abajo
-    // Opcional: Si prefieres que SIEMPRE se auto-rellene al máximo al cambiar algo (como el inicial), déjalo así.
-    // Si prefieres que respete lo que escribió el asesor, tendríamos que agregar una bandera extra.
-    // Por ahora, lo mantenemos simple: al cambiar de proyecto o inicial, te sugiere el máximo.
     setDescuentoCredito(limites.maxCreditoPct);
     setDescuentoContado(limites.maxContadoPct);
     setDescuentoM2(limites.maxDescM2);
     setDescuentoContadoM2(limites.maxContadoM2);
-
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
 
   // Manejadores para edición manual con validación de tope
@@ -391,7 +385,6 @@ export default function App() {
   const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 
   const calcular = () => {
-    // Si se ingreso porcentaje, el monto es opcional. Si se ingreso monto, el porcentaje es opcional.
     let cuota_inicial = 0;
     let descIniVal = 0;
     const sup = Number(superficie); const prec = Number(precio); const ans = Number(años);
@@ -467,12 +460,8 @@ export default function App() {
       plazo: ans, planPagos: planPagosArreglo,
       timestampId: new Date().getTime()
     });
-    setCopiado(false); // Resetear estado de copiado al recalcular
+    setCopiado(false); 
   };
-
-  useEffect(() => {
-    if(años && precio && superficie) calcular();
-  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, años, descuentoContado, descuentoCredito, descuentoM2, descuentoInicial, descuentoContadoM2, categoria, aplicarDescContadoPct, aplicarDescCreditoPct, aplicarDescM2, aplicarDescContadoM2, aplicarBonoInicialOtro]);
 
   const getTextToCopy = () => {
     if (!resultado) return "";
@@ -511,14 +500,12 @@ export default function App() {
   const copiarTexto = () => {
     if (!resultado) return;
     const mensaje = getTextToCopy();
-    // Intenta usar la API moderna del portapapeles, si falla usa el método clásico
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(mensaje).then(() => {
             setCopiado(true);
             setTimeout(() => setCopiado(false), 2000);
         });
     } else {
-        // Fallback para entornos menos seguros o iframes
         let textArea = document.createElement("textarea");
         textArea.value = mensaje;
         textArea.style.position = "fixed";
