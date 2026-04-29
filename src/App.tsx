@@ -280,10 +280,8 @@ export default function App() {
   // ==========================================================================
   // LÓGICA DE DESCUENTOS Y RESTRICCIONES PREMIUM
   // ==========================================================================
-  // Identificar si el lote es premium para activar el candado visual e interno
   const isPremiumLote = categoria.toUpperCase().includes('AVENIDA') || categoria.toUpperCase().includes('PARQUE') || categoria.toUpperCase().includes('RADIAL');
   
-  // Calcular el monto en dólares exacto que representa el 5% mínimo (Para bloquear la casilla de monto)
   let minMontoPremium = 0;
   if (isPremiumLote && superficie && precio) {
       const sup = Number(superficie); const prec = Number(precio);
@@ -295,8 +293,14 @@ export default function App() {
       if (base > 0) minMontoPremium = base * 0.05;
   }
 
-  // Efecto que distribuye las recompensas si se alcanza el 5%
-  useEffect(() => {
+  // --- NUEVA LÓGICA: Calcular los límites MÁXIMOS permitidos ---
+  const calcularLimitesMaximos = () => {
+    let maxCreditoPct = 0;
+    let maxContadoPct = 0;
+    let maxDescM2 = 0;
+    let maxContadoM2 = 0;
+    const maxBonoInicial = 500;
+
     let pct = 0;
     if (modoInicial === 'porcentaje') {
       pct = Number(inicialPorcentaje);
@@ -312,30 +316,77 @@ export default function App() {
       }
     }
 
-    if (pct >= 0) {
-      if (descGroup4_30PCT.includes(proyecto)) {
-        if (pct >= 4.99) setDescuentoCredito(23);
-        else setDescuentoCredito(20);
-      } 
-      else if (descGroup5_32PCT.includes(proyecto)) {
-        if (pct >= 4.99) setDescuentoCredito(28);
-        else setDescuentoCredito(25);
-      } 
-      else if (descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto)) {
-        if (pct >= 4.99) setDescuentoM2(2);
-        else setDescuentoM2(1);
-      } 
-      else if (descGroup3_7USD.includes(proyecto)) {
-        setDescuentoM2(5);
-      }
-      else if (descGroup6_20PCT.includes(proyecto)) {
-        setDescuentoCredito(15);
-      }
-      else if (descGroup7_15PCT.includes(proyecto)) {
-        setDescuentoCredito(10);
-      }
+    if (descGroup4_30PCT.includes(proyecto)) {
+      maxContadoPct = 30;
+      maxCreditoPct = (pct >= 4.99 && isPremiumLote) ? 23 : 20;
+    } else if (descGroup5_32PCT.includes(proyecto)) {
+      maxContadoPct = 32;
+      maxCreditoPct = (pct >= 4.99 && isPremiumLote) ? 28 : 25;
+    } else if (descGroup1_3USD.includes(proyecto)) {
+      maxContadoM2 = 3;
+      maxDescM2 = (pct >= 4.99) ? 2 : 1;
+    } else if (descGroup2_4USD.includes(proyecto)) {
+      maxContadoM2 = 4;
+      maxDescM2 = (pct >= 4.99) ? 2 : 1;
+    } else if (descGroup3_7USD.includes(proyecto)) {
+      maxContadoM2 = 7;
+      maxDescM2 = 5;
+    } else if (descGroup6_20PCT.includes(proyecto)) {
+      maxContadoPct = 20;
+      maxCreditoPct = 15;
+    } else if (descGroup7_15PCT.includes(proyecto)) {
+      maxContadoPct = 15;
+      maxCreditoPct = 10;
     }
-  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, descuentoM2, descuentoCredito, aplicarDescM2, aplicarDescCreditoPct]);
+
+    return { maxCreditoPct, maxContadoPct, maxDescM2, maxContadoM2, maxBonoInicial };
+  };
+
+  // Efecto que auto-aplica los descuentos máximos si cambian las condiciones base (proyecto, inicial, categoría)
+  useEffect(() => {
+    const limites = calcularLimitesMaximos();
+    
+    // Solo auto-actualizamos si el usuario NO ha modificado manualmente hacia abajo
+    // Opcional: Si prefieres que SIEMPRE se auto-rellene al máximo al cambiar algo (como el inicial), déjalo así.
+    // Si prefieres que respete lo que escribió el asesor, tendríamos que agregar una bandera extra.
+    // Por ahora, lo mantenemos simple: al cambiar de proyecto o inicial, te sugiere el máximo.
+    setDescuentoCredito(limites.maxCreditoPct);
+    setDescuentoContado(limites.maxContadoPct);
+    setDescuentoM2(limites.maxDescM2);
+    setDescuentoContadoM2(limites.maxContadoM2);
+
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
+
+  // Manejadores para edición manual con validación de tope
+  const handleDescContadoChange = (e) => {
+    const val = Number(e.target.value);
+    const max = calcularLimitesMaximos().maxContadoPct;
+    setDescuentoContado(val > max ? max : val);
+  };
+
+  const handleDescCreditoChange = (e) => {
+    const val = Number(e.target.value);
+    const max = calcularLimitesMaximos().maxCreditoPct;
+    setDescuentoCredito(val > max ? max : val);
+  };
+
+  const handleDescM2Change = (e) => {
+    const val = Number(e.target.value);
+    const max = calcularLimitesMaximos().maxDescM2;
+    setDescuentoM2(val > max ? max : val);
+  };
+
+  const handleDescContadoM2Change = (e) => {
+    const val = Number(e.target.value);
+    const max = calcularLimitesMaximos().maxContadoM2;
+    setDescuentoContadoM2(val > max ? max : val);
+  };
+
+  const handleBonoInicialChange = (e) => {
+    const val = Number(e.target.value);
+    setDescuentoInicial(val > 500 ? 500 : val);
+  };
+
 
   const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
 
@@ -746,13 +797,15 @@ export default function App() {
                           <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
                             <input type="checkbox" checked={aplicarDescContadoPct} onChange={e => setAplicarDescContadoPct(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> A Contado (%)
                           </label>
-                          <input type="number" step="0.01" disabled={!aplicarDescContadoPct} value={descuentoContado} onChange={e=>setDescuentoContado(e.target.value)} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoPct ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                          <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoPct} value={descuentoContado} onChange={handleDescContadoChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoPct ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                          <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoPct ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: {calcularLimitesMaximos().maxContadoPct}%</p>
                         </div>
                         <div className="space-y-1.5">
                           <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
                             <input type="checkbox" checked={aplicarDescCreditoPct} onChange={e => setAplicarDescCreditoPct(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> A Crédito (%)
                           </label>
-                          <input type="number" step="0.01" disabled={!aplicarDescCreditoPct} value={descuentoCredito} onChange={e=>setDescuentoCredito(e.target.value)} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescCreditoPct ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                          <input type="number" step="0.01" min="0" disabled={!aplicarDescCreditoPct} value={descuentoCredito} onChange={handleDescCreditoChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescCreditoPct ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                          <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescCreditoPct ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: {calcularLimitesMaximos().maxCreditoPct}%</p>
                         </div>
                       </>
                     )}
@@ -761,8 +814,8 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
                           <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> Crédito x m² ($us)
                         </label>
-                        <input type="number" step="0.01" disabled={!aplicarDescM2} value={descuentoM2} onChange={e=>setDescuentoM2(e.target.value)} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Sin límite</p>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescM2} value={descuentoM2} onChange={handleDescM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxDescM2}</p>
                       </div>
                     )}
                     {showDescContadoM2 && (
@@ -770,8 +823,8 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
                           <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> Contado x m² ($us)
                         </label>
-                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={e=>setDescuentoContadoM2(e.target.value)} placeholder="Ej. 3" className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Sin límite</p>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={handleDescContadoM2Change} placeholder="Ej. 3" className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxContadoM2}</p>
                       </div>
                     )}
                     {showBonoInicial && (
@@ -779,7 +832,8 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
                           <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> Bono Inicial ($us)
                         </label>
-                        <input type="number" step="0.01" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={e=>{ let v = Number(e.target.value); setDescuentoInicial(v > 500 ? 500 : v); }} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'glass-input' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <input type="number" step="0.01" min="0" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={handleBonoInicialChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarBonoInicialOtro ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: $500</p>
                       </div>
                     )}
                   </div>
