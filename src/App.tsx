@@ -49,13 +49,13 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// AGRUPACIONES POR REGLAS DE DESCUENTOS
+// AGRUPACIONES POR REGLAS DE DESCUENTOS (MAYO 2026)
 // ============================================================================
-const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2"];
-const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3"];
+const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
+const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3", "CELINA VII FASE 1", "CELINA VII FASE 2", "TAMARINDO"];
 const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
-const descGroup4_30PCT = ["MUYURINA", "CELINA VII FASE 1", "CELINA VII FASE 2", "CELINA X", "TAMARINDO", "CLARA CHUCHIO", "URUBÓ NORTE", "CELINA 8"];
-const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "CELINA PAILÓN", "VILLA BELLA VIVIENDAS"];
+const descGroup4_30PCT = ["MUYURINA", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
+const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
 const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
 
@@ -306,10 +306,10 @@ export default function App() {
 
     if (descGroup4_30PCT.includes(proyecto)) {
       maxContadoPct = 30;
-      maxCreditoPct = (pct >= 4.99) ? 23 : 20; // SIN RESTRICCIÓN DE PREMIUM LOTE PARA EL PREMIO
+      maxCreditoPct = (pct >= 4.99) ? 23 : 20; 
     } else if (descGroup5_32PCT.includes(proyecto)) {
       maxContadoPct = 32;
-      maxCreditoPct = (pct >= 4.99) ? 28 : 25; // SIN RESTRICCIÓN DE PREMIUM LOTE PARA EL PREMIO
+      maxCreditoPct = (pct >= 4.99) ? 28 : 25; 
     } else if (descGroup1_3USD.includes(proyecto)) {
       maxContadoM2 = 3;
       maxDescM2 = (pct >= 4.99) ? 2 : 1;
