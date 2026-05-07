@@ -3,7 +3,7 @@ import {
   Calculator, Send, Map, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame
 } from "lucide-react";
 
 // ============================================================================
@@ -51,10 +51,10 @@ const proyectosPorRegional = {
 // ============================================================================
 // AGRUPACIONES POR REGLAS DE DESCUENTOS (MAYO 2026)
 // ============================================================================
-const descGroup1_3USD = ["LOS JARDINES", "SANTA FE", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
+const descGroup1_3USD = ["LOS JARDINES", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
 const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3", "CELINA VII FASE 1", "CELINA VII FASE 2", "TAMARINDO"];
 const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
-const descGroup4_30PCT = ["MUYURINA", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
+const descGroup4_30PCT = ["MUYURINA", "SANTA FE", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
 const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
 const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
@@ -97,6 +97,10 @@ export default function App() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [copiado, setCopiado] = useState(false);
   
+  // Estados para la Comparativa
+  const [escenarioGuardado, setEscenarioGuardado] = useState(null);
+  const [mostrarComparativa, setMostrarComparativa] = useState(false);
+
   const resultadosRef = useRef(null);
 
   // ==========================================================================
@@ -186,6 +190,7 @@ export default function App() {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
     setResultado(null); setProyectoPersonalizado(""); setMostrarPlan(false);
+    setEscenarioGuardado(null); setMostrarComparativa(false);
 
     setAplicarDescContadoPct(true); setAplicarDescCreditoPct(true); setAplicarDescM2(true);
     setAplicarDescContadoM2(true); setAplicarBonoInicialOtro(true);
@@ -281,7 +286,6 @@ export default function App() {
   // LÓGICA DE DESCUENTOS
   // ==========================================================================
 
-  // --- NUEVA LÓGICA: Calcular los límites MÁXIMOS permitidos ---
   const calcularLimitesMaximos = () => {
     let maxCreditoPct = 0;
     let maxContadoPct = 0;
@@ -304,6 +308,14 @@ export default function App() {
       }
     }
 
+    const catUpper = categoria.toUpperCase();
+    const isCanaveralPremium = proyecto === "CAÑAVERAL" && (
+      catUpper.includes('CARRETERA') || 
+      catUpper.includes('PAVIMENTO') || 
+      catUpper.includes('4TO ANILLO') || 
+      catUpper.includes('4 ANILLO')
+    );
+
     if (descGroup4_30PCT.includes(proyecto)) {
       maxContadoPct = 30;
       maxCreditoPct = (pct >= 4.99) ? 23 : 20; 
@@ -315,7 +327,11 @@ export default function App() {
       maxDescM2 = (pct >= 4.99) ? 2 : 1;
     } else if (descGroup2_4USD.includes(proyecto)) {
       maxContadoM2 = 4;
-      maxDescM2 = (pct >= 4.99) ? 2 : 1;
+      if (isCanaveralPremium) {
+        maxDescM2 = 3;
+      } else {
+        maxDescM2 = (pct >= 4.99) ? 2 : 1;
+      }
     } else if (descGroup3_7USD.includes(proyecto)) {
       maxContadoM2 = 7;
       maxDescM2 = 5;
@@ -330,7 +346,6 @@ export default function App() {
     return { maxCreditoPct, maxContadoPct, maxDescM2, maxContadoM2, maxBonoInicial };
   };
 
-  // Efecto que auto-aplica los descuentos máximos
   useEffect(() => {
     const limites = calcularLimitesMaximos();
     setDescuentoCredito(limites.maxCreditoPct);
@@ -339,7 +354,6 @@ export default function App() {
     setDescuentoContadoM2(limites.maxContadoM2);
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
 
-  // Manejadores para edición manual con validación de tope
   const handleDescContadoChange = (e) => {
     const val = Number(e.target.value);
     const max = calcularLimitesMaximos().maxContadoPct;
@@ -374,6 +388,7 @@ export default function App() {
 
   const calcular = () => {
     let cuota_inicial = 0;
+    let pct_efectivo = 0;
     let descIniVal = 0;
     const sup = Number(superficie); const prec = Number(precio); const ans = Number(años);
     const descCreditoPct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
@@ -390,9 +405,11 @@ export default function App() {
     const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
     
     if (modoInicial === 'porcentaje') {
-       cuota_inicial = base_para_inicial * (Number(inicialPorcentaje) / 100);
+       pct_efectivo = Number(inicialPorcentaje);
+       cuota_inicial = base_para_inicial * (pct_efectivo / 100);
     } else {
        cuota_inicial = Number(inicialMonto);
+       pct_efectivo = base_para_inicial > 0 ? (cuota_inicial / base_para_inicial) * 100 : 0;
     }
 
     descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min(Number(descuentoInicial), 500) : 0;
@@ -409,19 +426,21 @@ export default function App() {
     }
     const valor_contado = valor_original - monto_descuento_total_contado;
 
+    // --- MATEMÁTICA Y TABLA DE PLAN DE PAGOS (1 a 10 Años) ---
     const saldo = valor_credito - cuota_inicial;
-    const meses = ans * 12;
     const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
-    let pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
     const refSaldo = 34278.00;
     const baseSeguro = { 1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38 };
-    const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1) / refSaldo;
-
-    const seguro = saldo * factorSeguro;
     const cbdi = 0;
+    
+    let pago_puro = tasa === 0 ? saldo / (ans*12) : saldo * (tasa * Math.pow(1 + tasa, ans*12)) / (Math.pow(1 + tasa, ans*12) - 1);
+    const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1) / refSaldo;
+    const seguro = saldo * factorSeguro;
     const cuota_final = pago_puro + seguro + cbdi;
+    
     const TIPO_CAMBIO = 6.97;
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
+    const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
 
     let planPagosArreglo = [];
     for (let i = 10; i >= 1; i--) {
@@ -430,22 +449,34 @@ export default function App() {
       const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1) / refSaldo;
       const seg_i = saldo * fS_i;
       const c_final_i = pp_i + seg_i + cbdi;
-      planPagosArreglo.push({ año: i, cuotaUsd: formatMoney(c_final_i), cuotaBs: formatMoney(c_final_i * TIPO_CAMBIO) });
+      
+      planPagosArreglo.push({ 
+        año: i, 
+        cuotaUsd: formatMoney(c_final_i), 
+        cuotaBs: formatMoney(c_final_i * TIPO_CAMBIO),
+        isCurrent: i === ans
+      });
     }
 
     setResultado({
       regional: regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria: categoria,
+      valorOriginalRaw: valor_original,
       valorOriginal: formatMoney(valor_original), valorOriginalBs: formatMoney(valor_original * TIPO_CAMBIO),
       valorContado: formatMoney(valor_contado), valorContadoBs: formatMoney(valor_contado * TIPO_CAMBIO),
+      ahorroContadoRaw: monto_descuento_total_contado,
       ahorroContado: formatMoney(monto_descuento_total_contado), porcentajeContado: aplicarDescContadoPct ? descuentoContado : 0,
       descuentoContadoM2: aplicarDescContadoM2 ? descContadoM2Val : 0,
+      valorCreditoRaw: valor_credito,
       valorCredito: formatMoney(valor_credito), valorCreditoBs: formatMoney(valor_credito * TIPO_CAMBIO),
+      ahorroCreditoRaw: monto_descuento_total_credito,
       ahorroCredito: formatMoney(monto_descuento_total_credito), porcentajeCredito: aplicarDescCreditoPct ? descuentoCredito : 0,
       descuentoM2: aplicarDescM2 ? descM2Val : 0, descuentoInicial: descIniVal,
-      inicial: formatMoney(cuota_inicial), inicialBs: formatMoney(cuota_inicial * TIPO_CAMBIO),
+      inicialRaw: cuota_inicial,
+      inicial: formatMoney(cuota_inicial), inicialBs: formatMoney(cuota_inicial * TIPO_CAMBIO), inicialPct: formatPct,
       pagoAmortizacion: formatMoney(pago_puro), seguro: formatMoney(seguro), cbdi: formatMoney(cbdi),
       mensual: formatMoney(cuota_final), mensualBs: formatMoney(cuota_final * TIPO_CAMBIO),
-      plazo: ans, planPagos: planPagosArreglo,
+      plazo: ans, 
+      planPagos: planPagosArreglo,
       timestampId: new Date().getTime()
     });
     setCopiado(false); 
@@ -473,7 +504,7 @@ export default function App() {
     if (resultado.descuentoInicial > 0) arrCredito.push(`Bono Inicial Doble`);
     let creditoStr = arrCredito.length > 0 ? `✅ *Crédito - ¡Con ${arrCredito.join(' + ')} de descuento!*\n*Inversión:* $ ${resultado.valorCredito} (Bs. ${resultado.valorCreditoBs})\n\n` : "";
 
-    const financiamiento = `📊 *Plan de Financiamiento* (${resultado.plazo} años)\n*Cuota inicial:* $${resultado.inicial} (Bs. ${resultado.inicialBs})\n*Cuota mensual:* $${resultado.mensual} (Bs. ${resultado.mensualBs})\n\n`;
+    const financiamiento = `📊 *Plan de Financiamiento* (${resultado.plazo} años)\n*Cuota inicial:* ${resultado.inicialPct}% ($${resultado.inicial})\n*Cuota mensual:* $${resultado.mensual} (Bs. ${resultado.mensualBs})\n\n`;
     const cierre = `¿Le gustaría agendar una visita al terreno o prefiere una breve llamada para coordinar el cierre? Quedo a su disposición. 🤝`;
 
     return saludo + ubicacion + precioLista + contadoStr + creditoStr + financiamiento + cierre;
@@ -526,6 +557,41 @@ export default function App() {
     }, 400);
   };
 
+  // UI Reutilizable para la tarjeta de comparativa
+  const EscenarioCard = ({ data, isGuardado }) => (
+    <div className={`bg-slate-900/40 border rounded-2xl p-5 relative overflow-hidden flex flex-col h-full ${isGuardado ? 'border-slate-700/50' : 'border-cyan-500/30 bg-cyan-950/20'}`}>
+      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl ${isGuardado ? 'bg-slate-500/5' : 'bg-cyan-500/10'}`}></div>
+      <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full w-fit mx-auto mb-5 border ${isGuardado ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'}`}>
+        {isGuardado ? 'ESCENARIO A (GUARDADO)' : 'ESCENARIO B (ACTUAL)'}
+      </div>
+      <div className="text-center mb-6 relative z-10">
+        <div className="text-3xl font-black text-white mb-1">{data.plazo} Años</div>
+        <div className="text-cyan-400 font-bold text-sm tracking-wide">Inicial: {data.inicialPct}% (${data.inicial})</div>
+      </div>
+      <div className="space-y-3 relative z-10 flex-1">
+        <div className="flex justify-between items-center py-2 border-b border-slate-800/60">
+          <span className="text-slate-400 text-sm">Superficie:</span>
+          <span className="text-white font-bold text-sm">{data.superficie} m²</span>
+        </div>
+        <div className="flex justify-between items-center py-2 border-b border-slate-800/60">
+          <span className="text-slate-400 text-sm">Total a Financiar:</span>
+          <span className="text-white font-bold text-sm">${data.valorCredito}</span>
+        </div>
+        <div className="flex justify-between items-center py-2 border-b border-slate-800/60">
+          <span className="text-slate-400 text-sm">Ahorro Crédito:</span>
+          <span className={`font-bold text-sm ${data.ahorroCredito !== "0.00" ? 'text-emerald-400' : 'text-slate-500'}`}>{data.ahorroCredito !== "0.00" ? data.ahorroCredito : "0.00"}</span>
+        </div>
+      </div>
+      <div className={`mt-6 border rounded-xl p-4 flex justify-between items-center relative z-10 ${isGuardado ? 'bg-[#0b172a] border-slate-700/50' : 'bg-cyan-950/40 border-cyan-500/30'}`}>
+        <div className="text-[10px] text-cyan-400 font-black uppercase tracking-wider leading-tight">Cuota<br/>Mensual</div>
+        <div className="text-right">
+          <div className="text-2xl font-black text-white leading-none mb-1">${data.mensual}</div>
+          <div className="text-[10px] text-slate-500 font-bold">Bs. {data.mensualBs}</div>
+        </div>
+      </div>
+    </div>
+  );
+
   const showDescPorcentaje = descGroup4_30PCT.includes(proyecto) || descGroup5_32PCT.includes(proyecto) || descGroup6_20PCT.includes(proyecto) || descGroup7_15PCT.includes(proyecto) || proyecto === "OTRO";
   const showDescM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto) || proyecto === "OTRO";
   const showDescContadoM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto);
@@ -550,7 +616,63 @@ export default function App() {
         .glass-input { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); color: #f8fafc; }
         .glass-input:focus { background: rgba(15, 23, 42, 0.8); border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), inset 0 2px 4px 0 rgba(0, 0, 0, 0.05); }
         select option { background: #0f172a; color: #f8fafc; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.5); border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.8); }
       `}</style>
+
+      {/* MODAL DE COMPARATIVA CON SENTIDO DE URGENCIA */}
+      {mostrarComparativa && escenarioGuardado && resultado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020617]/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-300">
+          <div className="bg-[#0f172a] border border-slate-700/50 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh]">
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-800 shrink-0">
+              <h3 className="flex items-center gap-3 text-lg sm:text-xl font-bold text-white tracking-wide">
+                <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" /> Comparativa de Inversión
+              </h3>
+              <button onClick={() => setMostrarComparativa(false)} className="text-slate-400 hover:text-white transition-colors bg-slate-800/50 p-2 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 bg-gradient-to-b from-[#0f172a] to-[#020617] overflow-y-auto">
+              <EscenarioCard data={escenarioGuardado} isGuardado={true} />
+              <EscenarioCard data={resultado} isGuardado={false} />
+            </div>
+
+            {/* 🔥 BANNER DE URGENCIA (ANALISIS DE AHORRO) */}
+            <div className="px-5 sm:px-6 pb-5 sm:pb-6 bg-[#020617] shrink-0">
+               <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-rose-500/20 border border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl"></div>
+                 <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                   <div className="flex items-center gap-3">
+                     <div className="bg-amber-500/20 p-2 rounded-full border border-amber-500/30">
+                        <Flame className="w-6 h-6 text-amber-400" />
+                     </div>
+                     <div>
+                       <h4 className="text-amber-400 font-black tracking-wide text-sm sm:text-base uppercase">Análisis de Oportunidad</h4>
+                       <p className="text-slate-300 text-xs sm:text-sm font-medium mt-1">
+                         Aprovechando los descuentos válidos hasta el <span className="font-bold text-white">31 de mayo de 2026</span>.
+                       </p>
+                     </div>
+                   </div>
+                   <div className="text-center sm:text-right bg-[#020617]/50 px-4 py-2 rounded-xl border border-amber-500/20 w-full sm:w-auto">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Ahorro Real Obtenido</div>
+                      <div className="text-2xl font-black text-amber-400">${resultado.ahorroCredito !== "0.00" ? resultado.ahorroCredito : resultado.ahorroContado}</div>
+                   </div>
+                 </div>
+               </div>
+            </div>
+
+            <div className="p-5 sm:p-6 border-t border-slate-800 shrink-0 bg-[#0f172a]">
+              <button onClick={() => setMostrarComparativa(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors">
+                Cerrar Comparativa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MAPA ISOMÉTRICO */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.25] flex items-center justify-center mix-blend-screen animate-float">
@@ -981,14 +1103,22 @@ export default function App() {
                       <div key={`c-${resultado.timestampId}`} className="text-[2.5rem] leading-none sm:text-7xl font-black text-white tracking-tighter drop-shadow-lg break-all animate-pop">$ {resultado.mensual}</div>
                       <div key={`cbs-${resultado.timestampId}`} className="text-xl sm:text-3xl font-bold text-emerald-300 mt-1 sm:mt-0 animate-pop" style={{animationDelay: '100ms'}}>Bs. {resultado.mensualBs}</div>
                     </div>
-                    <div className="text-[10px] sm:text-xs text-emerald-200/60 mt-4 sm:mt-6 font-semibold tracking-widest relative z-10 flex flex-wrap gap-2 sm:gap-4 border-t border-emerald-500/30 pt-3 sm:pt-4 uppercase">
-                      <span>Amort. ${resultado.pagoAmortizacion}</span><span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 my-auto hidden sm:block"></span>
-                      <span>Seguro ${resultado.seguro}</span><span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 my-auto hidden sm:block"></span>
-                      <span>CBDI ${resultado.cbdi}</span>
-                    </div>
                   </div>
 
-                  {/* ACORDEÓN: PLAN DE PAGOS */}
+                  {/* NUEVO: PANEL DE COMPARATIVA (BOTONES) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+                    <button onClick={() => setEscenarioGuardado(resultado)} className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm">
+                       <Scale className="w-4 h-4"/>
+                       {escenarioGuardado ? "Actualizar Escenario A" : "Guardar como Escenario A"}
+                    </button>
+                    {escenarioGuardado && (
+                      <button onClick={() => setMostrarComparativa(true)} className="w-full bg-cyan-900/50 hover:bg-cyan-800/50 border border-cyan-500/50 text-cyan-400 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                         <Scale className="w-4 h-4"/> Comparar Escenarios
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ACORDEÓN: PLAN DE PAGOS (1 a 10 Años) */}
                   <div className="mt-5 sm:mt-6">
                     <button onClick={() => setMostrarPlan(!mostrarPlan)} className="w-full flex items-start sm:items-center justify-between p-3 sm:p-4 rounded-2xl bg-slate-800/40 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-slate-800/60 hover:border-emerald-500/40 transition-all duration-300 group shadow-sm text-left">
                       <div className="flex items-center gap-2 sm:gap-3"><div className="bg-emerald-500/10 p-1.5 sm:p-2 rounded-lg border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors"><ListOrdered className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /></div><span className="tracking-wide text-xs sm:text-base mt-0.5 sm:mt-0">Ver Plan de Pagos (10 a 1 años)</span></div>
@@ -1001,10 +1131,10 @@ export default function App() {
                         </div>
                         <div className="p-1.5 sm:p-2">
                           {resultado.planPagos.map((plan, i) => (
-                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg sm:rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.año === resultado.plazo ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-emerald-500/20 border border-emerald-500/40 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.02] transform my-1' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
-                              <div className="flex items-center justify-center gap-1.5 sm:gap-2">{plan.año === resultado.plazo && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>} {plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
-                              <div className={`font-black ${plan.año === resultado.plazo ? 'text-white' : 'text-emerald-100'}`}>$ {plan.cuotaUsd}</div>
-                              <div className={plan.año === resultado.plazo ? 'text-emerald-300' : 'text-slate-400'}>Bs. {plan.cuotaBs}</div>
+                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg sm:rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-emerald-500/20 border border-emerald-500/40 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.02] transform my-1' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
+                              <div className="flex items-center justify-center gap-1.5 sm:gap-2">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>} {plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
+                              <div className={`font-black ${plan.isCurrent ? 'text-white' : 'text-emerald-100'}`}>$ {plan.cuotaUsd}</div>
+                              <div className={plan.isCurrent ? 'text-emerald-300' : 'text-slate-400'}>Bs. {plan.cuotaBs}</div>
                             </div>
                           ))}
                         </div>
