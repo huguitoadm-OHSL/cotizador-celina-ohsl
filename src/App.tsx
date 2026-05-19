@@ -97,7 +97,6 @@ export default function App() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [copiado, setCopiado] = useState(false);
   
-  // Estados para la Comparativa
   const [escenarioGuardado, setEscenarioGuardado] = useState(null);
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
 
@@ -170,7 +169,6 @@ export default function App() {
     }
   }, [regional]);
 
-  // Manejadores de cascada
   const handleUvChange = (e) => {
     setUv(e.target.value);
     setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
@@ -185,7 +183,6 @@ export default function App() {
     setLote(e.target.value);
   };
 
-  // Reset TOTAL al cambiar de proyecto
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
@@ -269,7 +266,6 @@ export default function App() {
     if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote("");
   }, [modoBD, lotesDisponibles, lote]);
 
-  // Rellenar Superficie y Precio Final
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
@@ -557,35 +553,35 @@ export default function App() {
     }, 400);
   };
 
-  // UI Reutilizable para la tarjeta de comparativa
+  // UI Reutilizable para la tarjeta de comparativa (Light Mode)
   const EscenarioCard = ({ data, isGuardado }) => (
-    <div className={`bg-slate-900/40 border rounded-2xl p-5 relative overflow-hidden flex flex-col h-full ${isGuardado ? 'border-slate-700/50' : 'border-cyan-500/30 bg-cyan-950/20'}`}>
-      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl ${isGuardado ? 'bg-slate-500/5' : 'bg-cyan-500/10'}`}></div>
-      <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full w-fit mx-auto mb-5 border ${isGuardado ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'}`}>
+    <div className={`bg-white border rounded-2xl p-5 relative overflow-hidden flex flex-col h-full shadow-sm ${isGuardado ? 'border-slate-200' : 'border-emerald-300 bg-emerald-50/30'}`}>
+      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl ${isGuardado ? 'bg-slate-100' : 'bg-emerald-100/50'}`}></div>
+      <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full w-fit mx-auto mb-5 border ${isGuardado ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>
         {isGuardado ? 'ESCENARIO A (GUARDADO)' : 'ESCENARIO B (ACTUAL)'}
       </div>
       <div className="text-center mb-6 relative z-10">
-        <div className="text-3xl font-black text-white mb-1">{data.plazo} Años</div>
-        <div className="text-cyan-400 font-bold text-sm tracking-wide">Inicial: {data.inicialPct}% (${data.inicial})</div>
+        <div className="text-3xl font-black text-slate-900 mb-1">{data.plazo} Años</div>
+        <div className="text-emerald-600 font-bold text-sm tracking-wide">Inicial: {data.inicialPct}% (${data.inicial})</div>
       </div>
       <div className="space-y-3 relative z-10 flex-1">
-        <div className="flex justify-between items-center py-2 border-b border-slate-800/60">
-          <span className="text-slate-400 text-sm">Superficie:</span>
-          <span className="text-white font-bold text-sm">{data.superficie} m²</span>
+        <div className="flex justify-between items-center py-2 border-b border-slate-100">
+          <span className="text-slate-500 text-sm">Superficie:</span>
+          <span className="text-slate-900 font-bold text-sm">{data.superficie} m²</span>
         </div>
-        <div className="flex justify-between items-center py-2 border-b border-slate-800/60">
-          <span className="text-slate-400 text-sm">Total a Financiar:</span>
-          <span className="text-white font-bold text-sm">${data.valorCredito}</span>
+        <div className="flex justify-between items-center py-2 border-b border-slate-100">
+          <span className="text-slate-500 text-sm">Total a Financiar:</span>
+          <span className="text-slate-900 font-bold text-sm">${data.valorCredito}</span>
         </div>
-        <div className="flex justify-between items-center py-2 border-b border-slate-800/60">
-          <span className="text-slate-400 text-sm">Ahorro Crédito:</span>
-          <span className={`font-bold text-sm ${data.ahorroCredito !== "0.00" ? 'text-emerald-400' : 'text-slate-500'}`}>{data.ahorroCredito !== "0.00" ? data.ahorroCredito : "0.00"}</span>
+        <div className="flex justify-between items-center py-2 border-b border-slate-100">
+          <span className="text-slate-500 text-sm">Ahorro Crédito:</span>
+          <span className={`font-bold text-sm ${data.ahorroCredito !== "0.00" ? 'text-emerald-600' : 'text-slate-400'}`}>{data.ahorroCredito !== "0.00" ? data.ahorroCredito : "0.00"}</span>
         </div>
       </div>
-      <div className={`mt-6 border rounded-xl p-4 flex justify-between items-center relative z-10 ${isGuardado ? 'bg-[#0b172a] border-slate-700/50' : 'bg-cyan-950/40 border-cyan-500/30'}`}>
-        <div className="text-[10px] text-cyan-400 font-black uppercase tracking-wider leading-tight">Cuota<br/>Mensual</div>
+      <div className={`mt-6 border rounded-xl p-4 flex justify-between items-center relative z-10 ${isGuardado ? 'bg-slate-50 border-slate-200' : 'bg-emerald-50 border-emerald-200'}`}>
+        <div className="text-[10px] text-emerald-700 font-black uppercase tracking-wider leading-tight">Cuota<br/>Mensual</div>
         <div className="text-right">
-          <div className="text-2xl font-black text-white leading-none mb-1">${data.mensual}</div>
+          <div className="text-2xl font-black text-slate-900 leading-none mb-1">${data.mensual}</div>
           <div className="text-[10px] text-slate-500 font-bold">Bs. {data.mensualBs}</div>
         </div>
       </div>
@@ -598,7 +594,7 @@ export default function App() {
   const showBonoInicial = proyecto === "OTRO";
 
   return (
-    <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-200 overflow-x-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
+    <div className="min-h-screen bg-slate-50 relative font-['Plus_Jakarta_Sans'] text-slate-800 overflow-x-hidden selection:bg-emerald-200 selection:text-emerald-900">
       
       <style>{`
         @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
@@ -612,61 +608,62 @@ export default function App() {
         .animation-delay-2000 { animation-delay: 2s; }
         .animation-delay-4000 { animation-delay: 4s; }
         
-        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(16, 185, 129, 0.15); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255,255,255,0.05); }
-        .glass-input { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); color: #f8fafc; }
-        .glass-input:focus { background: rgba(15, 23, 42, 0.8); border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), inset 0 2px 4px 0 rgba(0, 0, 0, 0.05); }
-        select option { background: #0f172a; color: #f8fafc; }
+        /* Light Theme Glassmorphism */
+        .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(16, 185, 129, 0.2); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); }
+        .glass-input { background: #ffffff; border: 1px solid #e2e8f0; color: #0f172a; }
+        .glass-input:focus { background: #ffffff; border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); outline: none;}
+        select option { background: #ffffff; color: #0f172a; }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); border-radius: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.5); border-radius: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.8); }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* MODAL DE COMPARATIVA CON SENTIDO DE URGENCIA */}
+      {/* MODAL DE COMPARATIVA (Light Theme) */}
       {mostrarComparativa && escenarioGuardado && resultado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020617]/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-[#0f172a] border border-slate-700/50 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh]">
-            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-800 shrink-0">
-              <h3 className="flex items-center gap-3 text-lg sm:text-xl font-bold text-white tracking-wide">
-                <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" /> Comparativa de Inversión
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-300">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh]">
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0">
+              <h3 className="flex items-center gap-3 text-lg sm:text-xl font-bold text-slate-900 tracking-wide">
+                <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" /> Comparativa de Inversión
               </h3>
-              <button onClick={() => setMostrarComparativa(false)} className="text-slate-400 hover:text-white transition-colors bg-slate-800/50 p-2 rounded-full">
+              <button onClick={() => setMostrarComparativa(false)} className="text-slate-400 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 p-2 rounded-full">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 bg-gradient-to-b from-[#0f172a] to-[#020617] overflow-y-auto">
+            <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 bg-slate-50/50 overflow-y-auto">
               <EscenarioCard data={escenarioGuardado} isGuardado={true} />
               <EscenarioCard data={resultado} isGuardado={false} />
             </div>
 
-            {/* 🔥 BANNER DE URGENCIA (ANALISIS DE AHORRO) */}
-            <div className="px-5 sm:px-6 pb-5 sm:pb-6 bg-[#020617] shrink-0">
-               <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-rose-500/20 border border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden">
-                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl"></div>
+            {/* BANNER DE URGENCIA (Light Theme) */}
+            <div className="px-5 sm:px-6 pb-5 sm:pb-6 bg-white shrink-0">
+               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-sm relative overflow-hidden">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/30 rounded-full blur-2xl"></div>
                  <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
                    <div className="flex items-center gap-3">
-                     <div className="bg-amber-500/20 p-2 rounded-full border border-amber-500/30">
-                        <Flame className="w-6 h-6 text-amber-400" />
+                     <div className="bg-amber-100 p-2 rounded-full border border-amber-200">
+                        <Flame className="w-6 h-6 text-amber-600" />
                      </div>
                      <div>
-                       <h4 className="text-amber-400 font-black tracking-wide text-sm sm:text-base uppercase">Análisis de Oportunidad</h4>
-                       <p className="text-slate-300 text-xs sm:text-sm font-medium mt-1">
-                         Aprovechando los descuentos válidos hasta el <span className="font-bold text-white">31 de mayo de 2026</span>.
+                       <h4 className="text-amber-800 font-black tracking-wide text-sm sm:text-base uppercase">Análisis de Oportunidad</h4>
+                       <p className="text-amber-700/80 text-xs sm:text-sm font-medium mt-1">
+                         Aprovechando los descuentos válidos hasta el <span className="font-bold text-amber-900">31 de mayo de 2026</span>.
                        </p>
                      </div>
                    </div>
-                   <div className="text-center sm:text-right bg-[#020617]/50 px-4 py-2 rounded-xl border border-amber-500/20 w-full sm:w-auto">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Ahorro Real Obtenido</div>
-                      <div className="text-2xl font-black text-amber-400">${resultado.ahorroCredito !== "0.00" ? resultado.ahorroCredito : resultado.ahorroContado}</div>
+                   <div className="text-center sm:text-right bg-white px-4 py-2 rounded-xl border border-amber-200 w-full sm:w-auto shadow-sm">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Ahorro Real Obtenido</div>
+                      <div className="text-2xl font-black text-amber-600">${resultado.ahorroCredito !== "0.00" ? resultado.ahorroCredito : resultado.ahorroContado}</div>
                    </div>
                  </div>
                </div>
             </div>
 
-            <div className="p-5 sm:p-6 border-t border-slate-800 shrink-0 bg-[#0f172a]">
-              <button onClick={() => setMostrarComparativa(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors">
+            <div className="p-5 sm:p-6 border-t border-slate-100 shrink-0 bg-slate-50">
+              <button onClick={() => setMostrarComparativa(false)} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-colors shadow-md">
                 Cerrar Comparativa
               </button>
             </div>
@@ -674,35 +671,36 @@ export default function App() {
         </div>
       )}
 
-      {/* MAPA ISOMÉTRICO */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.25] flex items-center justify-center mix-blend-screen animate-float">
+      {/* MAPA ISOMÉTRICO (Ajustado para Light Theme) */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.15] flex items-center justify-center mix-blend-multiply animate-float">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]" xmlns="http://www.w3.org/2000/svg">
           <g transform="translate(500, 400) scale(1.6)">
-            {[...Array(15)].map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(16, 185, 129, 0.2)" strokeWidth="1" strokeDasharray="4 4" />)}
-            {[...Array(15)].map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(16, 185, 129, 0.2)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)].map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(16, 185, 129, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)].map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(16, 185, 129, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
             <polygon points="0,0 60,30 0,60 -60,30" fill="rgba(16, 185, 129, 0.1)" stroke="#059669" strokeWidth="1" />
             <polygon points="60,30 120,60 60,90 0,60" fill="rgba(52, 211, 153, 0.15)" stroke="#10b981" strokeWidth="1.5" />
             <polygon points="-60,30 0,60 -60,90 -120,60" fill="rgba(5, 150, 105, 0.1)" stroke="#064e3b" strokeWidth="1" />
             <polygon points="0,60 60,90 0,120 -60,90" fill="rgba(251, 191, 36, 0.15)" stroke="#fbbf24" strokeWidth="2" className="animate-pulse" />
             <path d="M0,60 L0,10 L60,-20 L60,30 Z" fill="url(#vol1)" stroke="#059669" strokeWidth="1" />
             <path d="M0,60 L0,10 L-60,40 L-60,90 Z" fill="url(#vol2)" stroke="#047857" strokeWidth="1" />
-            <polygon points="0,10 60,-20 0,-50 -60,-20" fill="rgba(16, 185, 129, 0.4)" stroke="#34d399" strokeWidth="2" />
+            <polygon points="0,10 60,-20 0,-50 -60,-20" fill="rgba(16, 185, 129, 0.2)" stroke="#34d399" strokeWidth="2" />
           </g>
           <defs>
-            <linearGradient id="vol1" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="rgba(16, 185, 129, 0.5)" /><stop offset="100%" stopColor="rgba(2, 6, 23, 0.9)" /></linearGradient>
-            <linearGradient id="vol2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="rgba(5, 150, 105, 0.5)" /><stop offset="100%" stopColor="rgba(2, 6, 23, 0.9)" /></linearGradient>
+            <linearGradient id="vol1" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="rgba(16, 185, 129, 0.3)" /><stop offset="100%" stopColor="rgba(248, 250, 252, 0.9)" /></linearGradient>
+            <linearGradient id="vol2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="rgba(5, 150, 105, 0.3)" /><stop offset="100%" stopColor="rgba(248, 250, 252, 0.9)" /></linearGradient>
           </defs>
         </svg>
       </div>
 
+      {/* BACKGROUND ORBS (Light Theme) */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-emerald-900/40 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
-        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-teal-800/30 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-cyan-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-emerald-200/30 rounded-full mix-blend-multiply filter blur-[120px] animate-blob"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-teal-200/20 rounded-full mix-blend-multiply filter blur-[120px] animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-cyan-200/20 rounded-full mix-blend-multiply filter blur-[120px] animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0">
-        <div className="transform -rotate-90 whitespace-nowrap text-slate-800/80 font-black tracking-[0.5em] text-3xl select-none">CELINA PREMIUM</div>
+        <div className="transform -rotate-90 whitespace-nowrap text-slate-300 font-black tracking-[0.5em] text-3xl select-none">CELINA PREMIUM</div>
       </div>
 
       <div className="max-w-[1280px] mx-auto py-10 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10">
@@ -710,14 +708,14 @@ export default function App() {
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative">
           <div className="hidden md:block w-32"></div>
           <div className="text-center flex-1 flex flex-col items-center">
-            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-800/50 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] mb-4 sm:mb-5 backdrop-blur-md">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-emerald-400 text-center">Plataforma Inteligente Inmobiliaria</span>
+            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-white/80 border border-emerald-200 shadow-sm mb-4 sm:mb-5 backdrop-blur-md">
+              <Sparkles className="w-4 h-4 text-emerald-500" />
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-emerald-700 text-center">Plataforma Inteligente Inmobiliaria</span>
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-xl flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full">
-              Simulador <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-500">Celina</span>
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 drop-shadow-sm flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full">
+              Simulador <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600">Celina</span>
             </h1>
-            <p className="text-slate-400 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase">Desarrollado por Oscar Saravia®</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase">Desarrollado por Oscar Saravia®</p>
           </div>
           <div className="hidden md:block w-32"></div>
         </div>
@@ -725,129 +723,127 @@ export default function App() {
         <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start">
           
           {/* PANEL IZQUIERDO: FORMULARIO */}
-          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:shadow-[0_25px_50px_-12px_rgba(16,185,129,0.15)] flex flex-col">
-            <div className="bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 p-5 sm:p-6 text-white flex items-center justify-between gap-3 relative overflow-hidden border-b border-emerald-500/10">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col">
+            <div className="bg-emerald-50/50 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-emerald-100">
               <div className="flex items-center gap-3 relative z-10">
-                <div className="bg-emerald-500/10 p-2.5 rounded-xl backdrop-blur-md border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                  <FileText className="w-5 h-5 text-emerald-400" />
+                <div className="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-sm">
+                  <FileText className="w-5 h-5 text-emerald-600" />
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white">Datos de Inversión</h2>
+                <h2 className="text-lg sm:text-xl font-bold tracking-wide text-slate-800">Datos de Inversión</h2>
               </div>
               
-              {/* Badge de estado de BD */}
               <div className="relative z-10">
                 {!cargandoBD && baseDeDatosLotes.length > 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/50 border border-emerald-500/30 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> BD Online
+                   <span className="flex items-center gap-1.5 px-3 py-1 bg-white border border-emerald-200 rounded-full text-[9px] font-bold text-emerald-600 tracking-wider shadow-sm">
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> BD Online
                    </span>
                 )}
                 {!cargandoBD && baseDeDatosLotes.length === 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-950/50 border border-rose-500/30 rounded-full text-[9px] font-bold text-rose-400 tracking-wider">
+                   <span className="flex items-center gap-1.5 px-3 py-1 bg-white border border-rose-200 rounded-full text-[9px] font-bold text-rose-600 tracking-wider shadow-sm">
                      <AlertCircle className="w-3 h-3" /> BD Offline
                    </span>
                 )}
               </div>
             </div>
             
-            <div className="p-5 sm:p-8 flex-1">
+            <div className="p-5 sm:p-8 flex-1 bg-white/50">
               <form onSubmit={handleProcesar} className="space-y-5 sm:space-y-6">
 
                 {/* REGIONAL */}
                 <div className="space-y-2.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Map className="w-4 h-4 text-teal-400" /> Regional
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <Map className="w-4 h-4 text-emerald-500" /> Regional
                   </label>
                   <div className="relative">
-                    <select value={regional} onChange={e => setRegional(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
+                    <select value={regional} onChange={e => setRegional(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none shadow-sm">
                       {Object.keys(proyectosPorRegional).map(reg => <option key={reg} value={reg}>{reg}</option>)}
                     </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-emerald-500"><ChevronDown className="w-5 h-5" /></div>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400"><ChevronDown className="w-5 h-5" /></div>
                   </div>
                 </div>
                 
                 {/* PROYECTO & BÚSQUEDA INTELIGENTE */}
                 <div className="space-y-2.5 relative">
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-teal-400" /> Proyecto
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-emerald-500" /> Proyecto
                     </label>
                     {cargandoBD ? (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1.5 rounded-full bg-amber-500/10">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-600 flex items-center gap-1.5 border border-amber-200 px-3 py-1.5 rounded-full bg-amber-50">
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-[#0f2c3a] text-[#48b5db] border border-[#1e5875] shadow-[0_0_10px_rgba(72,181,219,0.3)] hover:bg-[#13384a]' : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}>
-                        {usarBD ? <Database className="w-3 h-3 text-[#48b5db]"/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
+                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-cyan-50 text-cyan-700 border border-cyan-200 shadow-sm hover:bg-cyan-100' : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'}`}>
+                        {usarBD ? <Database className="w-3 h-3 text-cyan-600"/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
                     ) : null}
                   </div>
                   
                   <div className="relative">
-                    <select value={proyecto} onChange={e => setProyecto(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
+                    <select value={proyecto} onChange={e => setProyecto(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none shadow-sm">
                       {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
                       <option value="OTRO">OTRO...</option>
                     </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-emerald-500"><ChevronDown className="w-5 h-5" /></div>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400"><ChevronDown className="w-5 h-5" /></div>
                   </div>
-                  {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 outline-none transition-all font-semibold mt-3 animate-pop" placeholder="Escribe el nombre del proyecto..." />}
+                  {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop shadow-sm" placeholder="Escribe el nombre del proyecto..." />}
                 </div>
 
                 {/* UV / MZN / LOTE */}
                 <div className="pt-2 sm:pt-3">
-                  <div className="bg-[#0b172a]/80 backdrop-blur-md border border-[#1e3a5f] rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)]">
+                  <div className="bg-white border border-slate-200 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-sm">
                     
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-[#48b5db]" />
-                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase tracking-widest">Ubicación del Lote</span>
+                        <MapPin className="w-4 h-4 text-cyan-600" />
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
                       {!usarBD && tieneBD && (
-                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1"><Edit2 className="w-3 h-3"/> Ingreso Manual</span>
+                        <span className="text-[9px] text-slate-400 font-semibold tracking-widest uppercase flex items-center gap-1"><Edit2 className="w-3 h-3"/> Ingreso Manual</span>
                       )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">UV</label>
+                        <label className="text-[9px] sm:text-[10px] font-bold text-cyan-600 uppercase tracking-widest">UV</label>
                         {modoBD ? (
                            <div className="relative">
-                             <select value={uv} onChange={handleUvChange} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             <select value={uv} onChange={handleUvChange} className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-cyan-400 transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500">
                                <option value="" disabled hidden>Selec.</option>
                                {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
                              </select>
-                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-600"><ChevronDown className="w-3 h-3" /></div>
                            </div>
                         ) : (
-                           <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-400 focus:outline-none focus:border-cyan-500" />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">MZN</label>
+                        <label className="text-[9px] sm:text-[10px] font-bold text-cyan-600 uppercase tracking-widest">MZN</label>
                         {modoBD ? (
                            <div className="relative">
-                             <select value={mzn} onChange={handleMznChange} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             <select value={mzn} onChange={handleMznChange} className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-cyan-400 transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500">
                                <option value="" disabled hidden>Selec.</option>
                                {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                              </select>
-                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-600"><ChevronDown className="w-3 h-3" /></div>
                            </div>
                         ) : (
-                           <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-400 focus:outline-none focus:border-cyan-500" />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className="text-[9px] sm:text-[10px] font-bold text-[#48b5db] uppercase tracking-widest">LOTE</label>
+                        <label className="text-[9px] sm:text-[10px] font-bold text-cyan-600 uppercase tracking-widest">LOTE</label>
                         {modoBD ? (
                            <div className="relative">
-                             <select value={lote} onChange={handleLoteChange} className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-[#48b5db] transition-colors focus:outline-none focus:ring-1 focus:ring-[#48b5db]">
+                             <select value={lote} onChange={handleLoteChange} className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer hover:border-cyan-400 transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500">
                                <option value="" disabled hidden>Selec.</option>
                                {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
                              </select>
-                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#48b5db]"><ChevronDown className="w-3 h-3" /></div>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-600"><ChevronDown className="w-3 h-3" /></div>
                            </div>
                         ) : (
-                           <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-[#0d1f36] border border-[#1e3a5f] text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-500 focus:outline-none focus:border-[#48b5db]" />
+                           <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-3 text-center text-xs sm:text-sm font-bold transition-all placeholder-slate-400 focus:outline-none focus:border-cyan-500" />
                         )}
                       </div>
                     </div>
@@ -856,81 +852,81 @@ export default function App() {
 
                 {/* CATEGORIA */}
                 <div className="space-y-2.5 relative mt-4">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                       <LayoutTemplate className="w-3 h-3 text-emerald-500" /> Categoría del Lote
                     </label>
-                    <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold transition-all placeholder-slate-600 ${modoBD ? 'bg-emerald-950/20 border border-emerald-500/30 text-emerald-100 shadow-inner' : 'glass-input'}`} />
+                    <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold transition-all placeholder-slate-400 ${modoBD ? 'bg-slate-50 border border-slate-200 text-slate-800 shadow-inner' : 'glass-input'}`} />
                 </div>
 
                 {/* SUP & PRECIO */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mt-4">
                   <div className="space-y-2.5 relative">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
-                      <span className="flex items-center gap-1.5"><Map className="w-4 h-4 text-emerald-400" /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between gap-1.5">
+                      <span className="flex items-center gap-1.5"><Map className="w-4 h-4 text-emerald-500" /> Superficie <span className="text-slate-400 normal-case">(m²)</span></span>
                     </label>
-                    <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-600 ${modoBD ? 'bg-[#0d1f36] border border-[#1e3a5f] text-[#48b5db] shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]' : 'glass-input'}`} />
+                    <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-400 ${modoBD ? 'bg-white border border-slate-200 text-slate-900 shadow-sm' : 'glass-input shadow-sm'}`} />
                   </div>
 
                   <div className="space-y-2.5 relative">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
-                      <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-emerald-400" /> Precio <span className="text-slate-600 normal-case">/ m²</span></span>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between gap-1.5">
+                      <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-emerald-500" /> Precio <span className="text-slate-400 normal-case">/ m²</span></span>
                     </label>
-                    <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-600 ${modoBD ? 'bg-[#0d1f36] border border-[#1e3a5f] text-[#48b5db] shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]' : 'glass-input'}`} />
+                    <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl transition-all placeholder-slate-400 ${modoBD ? 'bg-white border border-slate-200 text-slate-900 shadow-sm' : 'glass-input shadow-sm'}`} />
                   </div>
                 </div>
 
                 {/* DESCUENTOS PREMIUM */}
-                <div className="bg-slate-800/40 border border-emerald-500/20 p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md">
-                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-400/20 transition-colors"></div>
-                  <div className="text-[10px] sm:text-xs font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-2 mb-4 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
-                    <div className="bg-emerald-500/20 p-1.5 rounded-lg border border-emerald-500/30"><Gift className="w-4 h-4 text-emerald-300" /></div>
+                <div className="bg-slate-50 border border-emerald-200 p-4 sm:p-5 rounded-[2rem] shadow-sm relative overflow-hidden group">
+                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-100/50 rounded-full blur-3xl group-hover:bg-emerald-200/50 transition-colors"></div>
+                  <div className="text-[10px] sm:text-xs font-extrabold text-emerald-700 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <div className="bg-white p-1.5 rounded-lg border border-emerald-200 shadow-sm"><Gift className="w-4 h-4 text-emerald-500" /></div>
                     Descuentos Promocionales
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10">
                     {showDescPorcentaje && (
                       <>
                         <div className="space-y-1.5">
-                          <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                            <input type="checkbox" checked={aplicarDescContadoPct} onChange={e => setAplicarDescContadoPct(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> A Contado (%)
+                          <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
+                            <input type="checkbox" checked={aplicarDescContadoPct} onChange={e => setAplicarDescContadoPct(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" /> A Contado (%)
                           </label>
-                          <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoPct} value={descuentoContado} onChange={handleDescContadoChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoPct ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                          <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoPct ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: {calcularLimitesMaximos().maxContadoPct}%</p>
+                          <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoPct} value={descuentoContado} onChange={handleDescContadoChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoPct ? 'bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'}`} />
+                          <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoPct ? 'text-emerald-600' : 'text-slate-400'}`}>Máx: {calcularLimitesMaximos().maxContadoPct}%</p>
                         </div>
                         <div className="space-y-1.5">
-                          <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                            <input type="checkbox" checked={aplicarDescCreditoPct} onChange={e => setAplicarDescCreditoPct(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> A Crédito (%)
+                          <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
+                            <input type="checkbox" checked={aplicarDescCreditoPct} onChange={e => setAplicarDescCreditoPct(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" /> A Crédito (%)
                           </label>
-                          <input type="number" step="0.01" min="0" disabled={!aplicarDescCreditoPct} value={descuentoCredito} onChange={handleDescCreditoChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescCreditoPct ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                          <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescCreditoPct ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: {calcularLimitesMaximos().maxCreditoPct}%</p>
+                          <input type="number" step="0.01" min="0" disabled={!aplicarDescCreditoPct} value={descuentoCredito} onChange={handleDescCreditoChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescCreditoPct ? 'bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'}`} />
+                          <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescCreditoPct ? 'text-emerald-600' : 'text-slate-400'}`}>Máx: {calcularLimitesMaximos().maxCreditoPct}%</p>
                         </div>
                       </>
                     )}
                     {showDescM2 && (
                       <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> Crédito x m² ($us)
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
+                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" /> Crédito x m² ($us)
                         </label>
-                        <input type="number" step="0.01" min="0" disabled={!aplicarDescM2} value={descuentoM2} onChange={handleDescM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxDescM2}</p>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescM2} value={descuentoM2} onChange={handleDescM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-emerald-600' : 'text-slate-400'}`}>Máx: ${calcularLimitesMaximos().maxDescM2}</p>
                       </div>
                     )}
                     {showDescContadoM2 && (
                       <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> Contado x m² ($us)
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" /> Contado x m² ($us)
                         </label>
-                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={handleDescContadoM2Change} placeholder="Ej. 3" className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxContadoM2}</p>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={handleDescContadoM2Change} placeholder="Ej. 3" className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-emerald-600' : 'text-slate-400'}`}>Máx: ${calcularLimitesMaximos().maxContadoM2}</p>
                       </div>
                     )}
                     {showBonoInicial && (
                       <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                          <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500" /> Bono Inicial ($us)
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-600 cursor-pointer hover:text-slate-900 transition-colors">
+                          <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" /> Bono Inicial ($us)
                         </label>
-                        <input type="number" step="0.01" min="0" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={handleBonoInicialChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
-                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarBonoInicialOtro ? 'text-emerald-400' : 'text-slate-600'}`}>Máx: $500</p>
+                        <input type="number" step="0.01" min="0" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={handleBonoInicialChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500' : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarBonoInicialOtro ? 'text-emerald-600' : 'text-slate-400'}`}>Máx: $500</p>
                       </div>
                     )}
                   </div>
@@ -938,10 +934,10 @@ export default function App() {
 
                 {/* INICIAL & PLAZO */}
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4">
-                  <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 backdrop-blur-sm relative">
+                  <div className="col-span-12 md:col-span-8 bg-emerald-50 border border-emerald-200 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 shadow-sm relative">
                     
                     <div className="space-y-2">
-                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-700 uppercase tracking-widest flex items-center gap-1.5">
                         <Percent className="w-3.5 h-3.5" /> Inicial (%)
                       </label>
                       <input 
@@ -951,12 +947,12 @@ export default function App() {
                         value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'}
-                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-bold text-white text-sm sm:text-base shadow-inner placeholder-slate-600" 
+                        className="w-full bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-slate-900 text-sm sm:text-base shadow-sm placeholder-slate-400" 
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-700 uppercase tracking-widest flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5" /> Monto ($us)
                       </label>
                       <input 
@@ -966,26 +962,26 @@ export default function App() {
                         value={modoInicial === 'monto' ? inicialMonto : ''} 
                         onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'}
-                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-black text-amber-400 text-sm sm:text-base shadow-inner placeholder-slate-600" 
+                        className="w-full bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-black text-amber-600 text-sm sm:text-base shadow-sm placeholder-slate-400" 
                       />
                     </div>
                   </div>
                   
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
-                    <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-emerald-400" /> Plazo
+                    <label className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-emerald-500" /> Plazo
                     </label>
                     <div className="relative h-[calc(100%-1.5rem)]">
-                      <select required value={años} onChange={e => setAños(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px]">
+                      <select required value={años} onChange={e => setAños(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-slate-900 text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] shadow-sm">
                         <option value="" disabled hidden>Selec.</option>
                         {[...Array(10)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-emerald-500"><ChevronRight className="w-5 h-5 rotate-90" /></div>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400"><ChevronRight className="w-5 h-5 rotate-90" /></div>
                     </div>
                   </div>
                 </div>
 
-                <button type="submit" disabled={isCalculating} className={`w-full mt-6 sm:mt-8 bg-gradient-to-r from-[#059669] via-[#10b981] to-[#059669] hover:from-[#047857] hover:via-[#059669] hover:to-[#047857] text-white font-extrabold py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(16,185,129,0.4)] border border-emerald-400/50 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:shadow-[0_0_35px_rgba(16,185,129,0.6)] hover:-translate-y-1'}`}>
+                <button type="submit" disabled={isCalculating} className={`w-full mt-6 sm:mt-8 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-extrabold py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-lg shadow-emerald-500/30 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-1'}`}>
                   <div className="absolute inset-0 bg-white/20 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
                   <span className="relative z-10 flex items-center gap-2 sm:gap-3">
                     {isCalculating ? (
@@ -1002,33 +998,33 @@ export default function App() {
           {/* PANEL DERECHO: RESULTADOS */}
           <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6">
             {!resultado || isCalculating ? (
-              <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-400 p-6 sm:p-10 text-center transition-all duration-500">
+              <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl animate-pulse"></div>
-                  <div className="bg-slate-800 p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-[0_0_30px_rgba(16,185,129,0.2)] border border-emerald-500/30 relative z-10">
-                    {isCalculating ? <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-400 animate-spin" /> : <Calculator className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-400" />}
+                  <div className="absolute inset-0 bg-emerald-100 rounded-full blur-2xl animate-pulse"></div>
+                  <div className="bg-white p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-lg border border-emerald-100 relative z-10">
+                    {isCalculating ? <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-500 animate-spin" /> : <Calculator className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-500" />}
                   </div>
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2 sm:mb-3">
+                <h3 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight mb-2 sm:mb-3">
                   {isCalculating ? "Calculando Propuesta..." : "Plataforma Activa"}
                 </h3>
-                <p className="text-sm sm:text-base max-w-md text-slate-400 font-medium leading-relaxed px-2">
+                <p className="text-sm sm:text-base max-w-md text-slate-500 font-medium leading-relaxed px-2">
                   {isCalculating ? "Aplicando promociones e inteligencia artificial de precios." : "Completa los parámetros de inversión a la izquierda para generar una propuesta financiera detallada y lista para el cliente."}
                 </p>
               </div>
             ) : (
-              <div className="glass-panel rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-10 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-[0_20px_50px_-15px_rgba(0,0,0,0.5)] border border-emerald-500/20">
-                <div className="absolute -top-32 -right-32 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px] pointer-events-none"></div>
-                <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-600/10 rounded-full blur-[100px] pointer-events-none"></div>
+              <div className="glass-panel rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-10 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-lg border border-emerald-100 bg-white">
+                <div className="absolute -top-32 -right-32 w-96 h-96 bg-teal-50 rounded-full blur-[100px] pointer-events-none"></div>
+                <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-50 rounded-full blur-[100px] pointer-events-none"></div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 sm:mb-10 pb-5 sm:pb-6 border-b border-slate-700/80 gap-4 relative z-10">
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center justify-center sm:justify-start gap-3 tracking-tight">
-                    <div className="bg-gradient-to-br from-amber-400 to-amber-600 p-2 rounded-xl shadow-[0_0_15px_rgba(251,191,36,0.4)]">
-                      <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-slate-900" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 sm:mb-10 pb-5 sm:pb-6 border-b border-slate-100 gap-4 relative z-10">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center justify-center sm:justify-start gap-3 tracking-tight">
+                    <div className="bg-gradient-to-br from-amber-400 to-amber-500 p-2 rounded-xl shadow-sm">
+                      <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div> Propuesta Oficial
                   </h2>
-                  <span className="mx-auto sm:mx-0 bg-emerald-950/50 text-emerald-400 border border-emerald-500/30 text-[10px] sm:text-xs font-extrabold px-4 py-2 rounded-full uppercase tracking-widest shadow-sm flex items-center gap-2 backdrop-blur-sm w-fit">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)] animate-pulse"></span> Aprobada
+                  <span className="mx-auto sm:mx-0 bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] sm:text-xs font-extrabold px-4 py-2 rounded-full uppercase tracking-widest shadow-sm flex items-center gap-2 w-fit">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse"></span> Aprobada
                   </span>
                 </div>
                 
@@ -1036,83 +1032,87 @@ export default function App() {
                   
                   {/* Fila: Proyecto y Lote */}
                   {(resultado.proyecto || resultado.uv || resultado.mzn || resultado.lote) && (
-                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-800/60 backdrop-blur-md p-4 rounded-2xl border border-slate-700/50 shadow-inner">
+                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
                       <div className="flex flex-col sm:flex-row items-center text-center sm:text-left gap-3 sm:gap-4 pl-0 sm:pl-2 w-full justify-center sm:justify-start">
-                        <div className="bg-gradient-to-br from-emerald-900 to-slate-900 p-3 sm:p-3.5 rounded-xl border border-emerald-500/30">
-                          <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
+                        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm">
+                          <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                         </div>
                         <div>
-                          <div className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 sm:mb-1">Desarrollo Urbanístico</div>
-                          <div key={`proj-${resultado.timestampId}`} className="text-white font-black text-lg sm:text-xl uppercase leading-none tracking-tight animate-pop">{resultado.proyecto || 'S/N'}</div>
-                          {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && <div key={`cat-${resultado.timestampId}`} className="text-[8px] sm:text-[9px] text-amber-400 font-bold mt-1 tracking-wider animate-pop">{resultado.categoria}</div>}
+                          <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 sm:mb-1">Desarrollo Urbanístico</div>
+                          <div key={`proj-${resultado.timestampId}`} className="text-slate-900 font-black text-lg sm:text-xl uppercase leading-none tracking-tight animate-pop">{resultado.proyecto || 'S/N'}</div>
+                          {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && <div key={`cat-${resultado.timestampId}`} className="text-[8px] sm:text-[9px] text-amber-600 font-bold mt-1 tracking-wider animate-pop">{resultado.categoria}</div>}
                         </div>
                       </div>
                       
                       <div className="flex flex-wrap justify-center sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
-                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">UV</div><div key={`uv-${resultado.timestampId}`} className="text-emerald-400 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '100ms'}}>{resultado.uv || '-'}</div></div>
-                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900/80 rounded-xl border border-slate-700 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">MZN</div><div key={`mzn-${resultado.timestampId}`} className="text-emerald-400 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '150ms'}}>{resultado.mzn || '-'}</div></div>
-                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-emerald-500 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400"><div className="text-[8px] sm:text-[9px] font-extrabold text-emerald-950 uppercase tracking-widest mb-1">LOTE</div><div key={`lt-${resultado.timestampId}`} className="text-slate-900 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '200ms'}}>{resultado.lote || '-'}</div></div>
+                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-white rounded-xl border border-slate-200 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">UV</div><div key={`uv-${resultado.timestampId}`} className="text-emerald-600 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '100ms'}}>{resultado.uv || '-'}</div></div>
+                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-white rounded-xl border border-slate-200 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mb-1">MZN</div><div key={`mzn-${resultado.timestampId}`} className="text-emerald-600 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '150ms'}}>{resultado.mzn || '-'}</div></div>
+                        <div className="text-center px-4 sm:px-5 py-2 sm:py-2.5 bg-emerald-50 rounded-xl border border-emerald-200 shadow-sm"><div className="text-[8px] sm:text-[9px] font-extrabold text-emerald-800 uppercase tracking-widest mb-1">LOTE</div><div key={`lt-${resultado.timestampId}`} className="text-emerald-700 font-black text-base sm:text-lg leading-none animate-pop" style={{animationDelay: '200ms'}}>{resultado.lote || '-'}</div></div>
                       </div>
                     </div>
                   )}
 
                   {/* Fila: Precio Contado */}
-                  <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-700/60 shadow-lg flex flex-col sm:flex-row justify-between sm:items-end gap-4 sm:gap-6 relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-emerald-500/10 to-transparent pointer-events-none transition-opacity duration-500 opacity-0 group-hover:opacity-100"></div>
+                  <div className="bg-white p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between sm:items-end gap-4 sm:gap-6 relative overflow-hidden group">
                     <div className="text-center sm:text-left">
-                      <span className="text-slate-400 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2 mb-1 sm:mb-2">Precio de Lista Original</span>
-                      <div key={`po-${resultado.timestampId}`} className="text-3xl sm:text-4xl font-black text-white tracking-tighter drop-shadow-md animate-pop">$ {resultado.valorOriginal}</div>
-                      <div key={`pobs-${resultado.timestampId}`} className="text-xs sm:text-sm font-bold text-slate-500 mt-1 sm:mt-1.5 animate-pop">Bs. {resultado.valorOriginalBs}</div>
+                      <span className="text-slate-500 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center justify-center sm:justify-start gap-2 mb-1 sm:mb-2">Precio de Lista Original</span>
+                      <div key={`po-${resultado.timestampId}`} className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter animate-pop">$ {resultado.valorOriginal}</div>
+                      <div key={`pobs-${resultado.timestampId}`} className="text-xs sm:text-sm font-bold text-slate-400 mt-1 sm:mt-1.5 animate-pop">Bs. {resultado.valorOriginalBs}</div>
                     </div>
                     
                     {resultado.ahorroContado !== "0.00" && (
-                      <div className="bg-emerald-950/60 backdrop-blur-md text-emerald-400 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)] relative z-10 w-full sm:w-auto text-center">
-                        <div className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest mb-1 text-emerald-300 flex items-center justify-center gap-1.5"><Tag className="w-3 h-3"/> Oferta al Contado</div>
-                        <div key={`pc-${resultado.timestampId}`} className="text-xl sm:text-2xl font-black tracking-tight text-white animate-pop">$ {resultado.valorContado}</div>
+                      <div className="bg-emerald-50 text-emerald-800 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-emerald-200 relative z-10 w-full sm:w-auto text-center">
+                        <div className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest mb-1 text-emerald-600 flex items-center justify-center gap-1.5"><Tag className="w-3 h-3"/> Oferta al Contado</div>
+                        <div key={`pc-${resultado.timestampId}`} className="text-xl sm:text-2xl font-black tracking-tight text-emerald-900 animate-pop">$ {resultado.valorContado}</div>
                       </div>
                     )}
                   </div>
 
                   {/* Fila: Crédito Directo y Cuota Inicial */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                    <div className="bg-slate-800/50 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-700/50 shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(16,185,129,0.2)] hover:border-emerald-500/30 text-center sm:text-left">
-                      <span className="text-teal-400 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest">Total a Financiar</span>
-                      <div key={`pcr-${resultado.timestampId}`} className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 sm:mt-2 animate-pop">$ {resultado.valorCredito}</div>
+                    <div className="bg-white p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-md hover:border-emerald-200 text-center sm:text-left">
+                      <span className="text-cyan-600 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest">Total a Financiar</span>
+                      <div key={`pcr-${resultado.timestampId}`} className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1 sm:mt-2 animate-pop">$ {resultado.valorCredito}</div>
                       {resultado.ahorroCredito !== "0.00" && (
-                          <div key={`ac-${resultado.timestampId}`} className="mt-2 sm:mt-3 text-[9px] sm:text-[10px] text-amber-400 font-extrabold bg-amber-950/30 inline-block px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-amber-500/30 uppercase tracking-widest shadow-sm animate-pop">
+                          <div key={`ac-${resultado.timestampId}`} className="mt-2 sm:mt-3 text-[9px] sm:text-[10px] text-amber-700 font-extrabold bg-amber-50 inline-block px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-amber-200 uppercase tracking-widest animate-pop">
                             Ahorro Incluido: $ {resultado.ahorroCredito}
                           </div>
                       )}
                     </div>
-                    <div className="bg-slate-800/50 backdrop-blur-md p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-700/50 shadow-lg transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(16,185,129,0.2)] hover:border-emerald-500/30 text-center sm:text-left">
-                      <span className="text-emerald-400 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest">Cuota Inicial</span>
-                      <div key={`ini-${resultado.timestampId}`} className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 sm:mt-2 animate-pop">$ {resultado.inicial}</div>
-                      <div key={`inibs-${resultado.timestampId}`} className="text-xs sm:text-sm font-bold text-slate-400 mt-1 animate-pop">Bs. {resultado.inicialBs}</div>
+                    <div className="bg-white p-5 sm:p-7 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-md hover:border-emerald-200 text-center sm:text-left">
+                      <span className="text-emerald-600 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest">Cuota Inicial</span>
+                      <div key={`ini-${resultado.timestampId}`} className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1 sm:mt-2 animate-pop">$ {resultado.inicial}</div>
+                      <div key={`inibs-${resultado.timestampId}`} className="text-xs sm:text-sm font-bold text-slate-500 mt-1 animate-pop">Bs. {resultado.inicialBs}</div>
                     </div>
                   </div>
 
-                  {/* Fila: Cuota Mensual ESTILO VIP CARD CELINA */}
-                  <div className="relative overflow-hidden bg-gradient-to-br from-[#022c22] via-[#064e3b] to-[#020617] p-6 sm:p-10 rounded-[1.5rem] sm:rounded-[2rem] shadow-[0_0_40px_rgba(5,150,105,0.3)] border border-emerald-400/40 group mt-4">
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" style={{ animationDuration: '2.5s' }}></div>
-                    <div className="absolute top-0 right-0 w-32 sm:w-64 h-full bg-emerald-500/10 skew-x-12 transform translate-x-10 pointer-events-none"></div>
-                    <div className="absolute -bottom-10 -right-10 opacity-20 group-hover:opacity-40 transition-opacity"><Building2 className="w-48 h-48 sm:w-64 sm:h-64 text-emerald-300" /></div>
-                    <span className="text-emerald-200/90 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest relative z-10 flex items-center gap-1.5 sm:gap-2">
+                  {/* Fila: Cuota Mensual ESTILO VIP CARD CELINA (VIBRANTE EN LIGHT MODE) */}
+                  <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-700 p-6 sm:p-10 rounded-[1.5rem] sm:rounded-[2rem] shadow-lg shadow-emerald-500/20 border border-emerald-400/40 group mt-4">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-shimmer" style={{ animationDuration: '2.5s' }}></div>
+                    <div className="absolute top-0 right-0 w-32 sm:w-64 h-full bg-white/5 skew-x-12 transform translate-x-10 pointer-events-none"></div>
+                    <div className="absolute -bottom-10 -right-10 opacity-10 group-hover:opacity-20 transition-opacity"><Building2 className="w-48 h-48 sm:w-64 sm:h-64 text-white" /></div>
+                    <span className="text-emerald-50 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest relative z-10 flex items-center gap-1.5 sm:gap-2">
                       <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,1)] animate-pulse"></div> Cuota Mensual Fija ({resultado.plazo} Años)
                     </span>
                     <div className="flex flex-wrap items-baseline gap-2 sm:gap-4 mt-2 sm:mt-3 relative z-10">
-                      <div key={`c-${resultado.timestampId}`} className="text-[2.5rem] leading-none sm:text-7xl font-black text-white tracking-tighter drop-shadow-lg break-all animate-pop">$ {resultado.mensual}</div>
-                      <div key={`cbs-${resultado.timestampId}`} className="text-xl sm:text-3xl font-bold text-emerald-300 mt-1 sm:mt-0 animate-pop" style={{animationDelay: '100ms'}}>Bs. {resultado.mensualBs}</div>
+                      <div key={`c-${resultado.timestampId}`} className="text-[2.5rem] leading-none sm:text-7xl font-black text-white tracking-tighter drop-shadow-md break-all animate-pop">$ {resultado.mensual}</div>
+                      <div key={`cbs-${resultado.timestampId}`} className="text-xl sm:text-3xl font-bold text-emerald-100 mt-1 sm:mt-0 animate-pop" style={{animationDelay: '100ms'}}>Bs. {resultado.mensualBs}</div>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-emerald-50/80 mt-4 sm:mt-6 font-semibold tracking-widest relative z-10 flex flex-wrap gap-2 sm:gap-4 border-t border-white/20 pt-3 sm:pt-4 uppercase">
+                      <span>Amort. ${resultado.pagoAmortizacion}</span><span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-200 my-auto hidden sm:block"></span>
+                      <span>Seguro ${resultado.seguro}</span><span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-200 my-auto hidden sm:block"></span>
+                      <span>CBDI ${resultado.cbdi}</span>
                     </div>
                   </div>
 
                   {/* NUEVO: PANEL DE COMPARATIVA (BOTONES) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-                    <button onClick={() => setEscenarioGuardado(resultado)} className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm">
+                    <button onClick={() => setEscenarioGuardado(resultado)} className="w-full bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm">
                        <Scale className="w-4 h-4"/>
                        {escenarioGuardado ? "Actualizar Escenario A" : "Guardar como Escenario A"}
                     </button>
                     {escenarioGuardado && (
-                      <button onClick={() => setMostrarComparativa(true)} className="w-full bg-cyan-900/50 hover:bg-cyan-800/50 border border-cyan-500/50 text-cyan-400 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                      <button onClick={() => setMostrarComparativa(true)} className="w-full bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 text-cyan-700 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm">
                          <Scale className="w-4 h-4"/> Comparar Escenarios
                       </button>
                     )}
@@ -1120,21 +1120,21 @@ export default function App() {
 
                   {/* ACORDEÓN: PLAN DE PAGOS (1 a 10 Años) */}
                   <div className="mt-5 sm:mt-6">
-                    <button onClick={() => setMostrarPlan(!mostrarPlan)} className="w-full flex items-start sm:items-center justify-between p-3 sm:p-4 rounded-2xl bg-slate-800/40 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-slate-800/60 hover:border-emerald-500/40 transition-all duration-300 group shadow-sm text-left">
-                      <div className="flex items-center gap-2 sm:gap-3"><div className="bg-emerald-500/10 p-1.5 sm:p-2 rounded-lg border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors"><ListOrdered className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" /></div><span className="tracking-wide text-xs sm:text-base mt-0.5 sm:mt-0">Ver Plan de Pagos (10 a 1 años)</span></div>
-                      <div className={`mt-0.5 sm:mt-0 bg-slate-900 p-1 sm:p-1.5 rounded-full border border-slate-700 transition-transform duration-500 flex-shrink-0 ${mostrarPlan ? 'rotate-180 bg-emerald-900 border-emerald-500' : ''}`}><ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 ${mostrarPlan ? 'text-emerald-400' : 'text-slate-400'}`} /></div>
+                    <button onClick={() => setMostrarPlan(!mostrarPlan)} className="w-full flex items-start sm:items-center justify-between p-3 sm:p-4 rounded-2xl bg-white border border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition-all duration-300 group shadow-sm text-left">
+                      <div className="flex items-center gap-2 sm:gap-3"><div className="bg-emerald-100 p-1.5 sm:p-2 rounded-lg border border-emerald-200 group-hover:bg-emerald-200 transition-colors"><ListOrdered className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" /></div><span className="tracking-wide text-xs sm:text-base mt-0.5 sm:mt-0">Ver Plan de Pagos (10 a 1 años)</span></div>
+                      <div className={`mt-0.5 sm:mt-0 bg-slate-50 p-1 sm:p-1.5 rounded-full border border-slate-200 transition-transform duration-500 flex-shrink-0 ${mostrarPlan ? 'rotate-180 bg-emerald-100 border-emerald-300' : ''}`}><ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 ${mostrarPlan ? 'text-emerald-600' : 'text-slate-400'}`} /></div>
                     </button>
                     {mostrarPlan && (
-                      <div className="mt-2 sm:mt-3 overflow-hidden rounded-xl sm:rounded-[1.5rem] border border-emerald-500/20 bg-[#020f18]/80 backdrop-blur-xl animate-in slide-in-from-top-4 fade-in duration-500 shadow-[0_10px_30px_-10px_rgba(5,150,105,0.2)]">
-                        <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 border-b border-emerald-500/10 bg-slate-900/50 text-[9px] sm:text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest text-center">
-                          <div>Plazo</div><div className="text-emerald-400 flex items-center justify-center gap-1"><DollarSign className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Cuota ($us)</div><div className="text-emerald-200 flex items-center justify-center gap-1">Cuota (Bs.)</div>
+                      <div className="mt-2 sm:mt-3 overflow-hidden rounded-xl sm:rounded-[1.5rem] border border-slate-200 bg-white shadow-sm animate-in slide-in-from-top-4 fade-in duration-500">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 border-b border-slate-100 bg-slate-50 text-[9px] sm:text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest text-center">
+                          <div>Plazo</div><div className="text-emerald-600 flex items-center justify-center gap-1"><DollarSign className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Cuota ($us)</div><div className="text-emerald-600 flex items-center justify-center gap-1">Cuota (Bs.)</div>
                         </div>
                         <div className="p-1.5 sm:p-2">
                           {resultado.planPagos.map((plan, i) => (
-                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg sm:rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-emerald-500/20 border border-emerald-500/40 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.02] transform my-1' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
-                              <div className="flex items-center justify-center gap-1.5 sm:gap-2">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>} {plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
-                              <div className={`font-black ${plan.isCurrent ? 'text-white' : 'text-emerald-100'}`}>$ {plan.cuotaUsd}</div>
-                              <div className={plan.isCurrent ? 'text-emerald-300' : 'text-slate-400'}>Bs. {plan.cuotaBs}</div>
+                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg sm:rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-sm scale-[1.02] transform my-1' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}>
+                              <div className="flex items-center justify-center gap-1.5 sm:gap-2">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse hidden sm:inline-block"></span>} {plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
+                              <div className={`font-black ${plan.isCurrent ? 'text-emerald-700' : 'text-slate-800'}`}>$ {plan.cuotaUsd}</div>
+                              <div className={plan.isCurrent ? 'text-emerald-600' : 'text-slate-500'}>Bs. {plan.cuotaBs}</div>
                             </div>
                           ))}
                         </div>
@@ -1142,15 +1142,14 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-700/80">
+                  <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-200">
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <button onClick={copiarTexto} className="w-full sm:w-1/3 bg-transparent hover:bg-slate-800 border border-[#48b5db] text-[#48b5db] font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden group">
-                          {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 relative z-10" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />}
-                          <span className="relative z-10">{copiado ? 'COPIADO' : 'COPIAR TODO'}</span>
+                        <button onClick={copiarTexto} className="w-full sm:w-1/3 bg-white hover:bg-cyan-50 border border-cyan-400 text-cyan-600 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden shadow-sm">
+                          {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6" />}
+                          <span>{copiado ? 'COPIADO' : 'COPIAR TODO'}</span>
                         </button>
-                        <button onClick={enviarWhatsApp} className="w-full sm:w-2/3 bg-gradient-to-r from-[#20bd5a] to-[#25D366] hover:from-[#1da850] hover:to-[#20bd5a] text-slate-900 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:shadow-[0_0_35px_rgba(37,211,102,0.6)] hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden group">
-                          <div className="absolute inset-0 bg-white/30 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
-                          <Send className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" /> <span className="relative z-10">Enviar Propuesta por WhatsApp</span>
+                        <button onClick={enviarWhatsApp} className="w-full sm:w-2/3 bg-[#25D366] hover:bg-[#1DA851] text-white font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-md hover:shadow-lg hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider">
+                          <Send className="w-5 h-5 sm:w-6 sm:h-6" /> <span>Enviar Propuesta por WhatsApp</span>
                         </button>
                     </div>
                   </div>
