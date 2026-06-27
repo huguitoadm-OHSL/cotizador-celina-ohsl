@@ -3,7 +3,8 @@ import {
   Calculator, Send, Map, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer,
+  Lock, ArrowRight // Iconos nuevos para el login
 } from "lucide-react";
 
 // ============================================================================
@@ -44,6 +45,13 @@ const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
 
 export default function App() {
+  // ==========================================================================
+  // ESTADOS DE SEGURIDAD (LOGIN)
+  // ==========================================================================
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+
   const [regional, setRegional] = useState("SANTA CRUZ");
   const [proyecto, setProyecto] = useState("URUBÓ NORTE");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
@@ -140,7 +148,7 @@ export default function App() {
 
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
     return () => document.head.removeChild(link);
@@ -526,7 +534,18 @@ export default function App() {
       if (resultadosRef.current) {
         resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-    }, 500); // 500ms para que se aprecie la animación de "procesando"
+    }, 500);
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === "MARJORIE") {
+      setIsAuthenticated(true);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+      setPasswordInput("");
+    }
   };
 
   // Comparar lógica
@@ -592,7 +611,6 @@ export default function App() {
   const showDescContadoM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto);
   const showBonoInicial = proyecto === "OTRO";
 
-  // Data Visualization: Barras de desglose
   const calculateBars = () => {
     if(!resultado) return { pAhorro: 0, pInicial: 0, pSaldo: 100 };
     const total = resultado.valorOriginalRaw;
@@ -604,6 +622,55 @@ export default function App() {
     return { pAhorro, pInicial, pSaldo };
   };
   const bars = calculateBars();
+
+  // Si el usuario no se ha autenticado, mostrar Pantalla de Bloqueo
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-['Plus_Jakarta_Sans'] relative overflow-hidden selection:bg-emerald-200 selection:text-emerald-900">
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+          @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
+          @keyframes popIn { 0% { opacity: 0; transform: scale(0.9) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+          .animate-blob { animation: blob 10s infinite alternate; }
+          .animation-delay-2000 { animation-delay: 2s; }
+          .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        `}</style>
+        
+        <div className="absolute top-[-10%] left-[-10%] w-[30rem] sm:w-[40rem] h-[30rem] sm:h-[40rem] bg-emerald-200/40 rounded-full mix-blend-multiply blur-[80px] sm:blur-[100px] animate-blob pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[30rem] sm:w-[40rem] h-[30rem] sm:h-[40rem] bg-cyan-200/40 rounded-full mix-blend-multiply blur-[80px] sm:blur-[100px] animate-blob animation-delay-2000 pointer-events-none"></div>
+        
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-12 w-full max-w-md relative z-10 shadow-2xl border border-white/50 text-center animate-in zoom-in-95 duration-500">
+          <div className="mx-auto w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-emerald-100 relative">
+            <div className="absolute inset-0 bg-emerald-200 rounded-full blur animate-pulse opacity-50"></div>
+            <Lock className="w-10 h-10 relative z-10" />
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Acceso Restringido</h1>
+          <p className="text-slate-500 font-medium mb-8 text-sm sm:text-base">Ingresa la credencial de seguridad para acceder a la plataforma de cotizaciones.</p>
+          
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2 text-left relative">
+              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest pl-2">Contraseña de Autorización</label>
+              <input 
+                type="password" 
+                value={passwordInput}
+                onChange={(e) => {setPasswordInput(e.target.value); setPasswordError(false);}}
+                className={`w-full bg-white rounded-2xl p-4 font-bold text-lg text-slate-900 transition-all text-center tracking-[0.2em] shadow-sm outline-none ${passwordError ? 'border border-rose-400 ring-2 ring-rose-400/20' : 'border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'}`}
+                placeholder="••••••••"
+                autoFocus
+              />
+              {passwordError && <p className="text-[10px] sm:text-xs font-bold text-rose-500 text-center animate-pop absolute -bottom-6 left-0 right-0">Contraseña incorrecta. Intenta nuevamente.</p>}
+            </div>
+            <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-4 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-1 uppercase tracking-widest text-sm mt-8">
+              Desbloquear Simulador <ArrowRight className="w-5 h-5" />
+            </button>
+          </form>
+          <div className="mt-8 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+            Celina Urbanizaciones © 2026
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 relative font-['Plus_Jakarta_Sans'] text-slate-800 overflow-x-hidden selection:bg-emerald-200 selection:text-emerald-900">
@@ -1147,29 +1214,28 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* TABLA DE PLAN DE PAGOS (1 a 10 Años) */}
+                  {/* ACORDEÓN: PLAN DE PAGOS (1 a 10 Años) */}
                   <div className="mt-5 sm:mt-6 print-only block">
-                    <div className="bg-white border border-emerald-200 rounded-[1.5rem] overflow-hidden shadow-sm">
-                      <div className="bg-emerald-50/80 p-4 border-b border-emerald-100">
-                         <h3 className="text-emerald-800 font-bold text-sm tracking-wide flex items-center gap-2">
-                           <Calendar className="w-4 h-4"/> Resumen de Plazos Alternativos
-                         </h3>
+                    <button onClick={() => setMostrarPlan(!mostrarPlan)} className="w-full flex items-start sm:items-center justify-between p-3 sm:p-4 rounded-2xl bg-white border border-emerald-200 text-emerald-700 font-bold hover:bg-emerald-50 transition-all duration-300 group shadow-sm text-left no-print">
+                      <div className="flex items-center gap-2 sm:gap-3"><div className="bg-emerald-100 p-1.5 sm:p-2 rounded-lg border border-emerald-200 group-hover:bg-emerald-200 transition-colors"><ListOrdered className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" /></div><span className="tracking-wide text-xs sm:text-base mt-0.5 sm:mt-0">Ver Plan de Pagos (10 a 1 años)</span></div>
+                      <div className={`mt-0.5 sm:mt-0 bg-slate-50 p-1 sm:p-1.5 rounded-full border border-slate-200 transition-transform duration-500 flex-shrink-0 ${mostrarPlan ? 'rotate-180 bg-emerald-100 border-emerald-300' : ''}`}><ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 ${mostrarPlan ? 'text-emerald-600' : 'text-slate-400'}`} /></div>
+                    </button>
+                    {(mostrarPlan || true) && ( // En modo impresión siempre se muestra, en UI depende del state
+                      <div className={`mt-2 sm:mt-3 overflow-hidden rounded-xl sm:rounded-[1.5rem] border border-slate-200 bg-white shadow-sm animate-in slide-in-from-top-4 fade-in duration-500 ${mostrarPlan ? 'block' : 'hidden print-only'}`}>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 border-b border-slate-100 bg-slate-50 text-[9px] sm:text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest text-center">
+                          <div>Plazo</div><div className="text-emerald-600 flex items-center justify-center gap-1"><DollarSign className="w-2.5 h-2.5 sm:w-3 sm:h-3"/> Cuota ($us)</div><div className="text-emerald-600 flex items-center justify-center gap-1">Cuota (Bs.)</div>
+                        </div>
+                        <div className="p-1.5 sm:p-2">
+                          {resultado.planPagos.map((plan, i) => (
+                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg sm:rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-sm scale-[1.02] transform my-1' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}>
+                              <div className="flex items-center justify-center gap-1.5 sm:gap-2">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse hidden sm:inline-block"></span>} {plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
+                              <div className={`font-black ${plan.isCurrent ? 'text-emerald-700' : 'text-slate-800'}`}>$ {plan.cuotaUsd}</div>
+                              <div className={plan.isCurrent ? 'text-emerald-600' : 'text-slate-500'}>Bs. {plan.cuotaBs}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="p-3 sm:p-5">
-                          <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-100 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest text-center">
-                            <div>Plazo</div><div className="text-emerald-600 flex items-center justify-center gap-1"><DollarSign className="w-3 h-3"/> Cuota ($us)</div><div className="text-emerald-600">Cuota (Bs.)</div>
-                          </div>
-                          <div className="pt-2">
-                            {resultado.planPagos.map((plan, i) => (
-                              <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-sm scale-[1.02] transform my-1' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}>
-                                <div className="flex items-center justify-center gap-1.5 sm:gap-2">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse hidden sm:inline-block"></span>} {plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
-                                <div className={`font-black ${plan.isCurrent ? 'text-emerald-700' : 'text-slate-800'}`}>$ {plan.cuotaUsd}</div>
-                                <div className={plan.isCurrent ? 'text-emerald-600' : 'text-slate-500'}>Bs. {plan.cuotaBs}</div>
-                              </div>
-                            ))}
-                          </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-200 no-print">
