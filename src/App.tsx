@@ -25,6 +25,19 @@ const proyectosPorRegional = {
     "EL PORVENIR",
     "EL PORVENIR FASE 2"
   ],
+    "MONTERO": [
+    "LOS JARDINES",
+    "EL RENACER",
+    "MUYURINA",
+    "CELINA 3",
+    "CELINA 4",
+    "CELINA 5",
+    "RANCHO NUEVO",
+    "CELINA X",
+    "CAÑAVERAL",
+    "SANTA FE",
+    "VILLA BELLA"
+  ],
   "SATÉLITE NORTE": [
     "CELINA 7 FASE 3",
     "CELINA 8",
