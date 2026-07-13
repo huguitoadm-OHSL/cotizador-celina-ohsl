@@ -3,8 +3,7 @@ import {
   Calculator, Send, Map, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer,
-  Activity, ArrowRight, Info
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity
 } from "lucide-react";
 
 // ============================================================================
@@ -49,6 +48,15 @@ const proyectosPorRegional = {
   ]
 };
 
+// AGRUPACIONES POR REGLAS DE DESCUENTOS (MAYO 2026)
+const descGroup1_3USD = ["LOS JARDINES", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
+const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3", "CELINA VII FASE 1", "CELINA VII FASE 2", "TAMARINDO"];
+const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
+const descGroup4_30PCT = ["MUYURINA", "SANTA FE", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
+const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
+const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
+const descGroup7_15PCT = ["ROSA RODALI"];
+
 export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
@@ -69,17 +77,20 @@ export default function App() {
   const [precio, setPrecio] = useState("");
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoCredito, setDescuentoCredito] = useState(0);
-  const [descuentoContado, setDescuentoContado] = useState(0);
-  const [descuentoM2, setDescuentoM2] = useState(1);
+  const [descuentoCredito, setDescuentoCredito] = useState(20);
+  const [descuentoContado, setDescuentoContado] = useState(30);
+  const [descuentoM2, setDescuentoM2] = useState(0);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
 
-  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
-  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(false);
+  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(true);
+  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(true);
   const [aplicarDescM2, setAplicarDescM2] = useState(true);
   const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(true);
   const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(true);
+  
+  // NUEVO: TOGGLE DE BONIFICACIÓN TRANSITORIA
+  const [aplicarBonificacion, setAplicarBonificacion] = useState(true);
 
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
@@ -87,7 +98,6 @@ export default function App() {
   
   const [años, setAños] = useState("");
   const [resultado, setResultado] = useState(null);
-  const [mostrarPlan, setMostrarPlan] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [copiado, setCopiado] = useState(false);
   
@@ -97,22 +107,19 @@ export default function App() {
 
   const resultadosRef = useRef(null);
 
-  // ==========================================================================
-  // CARGA DE BASE DE DATOS
-  // ==========================================================================
   useEffect(() => {
     const cargarLotes = async () => {
       try {
         let rawData;
         try {
           const response = await fetch('/lotes.json');
-          if (!response.ok) throw new Error('Fallo la ruta local');
+          if (!response.ok) throw new Error('Fallo local');
           rawData = await response.json();
         } catch (e) {
           const timestamp = new Date().getTime();
           const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
           const fallbackResponse = await fetch(githubRawUrl);
-          if (!fallbackResponse.ok) throw new Error('No se pudo descargar desde GitHub');
+          if (!fallbackResponse.ok) throw new Error('Fallo github');
           rawData = await fallbackResponse.json();
         }
 
@@ -181,16 +188,11 @@ export default function App() {
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
-    setResultado(null); setProyectoPersonalizado(""); setMostrarPlan(false);
+    setResultado(null); setProyectoPersonalizado(""); 
     setEscenarioGuardado(null); setMostrarComparativa(false);
 
-    // NUEVA REGLA GLOBAL: $1 Crédito, $2 Contado para todos.
-    setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(true);
+    setAplicarDescContadoPct(true); setAplicarDescCreditoPct(true); setAplicarDescM2(true);
     setAplicarDescContadoM2(true); setAplicarBonoInicialOtro(true);
-    
-    setDescuentoContado(0); setDescuentoCredito(0); 
-    setDescuentoContadoM2(2); setDescuentoM2(1); setDescuentoInicial(0);
-
   }, [proyecto]);
 
   const getAlias = (p) => {
@@ -233,17 +235,9 @@ export default function App() {
   const mznsDisponibles = [...new Set(lotesDelProyecto.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesDelProyecto.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
 
-  useEffect(() => {
-    if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv("");
-  }, [modoBD, uvsDisponibles, uv]);
-
-  useEffect(() => {
-    if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn("");
-  }, [modoBD, mznsDisponibles, mzn]);
-
-  useEffect(() => {
-    if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote("");
-  }, [modoBD, lotesDisponibles, lote]);
+  useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
+  useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
+  useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
@@ -256,33 +250,90 @@ export default function App() {
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
-  // ==========================================================================
-  // LÓGICA DE DESCUENTOS UNIFICADA
-  // ==========================================================================
-
   const calcularLimitesMaximos = () => {
-    // REGLA GLOBAL: Max 1$ Credito, 2$ Contado.
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 1, maxContadoM2: 2, maxBonoInicial: 500 };
+    let maxCreditoPct = 0; let maxContadoPct = 0;
+    let maxDescM2 = 0; let maxContadoM2 = 0;
+    const maxBonoInicial = 500;
+    let pct = 0;
+
+    if (modoInicial === 'porcentaje') {
+      pct = Number(inicialPorcentaje);
+    } else {
+      const sup = Number(superficie); const prec = Number(precio); const monto = Number(inicialMonto);
+      if (sup > 0 && prec > 0 && monto > 0) {
+        const val_orig = sup * prec;
+        const desc_m2_val = aplicarDescM2 ? Number(descuentoM2) : 0;
+        const val_post_desc_m2 = val_orig - (sup * desc_m2_val);
+        const m_desc_cred = val_post_desc_m2 * (aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0);
+        const base = val_post_desc_m2 - m_desc_cred;
+        if (base > 0) pct = (monto / base) * 100;
+      }
+    }
+
+    const catUpper = categoria.toUpperCase();
+    const isCanaveralPremium = proyecto === "CAÑAVERAL" && (
+      catUpper.includes('CARRETERA') || catUpper.includes('PAVIMENTO') || 
+      catUpper.includes('4TO ANILLO') || catUpper.includes('4 ANILLO')
+    );
+
+    if (descGroup4_30PCT.includes(proyecto)) {
+      maxContadoPct = 30; maxCreditoPct = (pct >= 4.99) ? 23 : 20; 
+    } else if (descGroup5_32PCT.includes(proyecto)) {
+      maxContadoPct = 32; maxCreditoPct = (pct >= 4.99) ? 28 : 25; 
+    } else if (descGroup1_3USD.includes(proyecto)) {
+      maxContadoM2 = 3; maxDescM2 = (pct >= 4.99) ? 2 : 1;
+    } else if (descGroup2_4USD.includes(proyecto)) {
+      maxContadoM2 = 4;
+      if (isCanaveralPremium) { maxDescM2 = 3; } 
+      else { maxDescM2 = (pct >= 4.99) ? 2 : 1; }
+    } else if (descGroup3_7USD.includes(proyecto)) {
+      maxContadoM2 = 7; maxDescM2 = 5;
+    } else if (descGroup6_20PCT.includes(proyecto)) {
+      maxContadoPct = 20; maxCreditoPct = 15;
+    } else if (descGroup7_15PCT.includes(proyecto)) {
+      maxContadoPct = 15; maxCreditoPct = 10;
+    }
+
+    return { maxCreditoPct, maxContadoPct, maxDescM2, maxContadoM2, maxBonoInicial };
   };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
+    setDescuentoCredito(limites.maxCreditoPct);
+    setDescuentoContado(limites.maxContadoPct);
     setDescuentoM2(limites.maxDescM2);
     setDescuentoContadoM2(limites.maxContadoM2);
-  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria]);
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
 
-  const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-
-  const showNotification = (message) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
+  const handleDescContadoChange = (e) => {
+    const val = Number(e.target.value); const max = calcularLimitesMaximos().maxContadoPct;
+    setDescuentoContado(val > max ? max : val);
+  };
+  const handleDescCreditoChange = (e) => {
+    const val = Number(e.target.value); const max = calcularLimitesMaximos().maxCreditoPct;
+    setDescuentoCredito(val > max ? max : val);
+  };
+  const handleDescM2Change = (e) => {
+    const val = Number(e.target.value); const max = calcularLimitesMaximos().maxDescM2;
+    setDescuentoM2(val > max ? max : val);
+  };
+  const handleDescContadoM2Change = (e) => {
+    const val = Number(e.target.value); const max = calcularLimitesMaximos().maxContadoM2;
+    setDescuentoContadoM2(val > max ? max : val);
+  };
+  const handleBonoInicialChange = (e) => {
+    const val = Number(e.target.value);
+    setDescuentoInicial(val > 500 ? 500 : val);
   };
 
+  const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 3000); };
+
   const calcular = () => {
-    let cuota_inicial = 0;
-    let pct_efectivo = 0;
-    let descIniVal = 0;
+    let cuota_inicial = 0; let pct_efectivo = 0; let descIniVal = 0;
     const sup = Number(superficie); const prec = Number(precio); const ans = Number(años);
+    const descCreditoPct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
+    const descContadoPct = aplicarDescContadoPct ? (Number(descuentoContado) / 100) : 0;
     const descM2Val = aplicarDescM2 ? Number(descuentoM2) : 0;
     const descContadoM2Val = aplicarDescContadoM2 ? Number(descuentoContadoM2) : 0;
 
@@ -291,7 +342,8 @@ export default function App() {
     const valor_original = sup * prec;
     let monto_descuento_m2 = sup * descM2Val;
     const valor_post_desc_m2 = valor_original - monto_descuento_m2;
-    const base_para_inicial = valor_post_desc_m2; // Ya no hay descuento en porcentaje
+    const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
+    const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
     
     if (modoInicial === 'porcentaje') {
        pct_efectivo = Number(inicialPorcentaje);
@@ -302,26 +354,27 @@ export default function App() {
     }
 
     descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min(Number(descuentoInicial), 500) : 0;
-
-    const monto_descuento_total_credito = monto_descuento_m2 + descIniVal;
+    const monto_descuento_total_credito = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
     const valor_credito = valor_original - monto_descuento_total_credito;
     
-    let monto_descuento_total_contado = sup * descContadoM2Val;
+    let monto_desc_contado_m2 = sup * descContadoM2Val;
+    let monto_descuento_total_contado = 0;
+    if (descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto)) {
+      monto_descuento_total_contado = monto_desc_contado_m2 + (valor_original * descContadoPct);
+    } else {
+      monto_descuento_total_contado = monto_descuento_m2 + (valor_post_desc_m2 * descContadoPct) + monto_desc_contado_m2;
+    }
     const valor_contado = valor_original - monto_descuento_total_contado;
 
-    // --- MATEMÁTICA Y TABLA DE PLAN DE PAGOS (1 a 14 Años) ---
+    // MATEMÁTICA Y SEGURO (HASTA 14 AÑOS)
     const saldo = valor_credito - cuota_inicial;
+    const meses = ans * 12;
     const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
     const refSaldo = 34278.00;
-    
-    // Extensión base seguro hasta 14 años
-    const baseSeguro = { 
-      1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 
-      8: 23.90, 9: 25.12, 10: 26.38, 11: 27.67, 12: 29.00, 13: 30.36, 14: 31.75 
-    };
+    const baseSeguro = { 1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38, 11: 27.67, 12: 29.00, 13: 30.36, 14: 31.75 };
     const cbdi = 0;
     
-    let pago_puro = tasa === 0 ? saldo / (ans*12) : saldo * (tasa * Math.pow(1 + tasa, ans*12)) / (Math.pow(1 + tasa, ans*12) - 1);
+    let pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
     const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1.3) / refSaldo;
     const seguro = saldo * factorSeguro;
     const cuota_final = pago_puro + seguro + cbdi;
@@ -329,6 +382,7 @@ export default function App() {
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
 
+    // TABLA DE PLAN DE PAGOS ALTERNATIVOS (1 a 14)
     let planPagosArreglo = [];
     for (let i = 14; i >= 1; i--) {
       const m_i = i * 12;
@@ -338,61 +392,70 @@ export default function App() {
       const c_final_i = pp_i + seg_i + cbdi;
       
       planPagosArreglo.push({ 
-        año: i, 
-        meses: m_i,
-        cuotaUsd: formatMoney(c_final_i), 
-        cuotaBs: formatMoney(c_final_i * tcFlexible),
-        isCurrent: i === ans
+        año: i, meses: m_i, cuotaUsd: formatMoney(c_final_i), cuotaBs: formatMoney(c_final_i * tcFlexible), isCurrent: i === ans
       });
     }
 
-    // --- TABLA DE TRANSICIÓN (TC ESCALONADO) ---
+    // TABLA DE TRANSICIÓN INFINITA (1 a N meses)
     const transicionData = [];
-    const baseMeses = ['ago 26', 'sep 26', 'oct 26', 'nov 26', 'dic 26', 'ene 27', 'feb 27', 'mar 27', 'abr 27', 'may 27', 'jun 27', 'jul 27', 'ago 27'];
     let totalAhorroTransicion = 0;
+    const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     
-    for(let m=1; m<=13; m++) {
+    // Mes 1 de compra es Agosto 2026 (mes 7 en JS, index 0 es ene)
+    let baseMonthIndex = 7; 
+    let baseYear = 26;
+    
+    for(let m=1; m<=meses; m++) {
         let tc_efectivo = tcFlexible;
-        // Escalera de 5% mensual partiendo de 6.97, topando en tcFlexible
-        if(m <= 6) {
-            tc_efectivo = Math.min(TC_PROMOCIONAL * Math.pow(1.05, m-1), tcFlexible);
-        }
         
+        if (aplicarBonificacion) {
+            if(m <= 6) {
+                // Sube 5% mensual partiendo desde la cuota 2
+                tc_efectivo = TC_PROMOCIONAL * Math.pow(1.05, m-1);
+                if (tc_efectivo > tcFlexible) tc_efectivo = tcFlexible;
+            } else {
+                tc_efectivo = tcFlexible;
+            }
+        }
+
         const montoBs = cuota_final * tc_efectivo;
-        const pagoUsdDesc = montoBs / tcFlexible; // Equivalente en USD del pago real en Bs
+        const pagoUsdDesc = montoBs / tcFlexible; 
         const descuentoPct = ((cuota_final - pagoUsdDesc) / cuota_final) * 100;
         const ahorroBs = (cuota_final * tcFlexible) - montoBs;
 
-        if (ahorroBs > 0) totalAhorroTransicion += ahorroBs;
+        if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
+
+        let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
+        let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
+        let mesLabel = `${mesesNombres[currentMIndex]} ${currentY}`;
 
         transicionData.push({
             mesNum: m,
-            mesLabel: baseMeses[m-1] || `Mes ${m}`,
+            mesLabel: mesLabel,
             pagoUsdNormal: cuota_final,
             descPct: ahorroBs > 0 ? descuentoPct : 0,
             conDescUsd: pagoUsdDesc,
             montoBs: montoBs,
             tcEfectivo: tc_efectivo,
             ahorroBs: ahorroBs > 0 ? ahorroBs : 0,
-            isDiscounted: m <= 6
+            isDiscounted: aplicarBonificacion && tc_efectivo < tcFlexible
         });
     }
 
     setResultado({
       regional: regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria: categoria,
-      valorOriginalRaw: valor_original,
-      valorOriginal: formatMoney(valor_original), valorOriginalBs: formatMoney(valor_original * tcFlexible),
-      valorContado: formatMoney(valor_contado), valorContadoBs: formatMoney(valor_contado * TC_PROMOCIONAL), // CONTADO JULIO = 6.97
+      valorOriginal: formatMoney(valor_original), valorOriginalBs: formatMoney(valor_original * TC_PROMOCIONAL),
+      valorContado: formatMoney(valor_contado), valorContadoBs: formatMoney(valor_contado * TC_PROMOCIONAL),
       ahorroContadoRaw: monto_descuento_total_contado,
       ahorroContado: formatMoney(monto_descuento_total_contado), porcentajeContado: aplicarDescContadoPct ? descuentoContado : 0,
       descuentoContadoM2: aplicarDescContadoM2 ? descContadoM2Val : 0,
       valorCreditoRaw: valor_credito,
-      valorCredito: formatMoney(valor_credito), valorCreditoBs: formatMoney(valor_credito * tcFlexible),
+      valorCredito: formatMoney(valor_credito), valorCreditoBs: formatMoney(valor_credito * TC_PROMOCIONAL), // Referencial
       ahorroCreditoRaw: monto_descuento_total_credito,
       ahorroCredito: formatMoney(monto_descuento_total_credito), porcentajeCredito: aplicarDescCreditoPct ? descuentoCredito : 0,
       descuentoM2: aplicarDescM2 ? descM2Val : 0, descuentoInicial: descIniVal,
       inicialRaw: cuota_inicial,
-      inicial: formatMoney(cuota_inicial), inicialBs: formatMoney(cuota_inicial * TC_PROMOCIONAL), inicialPct: formatPct, // INICIAL = 6.97
+      inicial: formatMoney(cuota_inicial), inicialBs: formatMoney(cuota_inicial * TC_PROMOCIONAL), inicialPct: formatPct,
       saldoRaw: saldo,
       pagoAmortizacion: formatMoney(pago_puro), seguro: formatMoney(seguro), cbdi: formatMoney(cbdi),
       mensualRaw: cuota_final,
@@ -405,6 +468,13 @@ export default function App() {
     });
     setCopiado(false); 
   };
+
+  // Re-calcular si el usuario hace toggle de la bonificación mientras ve el resultado
+  useEffect(() => {
+    if (resultado && !isCalculating) {
+      calcular();
+    }
+  }, [aplicarBonificacion]);
 
   const getTextToCopy = () => {
     if (!resultado) return "";
@@ -445,7 +515,7 @@ export default function App() {
     if (!resultado) return;
     const mensaje = getTextToCopy();
     if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(mensaje).then(() => showNotification("¡Copiado al portapapeles!"));
+        navigator.clipboard.writeText(mensaje).then(() => showNotification("¡Copiado al portapapeles con éxito!"));
     } else {
         let textArea = document.createElement("textarea");
         textArea.value = mensaje;
@@ -455,7 +525,7 @@ export default function App() {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        try { document.execCommand('copy'); showNotification("¡Copiado al portapapeles!"); } catch (error) {}
+        try { document.execCommand('copy'); showNotification("¡Copiado al portapapeles con éxito!"); } catch (error) {}
         textArea.remove();
     }
   };
@@ -467,17 +537,21 @@ export default function App() {
       calcular();
       setIsCalculating(false);
       if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 500); 
+    }, 500);
   };
 
+  const showDescPorcentaje = descGroup4_30PCT.includes(proyecto) || descGroup5_32PCT.includes(proyecto) || descGroup6_20PCT.includes(proyecto) || descGroup7_15PCT.includes(proyecto) || proyecto === "OTRO";
+  const showDescM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto) || proyecto === "OTRO";
+  const showDescContadoM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto);
+  const showBonoInicial = proyecto === "OTRO";
+
   return (
-    <div className="min-h-screen bg-[#060b13] relative font-['Plus_Jakarta_Sans'] text-slate-200 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20">
       
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
         
         @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
-        @keyframes shimmer { 100% { transform: translateX(100%); } }
         @keyframes float { 0%, 100% { transform: translateY(0) scale(1.2); } 50% { transform: translateY(-20px) scale(1.2); } }
         @keyframes popIn { 0% { opacity: 0; transform: scale(0.9) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes slideUpFade { 0% { opacity: 0; transform: translate(-50%, 20px); } 10% { opacity: 1; transform: translate(-50%, 0); } 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -20px); } }
@@ -487,11 +561,11 @@ export default function App() {
         .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .animate-toast { animation: slideUpFade 3s ease-in-out forwards; }
         
-        /* Dark Space Theme - Glassmorphism */
-        .glass-panel { background: rgba(9, 14, 23, 0.7); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 20px 50px -10px rgba(0,0,0,0.7); }
-        .glass-input { background: rgba(13, 20, 32, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); color: #f8fafc; }
-        .glass-input:focus { background: rgba(18, 28, 45, 0.8); border-color: #06b6d4; box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15); outline: none;}
-        select option { background: #060b13; color: #f8fafc; }
+        /* Dark Quantum Glassmorphism */
+        .glass-panel { background: rgba(9, 14, 23, 0.75); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(6, 182, 212, 0.15); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 0 rgba(255,255,255,0.05); }
+        .glass-input { background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); color: #f8fafc; }
+        .glass-input:focus { background: rgba(15, 23, 42, 0.8); border-color: #06b6d4; box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15); outline: none;}
+        select option { background: #0f172a; color: #f8fafc; }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); border-radius: 8px; }
@@ -501,9 +575,8 @@ export default function App() {
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
-            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: black; }
-            .glass-panel { box-shadow: none; border: 1px solid #e2e8f0; background: white;}
-            * { text-shadow: none !important; box-shadow: none !important; }
+            body { background: #020617; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .glass-panel { box-shadow: none; border: 1px solid #1e293b; }
         }
       `}</style>
 
@@ -514,13 +587,13 @@ export default function App() {
         </div>
       )}
 
-      {/* MAPA ISOMÉTRICO DE FONDO */}
+      {/* MAPA ISOMÉTRICO */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.15] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]" xmlns="http://www.w3.org/2000/svg">
           <g transform="translate(500, 400) scale(1.6)">
-            {[...Array(15)].map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(6, 182, 212, 0.2)" strokeWidth="1" strokeDasharray="4 4" />)}
-            {[...Array(15)].map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(6, 182, 212, 0.2)" strokeWidth="1" strokeDasharray="4 4" />)}
-            <polygon points="0,0 60,30 0,60 -60,30" fill="rgba(6, 182, 212, 0.05)" stroke="#0891b2" strokeWidth="1" />
+            {[...Array(15)].map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)].map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            <polygon points="0,0 60,30 0,60 -60,30" fill="rgba(6, 182, 212, 0.1)" stroke="#0891b2" strokeWidth="1" />
             <polygon points="60,30 120,60 60,90 0,60" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" strokeWidth="1.5" />
             <polygon points="-60,30 0,60 -60,90 -120,60" fill="rgba(2, 132, 199, 0.1)" stroke="#0369a1" strokeWidth="1" />
           </g>
@@ -528,13 +601,13 @@ export default function App() {
       </div>
 
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none no-print">
-        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-indigo-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
-        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-cyan-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-teal-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-cyan-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-emerald-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0 no-print">
-        <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA FINTECH</div>
+        <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
       <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10">
@@ -564,14 +637,14 @@ export default function App() {
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative no-print">
           <div className="hidden md:block w-32"></div>
           <div className="text-center flex-1 flex flex-col items-center">
-            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.1)] mb-4 sm:mb-5 backdrop-blur-md">
+            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] mb-4 sm:mb-5 backdrop-blur-md">
               <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Plataforma Financiera Premium</span>
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Plataforma Fintech de Alta Precisión</span>
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full">
-              Simulador <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400">Celina</span>
+              Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400">Quantum</span>
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase">Desarrollado por Oscar Saravia®</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase">Motor Financiero V 3.0</p>
           </div>
           <div className="hidden md:block w-32"></div>
         </div>
@@ -581,6 +654,7 @@ export default function App() {
           {/* PANEL IZQUIERDO: FORMULARIO */}
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print">
             <div className="bg-[#0d1420]/80 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
               <div className="flex items-center gap-3 relative z-10">
                 <div className="bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/20 shadow-inner">
                   <FileText className="w-5 h-5 text-cyan-400" />
@@ -623,11 +697,15 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-cyan-500" /> Proyecto
                     </label>
-                    {tieneBD && (
+                    {cargandoBD ? (
+                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1.5 rounded-full bg-amber-500/10">
+                        <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
+                      </span>
+                    ) : tieneBD ? (
                       <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}>
-                        {usarBD ? <Database className="w-3 h-3 text-cyan-400"/> : <Edit2 className="w-3 h-3"/>} BD INTELIGENTE
+                        {usarBD ? <Database className="w-3 h-3 text-cyan-400"/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
-                    )}
+                    ) : null}
                   </div>
                   <div className="relative">
                     <select value={proyecto} onChange={e => setProyecto(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
@@ -636,41 +714,56 @@ export default function App() {
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500"><ChevronDown className="w-5 h-5" /></div>
                   </div>
+                  {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop" placeholder="Escribe el nombre del proyecto..." />}
                 </div>
 
                 {/* UV / MZN / LOTE */}
                 <div className="pt-2 sm:pt-3">
                   <div className="bg-[#0d1420]/80 border border-slate-800/80 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-inner">
-                    <div className="flex items-center gap-2 mb-1">
-                      <MapPin className="w-4 h-4 text-teal-400" />
-                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-teal-400" />
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
+                      </div>
+                      {!usarBD && tieneBD && (
+                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1"><Edit2 className="w-3 h-3"/> Ingreso Manual</span>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-teal-500 uppercase tracking-widest">UV</label>
                         {modoBD ? (
-                           <select value={uv} onChange={handleUvChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
+                           <div className="relative">
+                             <select value={uv} onChange={handleUvChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
                                <option value="" disabled hidden>Selec.</option>
                                {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
-                           </select>
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-teal-500"><ChevronDown className="w-3 h-3" /></div>
+                           </div>
                         ) : <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600" />}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-teal-500 uppercase tracking-widest">MZN</label>
                         {modoBD ? (
-                           <select value={mzn} onChange={handleMznChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
+                           <div className="relative">
+                             <select value={mzn} onChange={handleMznChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
                                <option value="" disabled hidden>Selec.</option>
                                {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-                           </select>
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-teal-500"><ChevronDown className="w-3 h-3" /></div>
+                           </div>
                         ) : <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600" />}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-teal-500 uppercase tracking-widest">LOTE</label>
                         {modoBD ? (
-                           <select value={lote} onChange={handleLoteChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
+                           <div className="relative">
+                             <select value={lote} onChange={handleLoteChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
                                <option value="" disabled hidden>Selec.</option>
                                {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
-                           </select>
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-teal-500"><ChevronDown className="w-3 h-3" /></div>
+                           </div>
                         ) : <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600" />}
                       </div>
                     </div>
@@ -682,7 +775,7 @@ export default function App() {
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <LayoutTemplate className="w-3 h-3 text-cyan-500" /> Categoría del Lote
                     </label>
-                    <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className="w-full glass-input rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600" />
+                    <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 ${modoBD ? 'bg-cyan-950/20 border border-cyan-500/30 text-cyan-100' : 'glass-input'}`} />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mt-4">
@@ -690,13 +783,13 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5"><Map className="w-4 h-4 text-teal-400" /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
                     </label>
-                    <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className="w-full glass-input rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600" />
+                    <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? 'bg-[#060b13] border border-slate-800 text-cyan-400 shadow-inner' : 'glass-input'}`} />
                   </div>
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-teal-400" /> Precio <span className="text-slate-600 normal-case">/ m²</span></span>
                     </label>
-                    <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className="w-full glass-input rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600" />
+                    <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? 'bg-[#060b13] border border-slate-800 text-cyan-400 shadow-inner' : 'glass-input'}`} />
                   </div>
                 </div>
 
@@ -736,7 +829,6 @@ export default function App() {
                     <div className="relative h-[calc(100%-1.5rem)]">
                       <select required value={años} onChange={e => setAños(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px]">
                         <option value="" disabled hidden>Selec.</option>
-                        {/* HASTA 14 AÑOS */}
                         {[...Array(14)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500"><ChevronDown className="w-5 h-5" /></div>
@@ -748,7 +840,7 @@ export default function App() {
                   <div className="absolute inset-0 bg-white/30 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
                   <span className="relative z-10 flex items-center gap-2 sm:gap-3">
                     {isCalculating ? (
-                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" /> Procesando Algoritmo...</>
+                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" /> Procesando Núcleo...</>
                     ) : (
                       <>Procesar Cotización <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" /></>
                     )}
@@ -772,7 +864,7 @@ export default function App() {
                   {isCalculating ? "Analizando Transición TC..." : "Plataforma Fintech"}
                 </h3>
                 <p className="text-sm sm:text-base max-w-md text-slate-400 font-medium leading-relaxed px-2">
-                  {isCalculating ? "Calculando cuota escalonada, seguros y ahorro promocional." : "Genera propuestas financieras precisas con la nueva matriz de TC dinámico."}
+                  {isCalculating ? "Calculando cuota escalonada, seguros y ahorro promocional." : "Completa los parámetros de inversión a la izquierda para generar una propuesta financiera de alta precisión."}
                 </p>
               </div>
             ) : (
@@ -813,6 +905,7 @@ export default function App() {
                     <div className="text-center sm:text-left">
                       <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1 block">Valor Original</span>
                       <div className="text-2xl sm:text-3xl font-black text-white">$ {resultado.valorOriginal}</div>
+                      <div className="text-xs sm:text-sm font-bold text-slate-500 mt-1">Bs. {resultado.valorOriginalBs}</div>
                     </div>
                     {resultado.ahorroContado !== "0.00" && (
                       <div className="bg-emerald-950/40 text-emerald-400 px-5 py-3 rounded-2xl border border-emerald-500/30 text-center w-full sm:w-auto">
@@ -841,42 +934,60 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* TABLA DE TRANSICIÓN (LA KILLER FEATURE) */}
+                  {/* TABLA DE TRANSICIÓN INFINITA CON TOGGLE */}
                   <div className="bg-[#04070b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(6,182,212,0.1)] mt-8">
                       <div className="p-5 border-b border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 bg-gradient-to-r from-cyan-950/20 to-transparent">
                           <div>
-                            <h3 className="text-white font-black text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-amber-400"/> Bonificación de Transición</h3>
+                            <h3 className="text-white font-black text-lg flex items-center gap-2">
+                               <Sparkles className={`w-5 h-5 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
+                               Bonificación de Transición
+                            </h3>
                             <p className="text-slate-400 text-[10px] mt-1">Pago regular: ${resultado.mensual} · TC Mercado: {tcFlexible}</p>
                           </div>
-                          <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-2 rounded-xl text-center">
-                            <div className="text-[9px] text-amber-400 uppercase font-black tracking-widest">Ahorro Total Cliente</div>
-                            <div className="text-xl font-black text-amber-500">Bs. {resultado.totalAhorroTransicion}</div>
+                          
+                          <div className="flex items-center gap-5">
+                             {/* EL TOGGLE SUPREMO */}
+                             <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                               <span className={`text-[9px] font-black uppercase tracking-wider ${aplicarBonificacion ? 'text-cyan-400' : 'text-slate-500'}`}>
+                                  Con Bonificación
+                               </span>
+                               <button 
+                                 type="button" 
+                                 onClick={() => setAplicarBonificacion(!aplicarBonificacion)} 
+                                 className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none shadow-inner ${aplicarBonificacion ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                               >
+                                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm ${aplicarBonificacion ? 'translate-x-6 shadow-[0_0_10px_rgba(255,255,255,0.8)]' : 'translate-x-1'}`} />
+                               </button>
+                             </div>
+                             
+                             <div className={`border px-4 py-2 rounded-xl text-center transition-colors ${aplicarBonificacion ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800/50 border-slate-700'}`}>
+                               <div className={`text-[9px] uppercase font-black tracking-widest ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}>Ahorro Total Cliente</div>
+                               <div className={`text-xl font-black ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
+                             </div>
                           </div>
                       </div>
                       
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto overflow-y-auto max-h-[350px] custom-scrollbar">
                         <table className="w-full text-left text-xs whitespace-nowrap min-w-[650px]">
-                          <thead className="bg-[#090e17]">
+                          <thead className="sticky top-0 bg-[#090e17] z-10 border-b border-slate-800">
                             <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                               <th className="p-3 text-center">Mes</th>
                               <th className="p-3 text-center">Pago Fijo ($)</th>
-                              <th className="p-3 text-center text-cyan-400">Descuento</th>
-                              <th className="p-3 text-center text-cyan-300 bg-cyan-950/20">Pago c/Desc ($)</th>
+                              <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-cyan-400' : 'text-slate-600'}`}>Descuento</th>
+                              <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-cyan-300 bg-cyan-950/20' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
                               <th className="p-3 text-center text-white">Monto Real (Bs)</th>
                               <th className="p-3 text-center">TC Efe.</th>
-                              <th className="p-3 text-right pr-5 text-amber-400">Ahorro (Bs)</th>
                             </tr>
                           </thead>
                           <tbody className="font-semibold">
                             {resultado.transicionData.map((row, i) => (
-                              <tr key={i} className={`border-b border-slate-800/50 text-center ${row.isDiscounted ? 'bg-cyan-950/10' : 'text-slate-500'}`}>
+                              <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-cyan-950/10' : 'text-slate-500'}`}>
                                 <td className={`p-2.5 font-bold ${row.isDiscounted ? 'text-cyan-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                <td className="p-2.5">{row.pagoUsdNormal}</td>
-                                <td className="p-2.5 text-cyan-500">{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                <td className={`p-2.5 font-bold bg-cyan-950/20 ${row.isDiscounted ? 'text-cyan-300' : 'text-slate-500'}`}>{row.conDescUsd.toFixed(2)}</td>
+                                <td className="p-2.5 text-slate-300">{row.pagoUsdNormal.toFixed(2)}</td>
+                                <td className={`p-2.5 ${row.isDiscounted ? 'text-cyan-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
+                                <td className={`p-2.5 font-bold ${row.isDiscounted ? 'text-cyan-300 bg-cyan-950/20' : 'text-slate-500'}`}>{row.conDescUsd.toFixed(2)}</td>
                                 <td className={`p-2.5 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{row.montoBs.toFixed(2)}</td>
                                 <td className="p-2.5 text-slate-400">{row.tcEfectivo.toFixed(2)}</td>
-                                <td className={`p-2.5 text-right pr-5 font-bold ${row.ahorroBs > 0 ? 'text-amber-400' : 'text-slate-600'}`}>{row.ahorroBs > 0 ? row.ahorroBs.toFixed(0) : '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -887,22 +998,21 @@ export default function App() {
                       </div>
                   </div>
 
-                  {/* TABLA DE PLAN DE PAGOS (1 a 14 Años) */}
+                  {/* TABLA DE PLAN DE PAGOS (14 a 1 Años) */}
                   <div className="mt-8 border border-slate-800 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50">
-                    <div className="bg-[#090e17] p-4 border-b border-slate-800">
+                    <div className="bg-[#090e17] p-4 border-b border-slate-800 flex justify-between items-center">
                        <h3 className="text-slate-300 font-bold text-sm tracking-wide flex items-center gap-2">
-                         <Calendar className="w-4 h-4 text-cyan-500"/> Plan de Financiamiento (Alternativas de Plazo)
+                         <Calendar className="w-4 h-4 text-cyan-500"/> Resumen de Plazos Alternativos
                        </h3>
                     </div>
                     <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
-                        <div className="grid grid-cols-4 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
-                          <div>Años</div><div>Meses</div><div className="text-cyan-400">Cuota ($us)</div><div className="text-cyan-400">Cuota (Bs) al TC Mdo.</div>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
+                          <div>Plazo</div><div className="text-cyan-400">Cuota ($us)</div><div className="text-cyan-400">Cuota (Bs) al TC Mdo.</div>
                         </div>
                         <div className="pt-2">
                           {resultado.planPagos.map((plan, i) => (
-                            <div key={i} className={`grid grid-cols-4 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-cyan-900/30 border border-cyan-500/40 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)] scale-[1.02] transform my-2' : 'text-slate-400 hover:bg-slate-800/50 border border-transparent'}`}>
-                              <div className="flex items-center justify-center gap-1.5">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse hidden sm:inline-block"></span>} {plan.año}</div>
-                              <div className="text-slate-500">{plan.meses}</div>
+                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-cyan-900/30 border border-cyan-500/40 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)] scale-[1.02] transform my-2' : 'text-slate-400 hover:bg-slate-800/50 border border-transparent'}`}>
+                              <div className="flex items-center justify-center gap-1.5">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse hidden sm:inline-block"></span>} {plan.año} Años</div>
                               <div className={`font-black ${plan.isCurrent ? 'text-cyan-300' : 'text-slate-300'}`}>$ {plan.cuotaUsd}</div>
                               <div className={plan.isCurrent ? 'text-cyan-500' : 'text-slate-500'}>Bs. {plan.cuotaBs}</div>
                             </div>
@@ -922,7 +1032,7 @@ export default function App() {
                           <span>{copiado ? 'COPIADO' : 'COPIAR TEXTO'}</span>
                         </button>
                         <button onClick={enviarWhatsApp} className="w-full sm:w-2/3 bg-[#25D366] hover:bg-[#1DA851] text-slate-900 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-md hover:shadow-lg hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider">
-                          <Send className="w-5 h-5 sm:w-6 sm:h-6" /> <span>Enviar Propuesta por WhatsApp</span>
+                          <Send className="w-5 h-5 sm:w-6 sm:h-6" /> <span>Enviar por WhatsApp</span>
                         </button>
                     </div>
                   </div>
@@ -930,8 +1040,22 @@ export default function App() {
               </div>
             )}
           </div>
-
         </div>
+
+        {/* FOOTER OSCAR SARAVIA - FIRMA DE AUTOR */}
+        <div className="mt-24 pt-12 border-t border-slate-800/60 flex flex-col items-center justify-center text-center pb-12 no-print relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-1 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+          <div className="text-[#4fd1c5] text-[9px] sm:text-xs font-bold tracking-[0.4em] uppercase mb-5">
+            Concepto, Arquitectura y Desarrollo Web
+          </div>
+          <div className="text-5xl sm:text-7xl md:text-[5.5rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-[#4fd1c5] tracking-tighter mb-6 drop-shadow-[0_0_20px_rgba(79,209,197,0.25)]">
+            OSCAR SARAVIA
+          </div>
+          <p className="text-slate-400 text-[10px] sm:text-xs max-w-2xl font-semibold tracking-[0.15em] leading-relaxed uppercase">
+            Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
+          </p>
+        </div>
+
       </div>
     </div>
   );
