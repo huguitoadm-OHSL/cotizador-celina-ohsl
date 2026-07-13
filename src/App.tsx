@@ -331,6 +331,23 @@ export default function App() {
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
 
+    // TABLA DE RESUMEN DE AÑOS (1 a 14)
+    let planPagosArreglo = [];
+    for (let i = 14; i >= 1; i--) {
+      const m_i = i * 12;
+      let pp_i = tasa === 0 ? saldo / m_i : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
+      const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1.3) / refSaldo;
+      const seg_i = saldo * fS_i;
+      const c_final_i = pp_i + seg_i + cbdi;
+      
+      planPagosArreglo.push({ 
+        año: i, 
+        cuotaUsd: formatMoney(c_final_i), 
+        cuotaBs: formatMoney(c_final_i * tcFlexible),
+        isCurrent: i === ans
+      });
+    }
+
     // TABLA DE TRANSICIÓN INFINITA (1 a N meses, con caída exacta de 5 puntos)
     const transicionData = [];
     let totalAhorroTransicion = 0;
@@ -401,6 +418,7 @@ export default function App() {
       mensualRaw: cuota_final,
       mensual: formatMoney(cuota_final), mensualBs: formatMoney(cuota_final * tcFlexible),
       plazo: ans, 
+      planPagos: planPagosArreglo,
       transicionData: transicionData,
       totalAhorroTransicion: formatMoney(totalAhorroTransicion),
       timestampId: new Date().getTime()
@@ -962,10 +980,10 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody className="font-semibold relative z-10">
-                            {resultado.transicionData.map((row, i) => (
+                            {resultado.transicionData && resultado.transicionData.map((row, i) => (
                               <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-cyan-950/10' : 'text-slate-500'}`}>
                                 <td className={`p-3 font-bold ${row.isDiscounted ? 'text-cyan-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                <td className="p-3 text-slate-300">{row.pagoUsdNormal.toFixed(2)}</td>
+                                <td className="p-3 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
                                 <td className={`p-3 ${row.isDiscounted ? 'text-cyan-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
                                 <td className={`p-3 font-bold ${row.isDiscounted ? 'text-cyan-300 bg-cyan-950/20' : 'text-slate-500'}`}>{row.conDescUsd.toFixed(2)}</td>
                                 <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{row.montoBs.toFixed(2)}</td>
@@ -976,11 +994,11 @@ export default function App() {
                         </table>
                       </div>
                       <div className="p-3 bg-[#060b13] text-[9px] text-slate-500 text-center border-t border-slate-800">
-                        *Simulación matemática exacta para toda la vida del crédito.
+                        *Simulación referencial. Descuento matemático ordenado.
                       </div>
                   </div>
 
-                  {/* TABLA DE PLAN DE PAGOS (1 a 14 Años) ESTILO IMAGEN 1 */}
+                  {/* TABLA DE PLAN DE PAGOS (1 a 14 Años) */}
                   <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50">
                     <div className="bg-[#040810] p-4 border-b border-emerald-500/10 flex justify-between items-center">
                        <h3 className="text-slate-300 font-bold text-sm tracking-wide flex items-center gap-2">
@@ -992,7 +1010,7 @@ export default function App() {
                           <div>Plazo</div><div className="text-emerald-400">Cuota ($us)</div><div className="text-emerald-400">Cuota (Bs.)</div>
                         </div>
                         <div className="pt-2">
-                          {resultado.planPagos.map((plan, i) => (
+                          {resultado.planPagos && resultado.planPagos.map((plan, i) => (
                             <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-3 rounded-xl text-center text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-900/30 border border-emerald-500/40 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/50 border border-transparent'}`}>
                               <div className="flex items-center justify-center gap-2">
                                 {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>} 
