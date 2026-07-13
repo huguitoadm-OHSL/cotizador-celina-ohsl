@@ -48,6 +48,14 @@ const proyectosPorRegional = {
   ]
 };
 
+const descGroup1_3USD = ["LOS JARDINES", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
+const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3", "CELINA VII FASE 1", "CELINA VII FASE 2", "TAMARINDO"];
+const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
+const descGroup4_30PCT = ["MUYURINA", "SANTA FE", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
+const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
+const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
+const descGroup7_15PCT = ["ROSA RODALI"];
+
 export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
@@ -503,7 +511,7 @@ export default function App() {
   const showBonoInicial = proyecto === "OTRO";
 
   return (
-    <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20">
+    <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
@@ -532,14 +540,14 @@ export default function App() {
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
-            body { background: #020617; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { background: #020617; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
             .glass-panel { box-shadow: none; border: 1px solid #1e293b; }
         }
       `}</style>
 
       {/* TOAST NOTIFICATIONS */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
         </div>
       )}
@@ -567,19 +575,19 @@ export default function App() {
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10">
+      <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full">
         
         {/* TOP BAR: TC DINÁMICO */}
-        <div className="flex justify-end mb-6 no-print">
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4">
+        <div className="flex justify-end mb-6 no-print w-full">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto max-w-full">
              <div className="flex items-center gap-2">
-               <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/20"><Activity className="w-5 h-5 text-cyan-400" /></div>
-               <div className="hidden sm:block">
-                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">TC Mercado (Hoy)</div>
-                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> En Vivo</div>
+               <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/20 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
+               <div>
+                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC Mercado</div>
+                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative">
+             <div className="relative shrink-0">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" step="0.01" value={tcFlexible} 
@@ -593,7 +601,7 @@ export default function App() {
         {/* HEADER PRINCIPAL */}
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative no-print">
           <div className="hidden md:block w-32"></div>
-          <div className="text-center flex-1 flex flex-col items-center">
+          <div className="text-center flex-1 flex flex-col items-center max-w-full">
             <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] mb-4 sm:mb-5 backdrop-blur-md">
               <Sparkles className="w-4 h-4 text-cyan-400" />
               <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Plataforma Fintech de Alta Precisión</span>
@@ -606,10 +614,10 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           {/* PANEL IZQUIERDO: FORMULARIO */}
-          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print">
+          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0">
             <div className="bg-[#0d1420]/80 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
               <div className="flex items-center gap-3 relative z-10">
@@ -622,12 +630,12 @@ export default function App() {
               <div className="relative z-10">
                 {!cargandoBD && baseDeDatosLotes.length > 0 && (
                    <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/30 border border-emerald-500/30 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider shadow-sm">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> BD Online
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> BD Online
                    </span>
                 )}
                 {!cargandoBD && baseDeDatosLotes.length === 0 && (
                    <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-950/30 border border-rose-500/30 rounded-full text-[9px] font-bold text-rose-400 tracking-wider shadow-sm">
-                     <AlertCircle className="w-3 h-3" /> BD Offline
+                     <AlertCircle className="w-3 h-3 shrink-0" /> BD Offline
                    </span>
                 )}
               </div>
@@ -639,7 +647,7 @@ export default function App() {
                 {/* REGIONAL Y PROYECTO */}
                 <div className="space-y-2.5">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Map className="w-4 h-4 text-cyan-500" /> Regional
+                    <Map className="w-4 h-4 text-cyan-500 shrink-0" /> Regional
                   </label>
                   <div className="relative">
                     <select value={regional} onChange={e => setRegional(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none">
@@ -652,14 +660,14 @@ export default function App() {
                 <div className="space-y-2.5 relative">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-cyan-500" /> Proyecto
+                      <Building2 className="w-4 h-4 text-cyan-500 shrink-0" /> Proyecto
                     </label>
                     {cargandoBD ? (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1.5 rounded-full bg-amber-500/10">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1.5 rounded-full bg-amber-500/10 shrink-0">
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all ${usarBD ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}>
+                      <button type="button" onClick={() => setUsarBD(!usarBD)} className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 ${usarBD ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}>
                         {usarBD ? <Database className="w-3 h-3 text-cyan-400"/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
                     ) : null}
@@ -679,11 +687,11 @@ export default function App() {
                   <div className="bg-[#0d1420]/80 border border-slate-800/80 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-inner">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-teal-400" />
+                        <MapPin className="w-4 h-4 text-teal-400 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
                       {!usarBD && tieneBD && (
-                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1"><Edit2 className="w-3 h-3"/> Ingreso Manual</span>
+                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0"><Edit2 className="w-3 h-3"/> Ingreso Manual</span>
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -697,7 +705,7 @@ export default function App() {
                              </select>
                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-teal-500"><ChevronDown className="w-3 h-3" /></div>
                            </div>
-                        ) : <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600" />}
+                        ) : <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0" />}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-teal-500 uppercase tracking-widest">MZN</label>
@@ -709,7 +717,7 @@ export default function App() {
                              </select>
                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-teal-500"><ChevronDown className="w-3 h-3" /></div>
                            </div>
-                        ) : <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600" />}
+                        ) : <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0" />}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold text-teal-500 uppercase tracking-widest">LOTE</label>
@@ -721,7 +729,7 @@ export default function App() {
                              </select>
                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-teal-500"><ChevronDown className="w-3 h-3" /></div>
                            </div>
-                        ) : <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600" />}
+                        ) : <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0" />}
                       </div>
                     </div>
                   </div>
@@ -730,7 +738,7 @@ export default function App() {
                 {/* CATEGORIA, SUP & PRECIO */}
                 <div className="space-y-2.5 relative mt-4">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <LayoutTemplate className="w-3 h-3 text-cyan-500" /> Categoría del Lote
+                      <LayoutTemplate className="w-3 h-3 text-cyan-500 shrink-0" /> Categoría del Lote
                     </label>
                     <input type="text" value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej. LOTE S/CALLE ESQ. A" className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 ${modoBD ? 'bg-cyan-950/20 border border-cyan-500/30 text-cyan-100' : 'glass-input'}`} />
                 </div>
@@ -738,13 +746,13 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mt-4">
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
-                      <span className="flex items-center gap-1.5"><Map className="w-4 h-4 text-teal-400" /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
+                      <span className="flex items-center gap-1.5"><Map className="w-4 h-4 text-teal-400 shrink-0" /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
                     </label>
                     <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? 'bg-[#060b13] border border-slate-800 text-cyan-400 shadow-inner' : 'glass-input'}`} />
                   </div>
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
-                      <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-teal-400" /> Precio <span className="text-slate-600 normal-case">/ m²</span></span>
+                      <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-teal-400 shrink-0" /> Precio <span className="text-slate-600 normal-case">/ m²</span></span>
                     </label>
                     <input type="number" required value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 145" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? 'bg-[#060b13] border border-slate-800 text-cyan-400 shadow-inner' : 'glass-input'}`} />
                   </div>
@@ -754,15 +762,15 @@ export default function App() {
                 <div className="bg-slate-800/40 border border-cyan-500/20 p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4">
                   <div className="absolute -right-10 -top-10 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl group-hover:bg-cyan-400/20 transition-colors"></div>
                   <div className="text-[10px] sm:text-xs font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-2 mb-4 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]">
-                    <div className="bg-cyan-500/20 p-1.5 rounded-lg border border-cyan-500/30"><Gift className="w-4 h-4 text-cyan-300" /></div>
+                    <div className="bg-cyan-500/20 p-1.5 rounded-lg border border-cyan-500/30 shadow-sm shrink-0"><Gift className="w-4 h-4 text-cyan-300" /></div>
                     Descuentos Promocionales
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10">
                     {showDescM2 && (
                       <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500" /> Crédito x m² ($us)
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
+                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Crédito x m² ($us)
                         </label>
                         <input type="number" step="0.01" min="0" disabled={!aplicarDescM2} value={descuentoM2} onChange={handleDescM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
                         <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-cyan-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxDescM2}</p>
@@ -770,8 +778,8 @@ export default function App() {
                     )}
                     {showDescContadoM2 && (
                       <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500" /> Contado x m² ($us)
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
                         </label>
                         <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={handleDescContadoM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
                         <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-cyan-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxContadoM2}</p>
@@ -779,8 +787,8 @@ export default function App() {
                     )}
                     {showBonoInicial && (
                       <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
-                          <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500" /> Bono Inicial ($us)
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
+                          <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Bono Inicial ($us)
                         </label>
                         <input type="number" step="0.01" min="0" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={handleBonoInicialChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
                         <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarBonoInicialOtro ? 'text-cyan-400' : 'text-slate-600'}`}>Máx: $500</p>
@@ -794,7 +802,7 @@ export default function App() {
                   <div className="col-span-12 md:col-span-8 bg-cyan-950/20 border border-cyan-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative">
                     <div className="space-y-2">
                       <label className="text-[10px] sm:text-[11px] font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <Percent className="w-3.5 h-3.5" /> Inicial (%)
+                        <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                       </label>
                       <input 
                         type="number" step="0.01" min="0" required={modoInicial === 'porcentaje'}
@@ -806,7 +814,7 @@ export default function App() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] sm:text-[11px] font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <DollarSign className="w-3.5 h-3.5" /> Monto ($us)
+                        <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                       </label>
                       <input 
                         type="number" step="0.01" min="0" required={modoInicial === 'monto'}
@@ -820,14 +828,14 @@ export default function App() {
                   
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-cyan-400" /> Plazo
+                      <Calendar className="w-4 h-4 text-cyan-400 shrink-0" /> Plazo
                     </label>
                     <div className="relative h-[calc(100%-1.5rem)]">
                       <select required value={años} onChange={e => setAños(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px]">
                         <option value="" disabled hidden>Selec.</option>
                         {[...Array(14)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500"><ChevronDown className="w-5 h-5" /></div>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500"><ChevronRight className="w-5 h-5 rotate-90" /></div>
                     </div>
                   </div>
                 </div>
@@ -836,9 +844,9 @@ export default function App() {
                   <div className="absolute inset-0 bg-white/30 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
                   <span className="relative z-10 flex items-center gap-2 sm:gap-3">
                     {isCalculating ? (
-                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" /> Procesando Núcleo...</>
+                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin shrink-0" /> Procesando Núcleo...</>
                     ) : (
-                      <>Procesar Cotización <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" /></>
+                      <>Procesar Cotización <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /></>
                     )}
                   </span>
                 </button>
@@ -847,7 +855,7 @@ export default function App() {
           </div>
 
           {/* PANEL DERECHO: RESULTADOS */}
-          <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6">
+          <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6 min-w-0 w-full">
             {!resultado || isCalculating ? (
               <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500">
                 <div className="relative">
@@ -869,11 +877,11 @@ export default function App() {
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-5 border-b border-slate-800 gap-4 relative z-10">
                   <h2 className="text-2xl font-extrabold text-white flex items-center gap-3 tracking-tight">
-                    <div className="bg-gradient-to-br from-cyan-400 to-teal-500 p-2 rounded-xl text-[#060b13]"><ShieldCheck className="w-5 h-5" /></div> 
+                    <div className="bg-gradient-to-br from-cyan-400 to-teal-500 p-2 rounded-xl text-[#060b13] shadow-sm shrink-0"><ShieldCheck className="w-5 h-5" /></div> 
                     Resumen de Inversión
                   </h2>
-                  <span className="bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-sm flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)] animate-pulse"></span> Cotización Válida
+                  <span className="bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)] animate-pulse shrink-0"></span> Cotización Válida
                   </span>
                 </div>
                 
@@ -882,17 +890,17 @@ export default function App() {
                   {/* Fila: Proyecto y Lote */}
                   <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-[#060b13]/80 p-4 rounded-2xl border border-slate-800 shadow-inner">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700"><MapPin className="w-5 h-5 text-cyan-400" /></div>
-                        <div>
+                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 shrink-0"><MapPin className="w-5 h-5 text-cyan-400" /></div>
+                        <div className="min-w-0">
                           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Proyecto</div>
-                          <div className="text-white font-black text-lg uppercase leading-none">{resultado.proyecto}</div>
-                          {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && <div className="text-[8px] text-amber-400 font-bold mt-1 tracking-wider">{resultado.categoria}</div>}
+                          <div className="text-white font-black text-lg uppercase leading-none truncate">{resultado.proyecto}</div>
+                          {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && <div className="text-[8px] text-amber-400 font-bold mt-1 tracking-wider truncate">{resultado.categoria}</div>}
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
-                        <div className="text-center px-4 py-2 bg-slate-900 rounded-xl border border-slate-800"><div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div><div className="text-cyan-400 font-black text-base leading-none">{resultado.uv || '-'}</div></div>
-                        <div className="text-center px-4 py-2 bg-slate-900 rounded-xl border border-slate-800"><div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div><div className="text-cyan-400 font-black text-base leading-none">{resultado.mzn || '-'}</div></div>
-                        <div className="text-center px-4 py-2 bg-cyan-900/30 rounded-xl border border-cyan-500/30"><div className="text-[8px] font-extrabold text-cyan-500 uppercase mb-1">LOTE</div><div className="text-white font-black text-base leading-none">{resultado.lote || '-'}</div></div>
+                        <div className="text-center px-4 py-2 bg-slate-900 rounded-xl border border-slate-800 flex-1 sm:flex-none"><div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div><div className="text-cyan-400 font-black text-base leading-none truncate">{resultado.uv || '-'}</div></div>
+                        <div className="text-center px-4 py-2 bg-slate-900 rounded-xl border border-slate-800 flex-1 sm:flex-none"><div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div><div className="text-cyan-400 font-black text-base leading-none truncate">{resultado.mzn || '-'}</div></div>
+                        <div className="text-center px-4 py-2 bg-cyan-900/30 rounded-xl border border-cyan-500/30 flex-1 sm:flex-none"><div className="text-[8px] font-extrabold text-cyan-500 uppercase mb-1">LOTE</div><div className="text-white font-black text-base leading-none truncate">{resultado.lote || '-'}</div></div>
                       </div>
                   </div>
 
@@ -905,8 +913,8 @@ export default function App() {
                     </div>
                     {resultado.ahorroContado !== "0.00" && (
                       <div className="bg-emerald-950/40 text-emerald-400 px-5 py-3 rounded-2xl border border-emerald-500/30 text-center w-full sm:w-auto">
-                        <div className="text-[9px] font-black uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><Tag className="w-3 h-3"/> Oferta Contado (TC 6.97)</div>
-                        <div className="text-xl font-black text-emerald-300">$ {resultado.valorContado}</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><Tag className="w-3 h-3 shrink-0"/> Oferta Contado (TC 6.97)</div>
+                        <div className="text-xl font-black text-emerald-300 truncate">$ {resultado.valorContado}</div>
                       </div>
                     )}
                   </div>
@@ -915,56 +923,56 @@ export default function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     <div className="bg-[#0d1420]/60 p-5 rounded-2xl border border-slate-800 text-center sm:text-left relative overflow-hidden">
                       <div className="text-cyan-500 text-[10px] font-extrabold uppercase tracking-widest">Total a Financiar</div>
-                      <div className="text-2xl font-black text-white mt-1">$ {resultado.valorCredito}</div>
+                      <div className="text-2xl font-black text-white mt-1 truncate">$ {resultado.valorCredito}</div>
                       {resultado.ahorroCredito !== "0.00" && (
-                          <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-900/20 px-2 py-1 rounded border border-amber-500/20 inline-block uppercase">
+                          <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-900/20 px-2 py-1 rounded border border-amber-500/20 inline-block uppercase truncate max-w-full">
                             Ahorro Incluido: $ {resultado.ahorroCredito}
                           </div>
                       )}
                     </div>
                     <div className="bg-[#0d1420]/60 p-5 rounded-2xl border border-slate-800 text-center sm:text-left relative">
                       <div className="absolute right-0 top-0 text-[8px] bg-emerald-500 text-slate-900 font-black px-2 py-1 rounded-bl-lg">TC 6.97 CONGELADO</div>
-                      <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest">Cuota Inicial ({resultado.inicialPct}%)</div>
-                      <div className="text-2xl font-black text-white mt-1">$ {resultado.inicial}</div>
-                      <div className="text-[11px] font-bold text-emerald-500 mt-1">Bs. {resultado.inicialBs}</div>
+                      <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest truncate">Cuota Inicial ({resultado.inicialPct}%)</div>
+                      <div className="text-2xl font-black text-white mt-1 truncate">$ {resultado.inicial}</div>
+                      <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.inicialBs}</div>
                     </div>
                   </div>
 
                   {/* TABLA DE TRANSICIÓN INFINITA CON TOGGLE CYBERPUNK */}
-                  <div className="bg-[#04070b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(6,182,212,0.1)] mt-8 relative">
+                  <div className="bg-[#04070b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(6,182,212,0.1)] mt-8 relative w-full">
                       
-                      <div className="p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-cyan-950/20 to-transparent">
+                      <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-cyan-950/20 to-transparent">
                           <div>
-                            <h3 className="text-white font-black text-lg flex items-center gap-2">
-                               <Sparkles className={`w-5 h-5 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
+                            <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2">
+                               <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
                                Bonificación de Transición
                             </h3>
-                            <p className="text-slate-400 text-[10px] mt-1">Pago regular: ${resultado.mensual} · TC Mercado: {tcFlexible}</p>
+                            <p className="text-slate-400 text-[9px] sm:text-[10px] mt-1">Pago regular: ${resultado.mensual} · TC Mercado: {tcFlexible}</p>
                           </div>
                           
-                          <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
                              {/* TOGGLE CYBERPUNK DE OTRO PLANETA */}
-                             <div className={`flex items-center gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner ${aplicarBonificacion ? 'bg-slate-900/80 border-cyan-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                             <div className={`flex items-center justify-between sm:justify-start gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner w-full sm:w-auto ${aplicarBonificacion ? 'bg-slate-900/80 border-cyan-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
                                <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${aplicarBonificacion ? 'text-cyan-400' : 'text-slate-500'}`}>
                                   Con Bonificación
                                </span>
                                <button 
                                  type="button" 
                                  onClick={() => setAplicarBonificacion(!aplicarBonificacion)} 
-                                 className={`relative inline-flex h-6 w-12 items-center rounded-full transition-all duration-300 focus:outline-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] ${aplicarBonificacion ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'bg-slate-800 border border-slate-700'}`}
+                                 className={`relative inline-flex h-6 w-12 shrink-0 items-center rounded-full transition-all duration-300 focus:outline-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] ${aplicarBonificacion ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'bg-slate-800 border border-slate-700'}`}
                                >
                                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${aplicarBonificacion ? 'translate-x-7 shadow-[0_0_10px_rgba(255,255,255,0.9)]' : 'translate-x-1'}`} />
                                </button>
                              </div>
                              
-                             <div className={`border px-5 py-2.5 rounded-xl text-center transition-all duration-300 flex-1 lg:flex-none ${aplicarBonificacion ? 'bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-800/50 border-slate-700'}`}>
+                             <div className={`border px-4 py-2.5 rounded-xl text-center transition-all duration-300 w-full sm:w-auto ${aplicarBonificacion ? 'bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-800/50 border-slate-700'}`}>
                                <div className={`text-[9px] uppercase font-black tracking-widest ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}>Ahorro Total Cliente</div>
-                               <div className={`text-xl font-black ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
+                               <div className={`text-lg sm:text-xl font-black truncate ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
                              </div>
                           </div>
                       </div>
                       
-                      <div className="overflow-x-auto overflow-y-auto max-h-[400px] custom-scrollbar relative">
+                      <div className="overflow-x-auto overflow-y-auto max-h-[400px] custom-scrollbar relative w-full">
                         {/* Overlay visual cuando está desactivado */}
                         {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
 
@@ -993,31 +1001,31 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
-                      <div className="p-3 bg-[#060b13] text-[9px] text-slate-500 text-center border-t border-slate-800">
+                      <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800">
                         *Simulación referencial. Descuento matemático ordenado.
                       </div>
                   </div>
 
                   {/* TABLA DE PLAN DE PAGOS (1 a 14 Años) */}
-                  <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50">
+                  <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50 w-full">
                     <div className="bg-[#040810] p-4 border-b border-emerald-500/10 flex justify-between items-center">
                        <h3 className="text-slate-300 font-bold text-sm tracking-wide flex items-center gap-2">
-                         <Calendar className="w-4 h-4 text-emerald-500"/> Resumen de Plazos Alternativos
+                         <Calendar className="w-4 h-4 text-emerald-500 shrink-0"/> Resumen de Plazos Alternativos
                        </h3>
                     </div>
                     <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
-                        <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
                           <div>Plazo</div><div className="text-emerald-400">Cuota ($us)</div><div className="text-emerald-400">Cuota (Bs.)</div>
                         </div>
                         <div className="pt-2">
                           {resultado.planPagos && resultado.planPagos.map((plan, i) => (
-                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-3 rounded-xl text-center text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-900/30 border border-emerald-500/40 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/50 border border-transparent'}`}>
-                              <div className="flex items-center justify-center gap-2">
-                                {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>} 
-                                {plan.año} {plan.año === 1 ? 'Año' : 'Años'}
+                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-900/30 border border-emerald-500/40 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/50 border border-transparent'}`}>
+                              <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                                {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block shrink-0"></span>} 
+                                <span className="truncate">{plan.año} {plan.año === 1 ? 'Año' : 'Años'}</span>
                               </div>
-                              <div className={`font-black ${plan.isCurrent ? 'text-white' : 'text-emerald-50'}`}>$ {plan.cuotaUsd}</div>
-                              <div className={plan.isCurrent ? 'text-emerald-400' : 'text-slate-400'}>Bs. {plan.cuotaBs}</div>
+                              <div className={`font-black truncate ${plan.isCurrent ? 'text-white' : 'text-emerald-50'}`}>$ {plan.cuotaUsd}</div>
+                              <div className={`truncate ${plan.isCurrent ? 'text-emerald-400' : 'text-slate-400'}`}>Bs. {plan.cuotaBs}</div>
                             </div>
                           ))}
                         </div>
@@ -1028,14 +1036,14 @@ export default function App() {
                   <div className="mt-8 pt-6 border-t border-slate-800 no-print">
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button onClick={() => window.print()} className="w-full sm:w-1/4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 sm:py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md">
-                          <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <Printer className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                         </button>
                         <button onClick={copiarTexto} className="w-full sm:w-1/3 bg-transparent hover:bg-cyan-900/30 border border-cyan-500/50 text-cyan-400 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden">
-                          {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6" />}
-                          <span>{copiado ? 'COPIADO' : 'COPIAR TEXTO'}</span>
+                          {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-300 shrink-0" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />}
+                          <span className="truncate">{copiado ? 'COPIADO' : 'COPIAR TEXTO'}</span>
                         </button>
                         <button onClick={enviarWhatsApp} className="w-full sm:w-2/3 bg-[#25D366] hover:bg-[#1DA851] text-slate-900 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-md hover:shadow-lg hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider">
-                          <Send className="w-5 h-5 sm:w-6 sm:h-6" /> <span>Enviar por WhatsApp</span>
+                          <Send className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /> <span className="truncate">Enviar por WhatsApp</span>
                         </button>
                     </div>
                   </div>
@@ -1045,19 +1053,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* FOOTER OSCAR SARAVIA - FIRMA DE AUTOR (DE OTRO PLANETA) */}
-        <div className="mt-32 pt-16 border-t border-slate-800/40 flex flex-col items-center justify-center text-center pb-16 no-print relative">
+        {/* FOOTER OSCAR SARAVIA - FIRMA DE AUTOR */}
+        <div className="mt-20 sm:mt-32 pt-12 sm:pt-16 border-t border-slate-800/40 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 no-print relative w-full">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
           
-          <div className="text-[#48b5db] text-[10px] sm:text-xs font-black tracking-[0.5em] uppercase mb-8 opacity-80">
+          <div className="text-[#48b5db] text-[8px] sm:text-[10px] md:text-xs font-black tracking-[0.3em] sm:tracking-[0.5em] uppercase mb-6 sm:mb-8 opacity-80 px-4">
             Concepto, Arquitectura y Desarrollo Web
           </div>
           
-          <div className="text-5xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-[#48b5db] tracking-tighter mb-8 drop-shadow-[0_0_30px_rgba(72,181,219,0.3)] select-none">
+          <div className="text-4xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-[#48b5db] tracking-tighter mb-6 sm:mb-8 drop-shadow-[0_0_30px_rgba(72,181,219,0.3)] select-none w-full break-words px-4">
             OSCAR SARAVIA
           </div>
           
-          <p className="text-slate-400 text-[10px] sm:text-xs max-w-3xl font-semibold tracking-[0.2em] leading-relaxed uppercase opacity-60">
+          <p className="text-slate-400 text-[8px] sm:text-[10px] md:text-xs max-w-3xl font-semibold tracking-[0.1em] sm:tracking-[0.2em] leading-relaxed uppercase opacity-60 px-4">
             Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
           </p>
         </div>
