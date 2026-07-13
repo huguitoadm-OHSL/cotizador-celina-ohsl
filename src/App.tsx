@@ -48,15 +48,6 @@ const proyectosPorRegional = {
   ]
 };
 
-// AGRUPACIONES POR REGLAS DE DESCUENTOS (MAYO 2026)
-const descGroup1_3USD = ["LOS JARDINES", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
-const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3", "CELINA VII FASE 1", "CELINA VII FASE 2", "TAMARINDO"];
-const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
-const descGroup4_30PCT = ["MUYURINA", "SANTA FE", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
-const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
-const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
-const descGroup7_15PCT = ["ROSA RODALI"];
-
 export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
@@ -77,19 +68,20 @@ export default function App() {
   const [precio, setPrecio] = useState("");
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoCredito, setDescuentoCredito] = useState(20);
-  const [descuentoContado, setDescuentoContado] = useState(30);
-  const [descuentoM2, setDescuentoM2] = useState(0);
+  const [descuentoCredito, setDescuentoCredito] = useState(0);
+  const [descuentoContado, setDescuentoContado] = useState(0);
+  const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); 
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
 
-  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(true);
-  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(true);
-  const [aplicarDescM2, setAplicarDescM2] = useState(true);
-  const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(true);
-  const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(true);
+  // Por defecto arrancan apagados para generar el "Efecto Revelación"
+  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
+  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(false);
+  const [aplicarDescM2, setAplicarDescM2] = useState(false);
+  const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(false);
+  const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(false);
   
-  // NUEVO: TOGGLE DE BONIFICACIÓN TRANSITORIA
+  // TOGGLE DE BONIFICACIÓN TRANSITORIA
   const [aplicarBonificacion, setAplicarBonificacion] = useState(true);
 
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
@@ -191,8 +183,12 @@ export default function App() {
     setResultado(null); setProyectoPersonalizado(""); 
     setEscenarioGuardado(null); setMostrarComparativa(false);
 
-    setAplicarDescContadoPct(true); setAplicarDescCreditoPct(true); setAplicarDescM2(true);
-    setAplicarDescContadoM2(true); setAplicarBonoInicialOtro(true);
+    // Apagados por defecto para el efecto revelación
+    setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
+    setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
+
+    // Valores estándar universales
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto]);
 
   const getAlias = (p) => {
@@ -251,50 +247,8 @@ export default function App() {
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => {
-    let maxCreditoPct = 0; let maxContadoPct = 0;
-    let maxDescM2 = 0; let maxContadoM2 = 0;
-    const maxBonoInicial = 500;
-    let pct = 0;
-
-    if (modoInicial === 'porcentaje') {
-      pct = Number(inicialPorcentaje);
-    } else {
-      const sup = Number(superficie); const prec = Number(precio); const monto = Number(inicialMonto);
-      if (sup > 0 && prec > 0 && monto > 0) {
-        const val_orig = sup * prec;
-        const desc_m2_val = aplicarDescM2 ? Number(descuentoM2) : 0;
-        const val_post_desc_m2 = val_orig - (sup * desc_m2_val);
-        const m_desc_cred = val_post_desc_m2 * (aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0);
-        const base = val_post_desc_m2 - m_desc_cred;
-        if (base > 0) pct = (monto / base) * 100;
-      }
-    }
-
-    const catUpper = categoria.toUpperCase();
-    const isCanaveralPremium = proyecto === "CAÑAVERAL" && (
-      catUpper.includes('CARRETERA') || catUpper.includes('PAVIMENTO') || 
-      catUpper.includes('4TO ANILLO') || catUpper.includes('4 ANILLO')
-    );
-
-    if (descGroup4_30PCT.includes(proyecto)) {
-      maxContadoPct = 30; maxCreditoPct = (pct >= 4.99) ? 23 : 20; 
-    } else if (descGroup5_32PCT.includes(proyecto)) {
-      maxContadoPct = 32; maxCreditoPct = (pct >= 4.99) ? 28 : 25; 
-    } else if (descGroup1_3USD.includes(proyecto)) {
-      maxContadoM2 = 3; maxDescM2 = (pct >= 4.99) ? 2 : 1;
-    } else if (descGroup2_4USD.includes(proyecto)) {
-      maxContadoM2 = 4;
-      if (isCanaveralPremium) { maxDescM2 = 3; } 
-      else { maxDescM2 = (pct >= 4.99) ? 2 : 1; }
-    } else if (descGroup3_7USD.includes(proyecto)) {
-      maxContadoM2 = 7; maxDescM2 = 5;
-    } else if (descGroup6_20PCT.includes(proyecto)) {
-      maxContadoPct = 20; maxCreditoPct = 15;
-    } else if (descGroup7_15PCT.includes(proyecto)) {
-      maxContadoPct = 15; maxCreditoPct = 10;
-    }
-
-    return { maxCreditoPct, maxContadoPct, maxDescM2, maxContadoM2, maxBonoInicial };
+    // REGLA UNIVERSAL: $1 Crédito y $2 Contado. Sin porcentajes.
+    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 1, maxContadoM2: 2, maxBonoInicial: 500 };
   };
 
   useEffect(() => {
@@ -358,12 +312,7 @@ export default function App() {
     const valor_credito = valor_original - monto_descuento_total_credito;
     
     let monto_desc_contado_m2 = sup * descContadoM2Val;
-    let monto_descuento_total_contado = 0;
-    if (descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto)) {
-      monto_descuento_total_contado = monto_desc_contado_m2 + (valor_original * descContadoPct);
-    } else {
-      monto_descuento_total_contado = monto_descuento_m2 + (valor_post_desc_m2 * descContadoPct) + monto_desc_contado_m2;
-    }
+    const monto_descuento_total_contado = monto_descuento_m2 + (valor_post_desc_m2 * descContadoPct) + monto_desc_contado_m2;
     const valor_contado = valor_original - monto_descuento_total_contado;
 
     // MATEMÁTICA Y SEGURO (HASTA 14 AÑOS)
@@ -382,21 +331,7 @@ export default function App() {
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
 
-    // TABLA DE PLAN DE PAGOS ALTERNATIVOS (1 a 14)
-    let planPagosArreglo = [];
-    for (let i = 14; i >= 1; i--) {
-      const m_i = i * 12;
-      let pp_i = tasa === 0 ? saldo / m_i : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
-      const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1.3) / refSaldo;
-      const seg_i = saldo * fS_i;
-      const c_final_i = pp_i + seg_i + cbdi;
-      
-      planPagosArreglo.push({ 
-        año: i, meses: m_i, cuotaUsd: formatMoney(c_final_i), cuotaBs: formatMoney(c_final_i * tcFlexible), isCurrent: i === ans
-      });
-    }
-
-    // TABLA DE TRANSICIÓN INFINITA (1 a N meses)
+    // TABLA DE TRANSICIÓN INFINITA (1 a N meses, con caída exacta de 5 puntos)
     const transicionData = [];
     let totalAhorroTransicion = 0;
     const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -407,11 +342,17 @@ export default function App() {
     
     for(let m=1; m<=meses; m++) {
         let tc_efectivo = tcFlexible;
+        let descPctExacto = 0;
         
         if (aplicarBonificacion) {
             if(m <= 6) {
-                // Sube 5% mensual partiendo desde la cuota 2
-                tc_efectivo = TC_PROMOCIONAL * Math.pow(1.05, m-1);
+                // Algoritmo: Descuento baja 5 puntos porcentuales exactos cada mes
+                let baseDiscount = ((tcFlexible - TC_PROMOCIONAL) / tcFlexible) * 100;
+                descPctExacto = baseDiscount - (5 * (m - 1));
+                if (descPctExacto < 0) descPctExacto = 0;
+                
+                tc_efectivo = tcFlexible * (1 - (descPctExacto / 100));
+                if (m === 1) tc_efectivo = TC_PROMOCIONAL; // Forzar exactitud mes 1
                 if (tc_efectivo > tcFlexible) tc_efectivo = tcFlexible;
             } else {
                 tc_efectivo = tcFlexible;
@@ -420,7 +361,6 @@ export default function App() {
 
         const montoBs = cuota_final * tc_efectivo;
         const pagoUsdDesc = montoBs / tcFlexible; 
-        const descuentoPct = ((cuota_final - pagoUsdDesc) / cuota_final) * 100;
         const ahorroBs = (cuota_final * tcFlexible) - montoBs;
 
         if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
@@ -433,7 +373,7 @@ export default function App() {
             mesNum: m,
             mesLabel: mesLabel,
             pagoUsdNormal: cuota_final,
-            descPct: ahorroBs > 0 ? descuentoPct : 0,
+            descPct: ahorroBs > 0 ? descPctExacto : 0,
             conDescUsd: pagoUsdDesc,
             montoBs: montoBs,
             tcEfectivo: tc_efectivo,
@@ -450,7 +390,7 @@ export default function App() {
       ahorroContado: formatMoney(monto_descuento_total_contado), porcentajeContado: aplicarDescContadoPct ? descuentoContado : 0,
       descuentoContadoM2: aplicarDescContadoM2 ? descContadoM2Val : 0,
       valorCreditoRaw: valor_credito,
-      valorCredito: formatMoney(valor_credito), valorCreditoBs: formatMoney(valor_credito * TC_PROMOCIONAL), // Referencial
+      valorCredito: formatMoney(valor_credito), valorCreditoBs: formatMoney(valor_credito * TC_PROMOCIONAL), 
       ahorroCreditoRaw: monto_descuento_total_credito,
       ahorroCredito: formatMoney(monto_descuento_total_credito), porcentajeCredito: aplicarDescCreditoPct ? descuentoCredito : 0,
       descuentoM2: aplicarDescM2 ? descM2Val : 0, descuentoInicial: descIniVal,
@@ -461,7 +401,6 @@ export default function App() {
       mensualRaw: cuota_final,
       mensual: formatMoney(cuota_final), mensualBs: formatMoney(cuota_final * tcFlexible),
       plazo: ans, 
-      planPagos: planPagosArreglo,
       transicionData: transicionData,
       totalAhorroTransicion: formatMoney(totalAhorroTransicion),
       timestampId: new Date().getTime()
@@ -497,7 +436,7 @@ export default function App() {
                            `*Cuota mensual regular:* $${resultado.mensual}\n` +
                            `🔥 *BENEFICIO DE TRANSICIÓN EN CUOTAS:*\n` + 
                            `• Cuota 1 (Agosto): Pagará al TC 6.97 (Bs. ${resultado.transicionData[0].montoBs.toFixed(2)})\n` +
-                           `• Cuotas 2 al 6: Subirán gradualmente solo 5% al mes.\n` +
+                           `• Cuotas 2 al 6: Su descuento se ajusta ordenadamente mes a mes.\n` +
                            `• Recién desde la Cuota 7 (Febrero) pagará al TC de mercado actual.\n\n`;
                            
     const cierre = `¡Usted se ahorra Bs. ${resultado.totalAhorroTransicion} solo en esta transición! ¿Le gustaría que agendemos una visita para conocer su próximo terreno? 🤝`;
@@ -540,9 +479,9 @@ export default function App() {
     }, 500);
   };
 
-  const showDescPorcentaje = descGroup4_30PCT.includes(proyecto) || descGroup5_32PCT.includes(proyecto) || descGroup6_20PCT.includes(proyecto) || descGroup7_15PCT.includes(proyecto) || proyecto === "OTRO";
-  const showDescM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto) || proyecto === "OTRO";
-  const showDescContadoM2 = descGroup1_3USD.includes(proyecto) || descGroup2_4USD.includes(proyecto) || descGroup3_7USD.includes(proyecto);
+  const showDescPorcentaje = false; // Desactivado por reglas globales
+  const showDescM2 = true;
+  const showDescContadoM2 = true;
   const showBonoInicial = proyecto === "OTRO";
 
   return (
@@ -793,6 +732,45 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* DESCUENTOS OPCIONALES */}
+                <div className="bg-slate-800/40 border border-cyan-500/20 p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4">
+                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl group-hover:bg-cyan-400/20 transition-colors"></div>
+                  <div className="text-[10px] sm:text-xs font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-2 mb-4 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]">
+                    <div className="bg-cyan-500/20 p-1.5 rounded-lg border border-cyan-500/30"><Gift className="w-4 h-4 text-cyan-300" /></div>
+                    Descuentos Promocionales
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    {showDescM2 && (
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
+                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500" /> Crédito x m² ($us)
+                        </label>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescM2} value={descuentoM2} onChange={handleDescM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescM2 ? 'text-cyan-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxDescM2}</p>
+                      </div>
+                    )}
+                    {showDescContadoM2 && (
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500" /> Contado x m² ($us)
+                        </label>
+                        <input type="number" step="0.01" min="0" disabled={!aplicarDescContadoM2} value={descuentoContadoM2} onChange={handleDescContadoM2Change} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarDescContadoM2 ? 'text-cyan-400' : 'text-slate-600'}`}>Máx: ${calcularLimitesMaximos().maxContadoM2}</p>
+                      </div>
+                    )}
+                    {showBonoInicial && (
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
+                          <input type="checkbox" checked={aplicarBonoInicialOtro} onChange={e => setAplicarBonoInicialOtro(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500" /> Bono Inicial ($us)
+                        </label>
+                        <input type="number" step="0.01" min="0" max="500" disabled={!aplicarBonoInicialOtro} value={descuentoInicial} onChange={handleBonoInicialChange} className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarBonoInicialOtro ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} />
+                        <p className={`text-[9px] sm:text-[10px] font-extrabold mt-1 ${aplicarBonoInicialOtro ? 'text-cyan-400' : 'text-slate-600'}`}>Máx: $500</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* INICIAL & PLAZO */}
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4">
                   <div className="col-span-12 md:col-span-8 bg-cyan-950/20 border border-cyan-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative">
@@ -922,7 +900,7 @@ export default function App() {
                       <div className="text-2xl font-black text-white mt-1">$ {resultado.valorCredito}</div>
                       {resultado.ahorroCredito !== "0.00" && (
                           <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-900/20 px-2 py-1 rounded border border-amber-500/20 inline-block uppercase">
-                            Ahorro: $ {resultado.ahorroCredito}
+                            Ahorro Incluido: $ {resultado.ahorroCredito}
                           </div>
                       )}
                     </div>
@@ -934,9 +912,10 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* TABLA DE TRANSICIÓN INFINITA CON TOGGLE */}
-                  <div className="bg-[#04070b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(6,182,212,0.1)] mt-8">
-                      <div className="p-5 border-b border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 bg-gradient-to-r from-cyan-950/20 to-transparent">
+                  {/* TABLA DE TRANSICIÓN INFINITA CON TOGGLE CYBERPUNK */}
+                  <div className="bg-[#04070b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(6,182,212,0.1)] mt-8 relative">
+                      
+                      <div className="p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-cyan-950/20 to-transparent">
                           <div>
                             <h3 className="text-white font-black text-lg flex items-center gap-2">
                                <Sparkles className={`w-5 h-5 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
@@ -945,31 +924,34 @@ export default function App() {
                             <p className="text-slate-400 text-[10px] mt-1">Pago regular: ${resultado.mensual} · TC Mercado: {tcFlexible}</p>
                           </div>
                           
-                          <div className="flex items-center gap-5">
-                             {/* EL TOGGLE SUPREMO */}
-                             <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
-                               <span className={`text-[9px] font-black uppercase tracking-wider ${aplicarBonificacion ? 'text-cyan-400' : 'text-slate-500'}`}>
+                          <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+                             {/* TOGGLE CYBERPUNK DE OTRO PLANETA */}
+                             <div className={`flex items-center gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner ${aplicarBonificacion ? 'bg-slate-900/80 border-cyan-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                               <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${aplicarBonificacion ? 'text-cyan-400' : 'text-slate-500'}`}>
                                   Con Bonificación
                                </span>
                                <button 
                                  type="button" 
                                  onClick={() => setAplicarBonificacion(!aplicarBonificacion)} 
-                                 className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none shadow-inner ${aplicarBonificacion ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                                 className={`relative inline-flex h-6 w-12 items-center rounded-full transition-all duration-300 focus:outline-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] ${aplicarBonificacion ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'bg-slate-800 border border-slate-700'}`}
                                >
-                                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm ${aplicarBonificacion ? 'translate-x-6 shadow-[0_0_10px_rgba(255,255,255,0.8)]' : 'translate-x-1'}`} />
+                                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${aplicarBonificacion ? 'translate-x-7 shadow-[0_0_10px_rgba(255,255,255,0.9)]' : 'translate-x-1'}`} />
                                </button>
                              </div>
                              
-                             <div className={`border px-4 py-2 rounded-xl text-center transition-colors ${aplicarBonificacion ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-800/50 border-slate-700'}`}>
+                             <div className={`border px-5 py-2.5 rounded-xl text-center transition-all duration-300 flex-1 lg:flex-none ${aplicarBonificacion ? 'bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-800/50 border-slate-700'}`}>
                                <div className={`text-[9px] uppercase font-black tracking-widest ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}>Ahorro Total Cliente</div>
                                <div className={`text-xl font-black ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
                              </div>
                           </div>
                       </div>
                       
-                      <div className="overflow-x-auto overflow-y-auto max-h-[350px] custom-scrollbar">
-                        <table className="w-full text-left text-xs whitespace-nowrap min-w-[650px]">
-                          <thead className="sticky top-0 bg-[#090e17] z-10 border-b border-slate-800">
+                      <div className="overflow-x-auto overflow-y-auto max-h-[400px] custom-scrollbar relative">
+                        {/* Overlay visual cuando está desactivado */}
+                        {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
+
+                        <table className="w-full text-left text-xs whitespace-nowrap min-w-[700px]">
+                          <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-800">
                             <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                               <th className="p-3 text-center">Mes</th>
                               <th className="p-3 text-center">Pago Fijo ($)</th>
@@ -979,42 +961,45 @@ export default function App() {
                               <th className="p-3 text-center">TC Efe.</th>
                             </tr>
                           </thead>
-                          <tbody className="font-semibold">
+                          <tbody className="font-semibold relative z-10">
                             {resultado.transicionData.map((row, i) => (
                               <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-cyan-950/10' : 'text-slate-500'}`}>
-                                <td className={`p-2.5 font-bold ${row.isDiscounted ? 'text-cyan-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                <td className="p-2.5 text-slate-300">{row.pagoUsdNormal.toFixed(2)}</td>
-                                <td className={`p-2.5 ${row.isDiscounted ? 'text-cyan-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                <td className={`p-2.5 font-bold ${row.isDiscounted ? 'text-cyan-300 bg-cyan-950/20' : 'text-slate-500'}`}>{row.conDescUsd.toFixed(2)}</td>
-                                <td className={`p-2.5 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{row.montoBs.toFixed(2)}</td>
-                                <td className="p-2.5 text-slate-400">{row.tcEfectivo.toFixed(2)}</td>
+                                <td className={`p-3 font-bold ${row.isDiscounted ? 'text-cyan-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
+                                <td className="p-3 text-slate-300">{row.pagoUsdNormal.toFixed(2)}</td>
+                                <td className={`p-3 ${row.isDiscounted ? 'text-cyan-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
+                                <td className={`p-3 font-bold ${row.isDiscounted ? 'text-cyan-300 bg-cyan-950/20' : 'text-slate-500'}`}>{row.conDescUsd.toFixed(2)}</td>
+                                <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{row.montoBs.toFixed(2)}</td>
+                                <td className="p-3 text-slate-400">{row.tcEfectivo.toFixed(2)}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
                       <div className="p-3 bg-[#060b13] text-[9px] text-slate-500 text-center border-t border-slate-800">
-                        *Simulación referencial. La cuota en Bolivianos sube 5% gradualmente hasta alcanzar el TC de Mercado actual.
+                        *Simulación matemática exacta para toda la vida del crédito.
                       </div>
                   </div>
 
-                  {/* TABLA DE PLAN DE PAGOS (14 a 1 Años) */}
-                  <div className="mt-8 border border-slate-800 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50">
-                    <div className="bg-[#090e17] p-4 border-b border-slate-800 flex justify-between items-center">
+                  {/* TABLA DE PLAN DE PAGOS (1 a 14 Años) ESTILO IMAGEN 1 */}
+                  <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50">
+                    <div className="bg-[#040810] p-4 border-b border-emerald-500/10 flex justify-between items-center">
                        <h3 className="text-slate-300 font-bold text-sm tracking-wide flex items-center gap-2">
-                         <Calendar className="w-4 h-4 text-cyan-500"/> Resumen de Plazos Alternativos
+                         <Calendar className="w-4 h-4 text-emerald-500"/> Resumen de Plazos Alternativos
                        </h3>
                     </div>
                     <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
-                        <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
-                          <div>Plazo</div><div className="text-cyan-400">Cuota ($us)</div><div className="text-cyan-400">Cuota (Bs) al TC Mdo.</div>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
+                          <div>Plazo</div><div className="text-emerald-400">Cuota ($us)</div><div className="text-emerald-400">Cuota (Bs.)</div>
                         </div>
                         <div className="pt-2">
                           {resultado.planPagos.map((plan, i) => (
-                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-cyan-900/30 border border-cyan-500/40 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)] scale-[1.02] transform my-2' : 'text-slate-400 hover:bg-slate-800/50 border border-transparent'}`}>
-                              <div className="flex items-center justify-center gap-1.5">{plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse hidden sm:inline-block"></span>} {plan.año} Años</div>
-                              <div className={`font-black ${plan.isCurrent ? 'text-cyan-300' : 'text-slate-300'}`}>$ {plan.cuotaUsd}</div>
-                              <div className={plan.isCurrent ? 'text-cyan-500' : 'text-slate-500'}>Bs. {plan.cuotaBs}</div>
+                            <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-3 rounded-xl text-center text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-900/30 border border-emerald-500/40 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/50 border border-transparent'}`}>
+                              <div className="flex items-center justify-center gap-2">
+                                {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>} 
+                                {plan.año} {plan.año === 1 ? 'Año' : 'Años'}
+                              </div>
+                              <div className={`font-black ${plan.isCurrent ? 'text-white' : 'text-emerald-50'}`}>$ {plan.cuotaUsd}</div>
+                              <div className={plan.isCurrent ? 'text-emerald-400' : 'text-slate-400'}>Bs. {plan.cuotaBs}</div>
                             </div>
                           ))}
                         </div>
@@ -1042,16 +1027,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* FOOTER OSCAR SARAVIA - FIRMA DE AUTOR */}
-        <div className="mt-24 pt-12 border-t border-slate-800/60 flex flex-col items-center justify-center text-center pb-12 no-print relative">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-1 bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
-          <div className="text-[#4fd1c5] text-[9px] sm:text-xs font-bold tracking-[0.4em] uppercase mb-5">
+        {/* FOOTER OSCAR SARAVIA - FIRMA DE AUTOR (DE OTRO PLANETA) */}
+        <div className="mt-32 pt-16 border-t border-slate-800/40 flex flex-col items-center justify-center text-center pb-16 no-print relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
+          
+          <div className="text-[#48b5db] text-[10px] sm:text-xs font-black tracking-[0.5em] uppercase mb-8 opacity-80">
             Concepto, Arquitectura y Desarrollo Web
           </div>
-          <div className="text-5xl sm:text-7xl md:text-[5.5rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-[#4fd1c5] tracking-tighter mb-6 drop-shadow-[0_0_20px_rgba(79,209,197,0.25)]">
+          
+          <div className="text-5xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-[#48b5db] tracking-tighter mb-8 drop-shadow-[0_0_30px_rgba(72,181,219,0.3)] select-none">
             OSCAR SARAVIA
           </div>
-          <p className="text-slate-400 text-[10px] sm:text-xs max-w-2xl font-semibold tracking-[0.15em] leading-relaxed uppercase">
+          
+          <p className="text-slate-400 text-[10px] sm:text-xs max-w-3xl font-semibold tracking-[0.2em] leading-relaxed uppercase opacity-60">
             Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
           </p>
         </div>
