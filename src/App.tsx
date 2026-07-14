@@ -68,7 +68,7 @@ export default function App() {
   // MODO DUAL DE COTIZACIÓN
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
-  // TC DINÁMICO
+  // TC DINÁMICO A 10.50
   const [tcFlexible, setTcFlexible] = useState(10.50);
   const TC_PROMOCIONAL = 6.97;
 
@@ -323,7 +323,7 @@ export default function App() {
     let planPagosArreglo = [];
     let transicionData = [];
     let totalAhorroTransicion = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.40;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.50;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -384,22 +384,40 @@ export default function App() {
           });
         }
 
+        // TABLA DE TRANSICIÓN INFINITA - NUEVO ALGORITMO DE CALENDARIO
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 7; 
-        let baseYear = 26;
+        let baseMonthIndex = 6; // Arranca en Julio (índice 6)
+        let baseYear = 26; // Año 2026
         
         for(let m=1; m<=meses; m++) {
             let tc_efectivo = TC_FLEX_NUMBER;
             let descPctExacto = 0;
             
+            let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
+            let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
+
             if (aplicarBonificacion) {
-                if(m <= 6) {
+                let step = -1;
+                if (currentY === 26) {
+                    if (currentMIndex >= 6 && currentMIndex <= 8) step = 0; // Jul, Ago, Sep
+                    else if (currentMIndex === 9) step = 1; // Oct
+                    else if (currentMIndex === 10) step = 2; // Nov
+                    else if (currentMIndex === 11) step = 3; // Dic
+                } else if (currentY === 27) {
+                    if (currentMIndex === 0) step = 4; // Ene
+                    else if (currentMIndex === 1) step = 5; // Feb
+                    else if (currentMIndex === 2) step = 6; // Mar
+                }
+
+                if (step >= 0) {
                     let baseDiscount = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100;
-                    descPctExacto = baseDiscount - (5 * (m - 1));
+                    descPctExacto = baseDiscount - (5 * step);
                     if (descPctExacto < 0) descPctExacto = 0;
                     
                     tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
-                    if (m === 1) tc_efectivo = TC_PROMOCIONAL; 
+                    
+                    // Asegurar TC de 6.97 exacto para el primer periodo promocional
+                    if (step === 0) tc_efectivo = TC_PROMOCIONAL; 
                     if (tc_efectivo > TC_FLEX_NUMBER) tc_efectivo = TC_FLEX_NUMBER;
                 }
             }
@@ -409,9 +427,6 @@ export default function App() {
             const ahorroBs = (cuota_final * TC_FLEX_NUMBER) - montoBs;
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
-
-            let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
-            let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
             transicionData.push({
                 mesNum: m,
@@ -492,7 +507,7 @@ export default function App() {
         contentStr += `💰 *PROPUESTA EXCLUSIVA AL CONTADO*\n`;
         if (arrContado.length > 0) contentStr += `¡Aplica descuento especial de ${arrContado.join(' + ')}!\n`;
         contentStr += `*Inversión Final:* $${resultado.valorFinal}\n`;
-        contentStr += `(Equivalente a Bs. ${resultado.valorFinalBs} con TC promocional de 6.97 exclusivo de Julio)\n\n`;
+        contentStr += `(Equivalente a Bs. ${resultado.valorFinalBs} con TC promocional de 6.97 hasta Septiembre)\n\n`;
         if (resultado.ahorroTotalRaw > 0) {
             contentStr += `✨ Aproveche este ahorro neto de $${resultado.ahorroTotal} comprando al contado.\n\n`;
         }
@@ -506,14 +521,14 @@ export default function App() {
         
         contentStr += `📊 *Su Plan de Financiamiento* (${resultado.plazo} años)\n` + 
                       `*Cuota inicial:* ${resultado.inicialPct}% ($${resultado.inicial})\n` +
-                      `👉 *Inicial congelada a Bs. ${resultado.inicialBs}* (TC 6.97 solo por Julio)\n\n` +
+                      `👉 *Inicial congelada a Bs. ${resultado.inicialBs}* (TC 6.97 hasta Septiembre)\n\n` +
                       `*Cuota mensual regular:* $${resultado.mensual}\n`;
                       
         if (aplicarBonificacion && resultado.transicionData && resultado.transicionData.length > 0) {
             contentStr += `🔥 *BENEFICIO DE TRANSICIÓN EN CUOTAS:*\n` + 
-                          `• Cuota 1 (Agosto): Pagará al TC 6.97 (Bs. ${resultado.transicionData[0].montoBs.toFixed(2)})\n` +
-                          `• Cuotas 2 al 6: Su descuento se ajusta ordenadamente mes a mes.\n` +
-                          `• Recién desde la Cuota 7 (Febrero) pagará al TC de mercado actual.\n\n` +
+                          `• Hasta Septiembre 2026: Pagará al TC congelado de 6.97.\n` +
+                          `• De Octubre a Marzo: Su descuento se ajusta ordenadamente mes a mes.\n` +
+                          `• Recién desde Abril 2027 pagará al TC de mercado actual.\n\n` +
                           `¡Usted se ahorra Bs. ${resultado.totalAhorroTransicion} solo en esta transición!\n\n`;
         }
     }
@@ -701,7 +716,7 @@ export default function App() {
                      <div>
                        <h4 className="text-amber-900 font-black tracking-tight text-xl mb-1">Análisis de Oportunidad</h4>
                        <p className="text-amber-700/80 text-sm font-semibold max-w-md leading-relaxed">
-                         Al cerrar hoy, te garantizas el descuento promocional válido hasta el <span className="font-bold text-amber-900">31 de mayo de 2026</span>. Evita pagar el precio regular sin promoción.
+                         Al cerrar hoy, te garantizas el descuento promocional válido hasta el <span className="font-bold text-amber-900">30 de septiembre de 2026</span>. Evita pagar el precio regular sin promoción.
                        </p>
                      </div>
                    </div>
@@ -1106,7 +1121,7 @@ export default function App() {
                                 $ {resultado.valorFinal}
                              </div>
                              <div className="text-xl sm:text-2xl font-bold text-cyan-200">
-                                Bs. {resultado.valorFinalBs} <span className="text-[10px] text-cyan-400 uppercase tracking-widest ml-2 bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-500/30">TC 6.97 JULIO</span>
+                                Bs. {resultado.valorFinalBs} <span className="text-[10px] text-cyan-400 uppercase tracking-widest ml-2 bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-500/30">TC 6.97 HASTA SEP</span>
                              </div>
 
                              {resultado.ahorroTotalRaw > 0 && (
@@ -1155,7 +1170,7 @@ export default function App() {
                           )}
                         </div>
                         <div className="bg-[#0d1420]/60 p-5 rounded-2xl border border-slate-800 text-center sm:text-left relative">
-                          <div className="absolute right-0 top-0 text-[8px] bg-emerald-500 text-slate-900 font-black px-2 py-1 rounded-bl-lg">TC 6.97 CONGELADO</div>
+                          <div className="absolute right-0 top-0 text-[8px] bg-emerald-500 text-slate-900 font-black px-2 py-1 rounded-bl-lg">TC 6.97 HASTA SEP</div>
                           <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest truncate">Cuota Inicial ({resultado.inicialPct}%)</div>
                           <div className="text-2xl font-black text-white mt-1 truncate">$ {resultado.inicial}</div>
                           <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.inicialBs}</div>
@@ -1224,7 +1239,7 @@ export default function App() {
                             </table>
                           </div>
                           <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800">
-                            *Simulación referencial. Descuento matemático ordenado.
+                            *Simulación referencial. La cuota en Bolivianos sube 5% gradualmente hasta alcanzar el TC de Mercado actual.
                           </div>
                       </div>
 
