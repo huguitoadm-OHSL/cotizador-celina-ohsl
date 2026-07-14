@@ -125,6 +125,11 @@ export default function App() {
           rawData = await fallbackResponse.json();
         }
 
+        // Blindaje extra: asegurar que data es un array
+        if (!Array.isArray(rawData)) {
+            rawData = [];
+        }
+
         const parseNum = (val) => {
             if (val === undefined || val === null) return 0;
             if (typeof val === 'number') return val;
@@ -133,14 +138,14 @@ export default function App() {
         };
 
         const normalizedData = rawData.map(item => ({
-            proyecto: String(item.Proyecto || item.proyecto || item.PROYECTO || "").trim().toUpperCase(),
-            uv: String(item.uv || item.Uv || item.UV || "").trim().toUpperCase() || "SN", 
-            mzn: String(item.mzn || item.Mzn || item.MZN || "").trim().toUpperCase(),
-            lote: String(item.lote || item.Lote || item.LOTE || "").trim().toUpperCase(),
-            superficie: parseNum(item.superficie || item.Superficie || item.SUPERFICIE),
-            precio: parseNum(item.precio || item.Precio || item.PRECIO),
-            estado: String(item.estado || item.Estado || item.ESTADO || "LIBRE").trim().toUpperCase(),
-            categoria: String(item.categoria || item.Categoria || item.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
+            proyecto: String(item?.Proyecto || item?.proyecto || item?.PROYECTO || "").trim().toUpperCase(),
+            uv: String(item?.uv || item?.Uv || item?.UV || "").trim().toUpperCase() || "SN", 
+            mzn: String(item?.mzn || item?.Mzn || item?.MZN || "").trim().toUpperCase(),
+            lote: String(item?.lote || item?.Lote || item?.LOTE || "").trim().toUpperCase(),
+            superficie: parseNum(item?.superficie || item?.Superficie || item?.SUPERFICIE),
+            precio: parseNum(item?.precio || item?.Precio || item?.PRECIO),
+            estado: String(item?.estado || item?.Estado || item?.ESTADO || "LIBRE").trim().toUpperCase(),
+            categoria: String(item?.categoria || item?.Categoria || item?.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
         }));
 
         const lotesPermitidos = normalizedData.filter(l => 
@@ -168,8 +173,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!proyectosPorRegional[regional].includes(proyecto)) {
-      setProyecto(proyectosPorRegional[regional]?.[0] || "OTRO");
+    // Blindaje de seguridad para proyectosPorRegional
+    if (proyectosPorRegional[regional] && !proyectosPorRegional[regional].includes(proyecto)) {
+      setProyecto(proyectosPorRegional[regional][0] || "OTRO");
     }
   }, [regional]);
 
@@ -199,6 +205,7 @@ export default function App() {
   }, [proyecto]);
 
   const getAlias = (p) => {
+    if (!p) return [];
     const aliases = [p, `CELINA ${p}`];
     if (p === "URUBÓ NORTE") aliases.push("CELINA URUBO DEL NORTE", "URUBO NORTE");
     if (p === "ROSA RODALI") aliases.push("ROSA DE RODALI", "CELINA ROSA RODALI");
@@ -225,18 +232,18 @@ export default function App() {
 
   const currentAliases = getAlias(proyecto);
 
-  const lotesDelProyecto = baseDeDatosLotes.filter(l => 
-    currentAliases.some(alias => l.proyecto === alias || l.proyecto.includes(alias)) || currentAliases.includes(l.proyecto)
-  );
+  const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
+    currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+  ) || [];
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   
-  const uvsDisponibles = [...new Set(lotesDelProyecto.map(l => l.uv))].sort(sortAlphaNum);
-  const mznsDisponibles = [...new Set(lotesDelProyecto.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
-  const lotesDisponibles = lotesDelProyecto.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
+  const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
+  const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
+  const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
 
   useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
@@ -286,12 +293,17 @@ export default function App() {
     setDescuentoInicial(val > 500 ? 500 : val);
   };
 
-  const formatMoney = (amount) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  const formatMoney = (amount) => {
+    if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  };
+  
   const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 3000); };
 
   const calcular = () => {
-    const sup = Number(superficie); const prec = Number(precio); 
-    const ans = tipoCotizacion === 'credito' ? Number(años) : 0; // Plazo no aplica a contado
+    const sup = Number(superficie) || 0; 
+    const prec = Number(precio) || 0; 
+    const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
 
     if (!sup || !prec) { setResultado(null); return; }
     if (tipoCotizacion === 'credito' && ans <= 0) { setResultado(null); return; }
@@ -310,11 +322,11 @@ export default function App() {
     let planPagosArreglo = [];
     let transicionData = [];
     let totalAhorroTransicion = 0;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.40;
 
     if (tipoCotizacion === 'contado') {
-        // === LÓGICA PURA DE CONTADO ===
-        const descContadoM2Val = aplicarDescContadoM2 ? Number(descuentoContadoM2) : 0;
-        const descContadoPct = aplicarDescContadoPct ? (Number(descuentoContado) / 100) : 0; // Por si a futuro se habilita %
+        const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
+        const descContadoPct = aplicarDescContadoPct ? ((Number(descuentoContado) || 0) / 100) : 0; 
         
         let monto_desc_contado_m2 = sup * descContadoM2Val;
         let base_post_m2 = valor_original - monto_desc_contado_m2;
@@ -323,28 +335,26 @@ export default function App() {
         valor_final = valor_original - ahorro_total;
 
     } else {
-        // === LÓGICA PURA DE CRÉDITO ===
-        const descCreditoPct = aplicarDescCreditoPct ? (Number(descuentoCredito) / 100) : 0;
-        const descM2Val = aplicarDescM2 ? Number(descuentoM2) : 0;
-        let descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min(Number(descuentoInicial), 500) : 0;
+        const descCreditoPct = aplicarDescCreditoPct ? ((Number(descuentoCredito) || 0) / 100) : 0;
+        const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 0) : 0;
+        let descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min((Number(descuentoInicial) || 0), 500) : 0;
 
         let monto_descuento_m2 = sup * descM2Val;
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
         ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
-        valor_final = valor_original - ahorro_total; // Esto es el Valor Crédito
+        valor_final = valor_original - ahorro_total; 
 
         const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
         if (modoInicial === 'porcentaje') {
-           pct_efectivo = Number(inicialPorcentaje);
+           pct_efectivo = Number(inicialPorcentaje) || 0;
            cuota_inicial = base_para_inicial * (pct_efectivo / 100);
         } else {
-           cuota_inicial = Number(inicialMonto);
+           cuota_inicial = Number(inicialMonto) || 0;
            pct_efectivo = base_para_inicial > 0 ? (cuota_inicial / base_para_inicial) * 100 : 0;
         }
 
-        // MATEMÁTICA DE AMORTIZACIÓN Y SEGURO
         const saldo = valor_final - cuota_inicial;
         const meses = ans * 12;
         const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
@@ -353,49 +363,50 @@ export default function App() {
         const cbdi = 0;
         
         pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
+        if(isNaN(pago_puro) || !isFinite(pago_puro)) pago_puro = 0;
+
         const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1.3) / refSaldo;
         seguro = saldo * factorSeguro;
         cuota_final = pago_puro + seguro + cbdi;
 
-        // TABLA DE RESUMEN DE AÑOS
         for (let i = 14; i >= 1; i--) {
           const m_i = i * 12;
           let pp_i = tasa === 0 ? saldo / m_i : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
+          if(isNaN(pp_i) || !isFinite(pp_i)) pp_i = 0;
           const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1.3) / refSaldo;
           const c_final_i = pp_i + (saldo * fS_i) + cbdi;
           
           planPagosArreglo.push({ 
             año: i, 
             cuotaUsd: formatMoney(c_final_i), 
-            cuotaBs: formatMoney(c_final_i * tcFlexible),
+            cuotaBs: formatMoney(c_final_i * TC_FLEX_NUMBER),
             isCurrent: i === ans
           });
         }
 
-        // TABLA DE TRANSICIÓN INFINITA
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 7; // Agosto
+        let baseMonthIndex = 7; 
         let baseYear = 26;
         
         for(let m=1; m<=meses; m++) {
-            let tc_efectivo = tcFlexible;
+            let tc_efectivo = TC_FLEX_NUMBER;
             let descPctExacto = 0;
             
             if (aplicarBonificacion) {
                 if(m <= 6) {
-                    let baseDiscount = ((tcFlexible - TC_PROMOCIONAL) / tcFlexible) * 100;
+                    let baseDiscount = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100;
                     descPctExacto = baseDiscount - (5 * (m - 1));
                     if (descPctExacto < 0) descPctExacto = 0;
                     
-                    tc_efectivo = tcFlexible * (1 - (descPctExacto / 100));
+                    tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
                     if (m === 1) tc_efectivo = TC_PROMOCIONAL; 
-                    if (tc_efectivo > tcFlexible) tc_efectivo = tcFlexible;
+                    if (tc_efectivo > TC_FLEX_NUMBER) tc_efectivo = TC_FLEX_NUMBER;
                 }
             }
 
             const montoBs = cuota_final * tc_efectivo;
-            const pagoUsdDesc = montoBs / tcFlexible; 
-            const ahorroBs = (cuota_final * tcFlexible) - montoBs;
+            const pagoUsdDesc = montoBs / TC_FLEX_NUMBER; 
+            const ahorroBs = (cuota_final * TC_FLEX_NUMBER) - montoBs;
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
@@ -405,13 +416,13 @@ export default function App() {
             transicionData.push({
                 mesNum: m,
                 mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
-                pagoUsdNormal: cuota_final,
+                pagoUsdNormal: cuota_final || 0,
                 descPct: ahorroBs > 0 ? descPctExacto : 0,
-                conDescUsd: pagoUsdDesc,
-                montoBs: montoBs,
-                tcEfectivo: tc_efectivo,
+                conDescUsd: pagoUsdDesc || 0,
+                montoBs: montoBs || 0,
+                tcEfectivo: tc_efectivo || 0,
                 ahorroBs: ahorroBs > 0 ? ahorroBs : 0,
-                isDiscounted: aplicarBonificacion && tc_efectivo < tcFlexible
+                isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
             });
         }
     }
@@ -431,7 +442,6 @@ export default function App() {
       ahorroTotalRaw: ahorro_total,
       ahorroTotal: formatMoney(ahorro_total),
       
-      // Variables específicas
       descuentoContadoM2: aplicarDescContadoM2 ? Number(descuentoContadoM2) : 0,
       descuentoM2: aplicarDescM2 ? Number(descuentoM2) : 0,
       
@@ -447,7 +457,7 @@ export default function App() {
       
       mensualRaw: cuota_final,
       mensual: formatMoney(cuota_final), 
-      mensualBs: formatMoney(cuota_final * tcFlexible),
+      mensualBs: formatMoney(cuota_final * TC_FLEX_NUMBER),
       plazo: ans, 
       planPagos: planPagosArreglo,
       transicionData: transicionData,
@@ -459,7 +469,9 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (resultado && !isCalculating) calcular();
+    if (resultado && !isCalculating) {
+       try { calcular(); } catch(e) {}
+    }
   }, [aplicarBonificacion, tipoCotizacion]);
 
   const getTextToCopy = () => {
@@ -540,9 +552,15 @@ export default function App() {
     e.preventDefault();
     setIsCalculating(true);
     setTimeout(() => {
-      calcular();
-      setIsCalculating(false);
-      if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        calcular();
+      } catch(err) {
+        console.error("Error Interno de Cálculo:", err);
+        showNotification("Error en los datos de entrada. Verifica.");
+      } finally {
+        setIsCalculating(false);
+        if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }, 500);
   };
 
@@ -550,7 +568,7 @@ export default function App() {
     let bestAhorro = false;
     let bestCuota = false;
 
-    if (otherData) {
+    if (otherData && data) {
       if (data.ahorroTotalRaw > otherData.ahorroTotalRaw) bestAhorro = true;
       if (data.tipoCotizacion === 'credito' && otherData.tipoCotizacion === 'credito') {
          if (data.mensualRaw < otherData.mensualRaw) bestCuota = true;
@@ -558,48 +576,48 @@ export default function App() {
     }
 
     return (
-      <div className={`bg-white border rounded-3xl p-6 relative overflow-hidden flex flex-col h-full shadow-md transition-all duration-300 ${isGuardado ? 'border-slate-200' : (data.tipoCotizacion === 'contado' ? 'border-blue-400 bg-blue-50/20' : 'border-emerald-400 bg-emerald-50/20')}`}>
-        <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl ${isGuardado ? 'bg-slate-200/50' : (data.tipoCotizacion === 'contado' ? 'bg-blue-200/50' : 'bg-emerald-200/50')}`}></div>
+      <div className={`bg-white border rounded-3xl p-6 relative overflow-hidden flex flex-col h-full shadow-md transition-all duration-300 ${isGuardado ? 'border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'border-blue-400 bg-blue-50/20' : 'border-emerald-400 bg-emerald-50/20')}`}>
+        <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl ${isGuardado ? 'bg-slate-200/50' : (data?.tipoCotizacion === 'contado' ? 'bg-blue-200/50' : 'bg-emerald-200/50')}`}></div>
         
         <div className="flex justify-between items-start mb-6 relative z-10">
-          <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${isGuardado ? 'bg-slate-100 text-slate-600 border-slate-200' : (data.tipoCotizacion === 'contado' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200')}`}>
+          <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${isGuardado ? 'bg-slate-100 text-slate-600 border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200')}`}>
             {isGuardado ? 'Escenario A (Guardado)' : 'Escenario B (Actual)'}
           </div>
           {bestAhorro && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded border border-amber-200 flex items-center gap-1 shadow-sm"><TrendingUp className="w-3 h-3"/> Mayor Ahorro</span>}
         </div>
 
         <div className="text-center mb-8 relative z-10">
-          <div className="text-4xl font-black text-slate-900 mb-1">{data.tipoCotizacion === 'contado' ? 'Al Contado' : `${data.plazo} Años`}</div>
-          {data.tipoCotizacion === 'credito' && (
-             <div className="text-emerald-600 font-bold tracking-wide bg-emerald-50 w-fit mx-auto px-4 py-1 rounded-full border border-emerald-100">Inicial: {data.inicialPct}% (${data.inicial})</div>
+          <div className="text-4xl font-black text-slate-900 mb-1">{data?.tipoCotizacion === 'contado' ? 'Al Contado' : `${data?.plazo} Años`}</div>
+          {data?.tipoCotizacion === 'credito' && (
+             <div className="text-emerald-600 font-bold tracking-wide bg-emerald-50 w-fit mx-auto px-4 py-1 rounded-full border border-emerald-100">Inicial: {data?.inicialPct}% (${data?.inicial})</div>
           )}
         </div>
         
         <div className="space-y-4 relative z-10 flex-1">
           <div className="flex justify-between items-center py-2 border-b border-slate-100">
             <span className="text-slate-500 text-sm">Superficie:</span>
-            <span className="text-slate-900 font-bold text-sm">{data.superficie} m²</span>
+            <span className="text-slate-900 font-bold text-sm">{data?.superficie} m²</span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-100">
-            <span className="text-slate-500 text-sm">{data.tipoCotizacion === 'contado' ? 'Inversión Final:' : 'Total a Financiar:'}</span>
-            <span className="text-slate-900 font-bold text-sm">${data.valorFinal}</span>
+            <span className="text-slate-500 text-sm">{data?.tipoCotizacion === 'contado' ? 'Inversión Final:' : 'Total a Financiar:'}</span>
+            <span className="text-slate-900 font-bold text-sm">${data?.valorFinal}</span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-100">
             <span className="text-slate-500 text-sm font-bold">Ahorro Promocional:</span>
-            <span className={`font-black text-base ${data.ahorroTotalRaw > 0 ? (data.tipoCotizacion === 'contado' ? 'text-blue-600' : 'text-emerald-600') : 'text-slate-400'}`}>
-              {data.ahorroTotalRaw > 0 ? `$${data.ahorroTotal}` : "$0.00"}
+            <span className={`font-black text-base ${data?.ahorroTotalRaw > 0 ? (data?.tipoCotizacion === 'contado' ? 'text-blue-600' : 'text-emerald-600') : 'text-slate-400'}`}>
+              {data?.ahorroTotalRaw > 0 ? `$${data?.ahorroTotal}` : "$0.00"}
             </span>
           </div>
         </div>
 
-        {data.tipoCotizacion === 'credito' && (
+        {data?.tipoCotizacion === 'credito' && (
           <div className={`mt-8 border rounded-2xl p-5 flex justify-between items-center relative z-10 shadow-sm ${isGuardado ? 'bg-slate-50 border-slate-200' : 'bg-emerald-500 border-emerald-600'}`}>
             <div className={`text-[10px] font-black uppercase tracking-widest leading-tight ${isGuardado ? 'text-slate-500' : 'text-emerald-100'}`}>Cuota<br/>Mensual</div>
             <div className="text-right flex items-center gap-3">
               {bestCuota && <div className={`text-[9px] font-black uppercase px-2 py-1 rounded ${isGuardado ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-400 text-white'}`}>Mejor Cuota</div>}
               <div>
-                <div className={`text-3xl font-black leading-none mb-1 ${isGuardado ? 'text-slate-900' : 'text-white'}`}>${data.mensual}</div>
-                <div className={`text-[10px] font-bold ${isGuardado ? 'text-slate-500' : 'text-emerald-200'}`}>Bs. {data.mensualBs}</div>
+                <div className={`text-3xl font-black leading-none mb-1 ${isGuardado ? 'text-slate-900' : 'text-white'}`}>${data?.mensual}</div>
+                <div className={`text-[10px] font-bold ${isGuardado ? 'text-slate-500' : 'text-emerald-200'}`}>Bs. {data?.mensualBs}</div>
               </div>
             </div>
           </div>
@@ -698,8 +716,8 @@ export default function App() {
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.15] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]" xmlns="http://www.w3.org/2000/svg">
           <g transform="translate(500, 400) scale(1.6)">
-            {[...Array(15)].map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
-            {[...Array(15)].map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)]?.map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)]?.map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
             <polygon points="0,0 60,30 0,60 -60,30" fill="rgba(6, 182, 212, 0.1)" stroke="#0891b2" strokeWidth="1" />
             <polygon points="60,30 120,60 60,90 0,60" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" strokeWidth="1.5" />
             <polygon points="-60,30 0,60 -60,90 -120,60" fill="rgba(2, 132, 199, 0.1)" stroke="#0369a1" strokeWidth="1" />
@@ -811,7 +829,7 @@ export default function App() {
                   </label>
                   <div className="relative">
                     <select value={regional} onChange={e => setRegional(e.target.value)} className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}>
-                      {Object.keys(proyectosPorRegional).map(reg => <option key={reg} value={reg}>{reg}</option>)}
+                      {Object.keys(proyectosPorRegional)?.map(reg => <option key={reg} value={reg}>{reg}</option>)}
                     </select>
                     <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}><ChevronDown className="w-5 h-5" /></div>
                   </div>
@@ -861,7 +879,7 @@ export default function App() {
                            <div className="relative">
                              <select value={uv} onChange={handleUvChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
                                <option value="" disabled hidden>Selec.</option>
-                               {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
+                               {uvsDisponibles?.map(u => <option key={u} value={u}>{u}</option>)}
                              </select>
                              <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}><ChevronDown className="w-3 h-3" /></div>
                            </div>
@@ -873,7 +891,7 @@ export default function App() {
                            <div className="relative">
                              <select value={mzn} onChange={handleMznChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
                                <option value="" disabled hidden>Selec.</option>
-                               {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
+                               {mznsDisponibles?.map(m => <option key={m} value={m}>{m}</option>)}
                              </select>
                              <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}><ChevronDown className="w-3 h-3" /></div>
                            </div>
@@ -885,7 +903,7 @@ export default function App() {
                            <div className="relative">
                              <select value={lote} onChange={handleLoteChange} className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer">
                                <option value="" disabled hidden>Selec.</option>
-                               {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+                               {lotesDisponibles?.map(l => <option key={l} value={l}>{l}</option>)}
                              </select>
                              <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}><ChevronDown className="w-3 h-3" /></div>
                            </div>
@@ -996,7 +1014,7 @@ export default function App() {
                     <div className="relative h-[calc(100%-1.5rem)]">
                       <select required value={años} onChange={e => setAños(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500">
                         <option value="" disabled hidden>Selec.</option>
-                        {[...Array(14)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
+                        {[...Array(14)]?.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-emerald-500"><ChevronRight className="w-5 h-5 rotate-90" /></div>
                     </div>
@@ -1192,14 +1210,14 @@ export default function App() {
                                 </tr>
                               </thead>
                               <tbody className="font-semibold relative z-10">
-                                {resultado.transicionData && resultado.transicionData.map((row, i) => (
+                                {resultado.transicionData?.map((row, i) => (
                                   <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-emerald-950/10' : 'text-slate-500'}`}>
                                     <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
                                     <td className="p-3 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
                                     <td className={`p-3 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{row.conDescUsd.toFixed(2)}</td>
-                                    <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{row.montoBs.toFixed(2)}</td>
-                                    <td className="p-3 text-slate-400">{row.tcEfectivo.toFixed(2)}</td>
+                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
+                                    <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
+                                    <td className="p-3 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1222,7 +1240,7 @@ export default function App() {
                               <div>Plazo</div><div className="text-emerald-400">Cuota ($us)</div><div className="text-emerald-400">Cuota (Bs.)</div>
                             </div>
                             <div className="pt-2">
-                              {resultado.planPagos && resultado.planPagos.map((plan, i) => (
+                              {resultado.planPagos?.map((plan, i) => (
                                 <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-900/30 border border-emerald-500/40 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/50 border border-transparent'}`}>
                                   <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                                     {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block shrink-0"></span>} 
