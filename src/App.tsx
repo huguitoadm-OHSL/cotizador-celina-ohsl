@@ -69,7 +69,7 @@ export default function App() {
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
   // TC DINÁMICO
-  const [tcFlexible, setTcFlexible] = useState(10.40);
+  const [tcFlexible, setTcFlexible] = useState(10.50);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -1311,4 +1311,3 @@ export default function App() {
     </div>
   );
 }
-
