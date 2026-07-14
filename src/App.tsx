@@ -318,6 +318,7 @@ export default function App() {
     let pct_efectivo = 0; 
     let pago_puro = 0;
     let seguro = 0;
+    let cbdi = 0;
     let cuota_final = 0;
     let planPagosArreglo = [];
     let transicionData = [];
@@ -360,7 +361,6 @@ export default function App() {
         const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
         const refSaldo = 34278.00;
         const baseSeguro = { 1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38, 11: 27.67, 12: 29.00, 13: 30.36, 14: 31.75 };
-        const cbdi = 0;
         
         pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
         if(isNaN(pago_puro) || !isFinite(pago_puro)) pago_puro = 0;
@@ -1311,3 +1311,4 @@ export default function App() {
     </div>
   );
 }
+
