@@ -3,7 +3,7 @@ import {
   Calculator, Send, Map, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock
 } from "lucide-react";
 
 // ============================================================================
@@ -57,6 +57,24 @@ const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
 
 export default function App() {
+  // ==========================================================================
+  // ESTADO DE AUTENTICACIÓN
+  // ==========================================================================
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loginError, setLoginError] = useState(false);
+  
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === "ELSEÑORESMIPASTOR") {
+      setIsAuthenticated(true);
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+      setTimeout(() => setLoginError(false), 2000);
+    }
+  };
+
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
@@ -110,6 +128,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   useEffect(() => {
+    if (!isAuthenticated) return; // Solo carga la BD si está autenticado
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -162,7 +181,7 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -645,6 +664,61 @@ export default function App() {
   const showDescContadoM2 = true;
   const showBonoInicial = proyecto === "OTRO";
 
+  // ==========================================================================
+  // RENDER PANTALLA DE BLOQUEO
+  // ==========================================================================
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 relative overflow-hidden font-['Plus_Jakarta_Sans']">
+        {/* Fondo animado estilo Quantum */}
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+          <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
+          <div className="absolute bottom-[20%] right-[20%] w-[40rem] h-[40rem] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style={{animationDelay: "1s"}}></div>
+        </div>
+
+        <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+             <Lock className="w-10 h-10 text-[#020617]" />
+          </div>
+          
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
+            Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span>
+          </h1>
+          <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada para usar el motor financiero.</p>
+
+          <form onSubmit={handleLogin} className="w-full space-y-6">
+            <div className="relative">
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Contraseña"
+                className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`}
+              />
+              {loginError && (
+                <div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">
+                  Acceso denegado. Intenta de nuevo.
+                </div>
+              )}
+            </div>
+
+            <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+              <Unlock className="w-5 h-5"/> Desbloquear Sistema
+            </button>
+          </form>
+
+          <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
+            <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
+            <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // RENDER PANTALLA PRINCIPAL (AUTENTICADO)
+  // ==========================================================================
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
@@ -752,9 +826,13 @@ export default function App() {
 
       <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0">
         
-        {/* TOP BAR: TC DINÁMICO */}
-        <div className="flex justify-end mb-6 no-print w-full min-w-0">
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto max-w-full">
+        {/* TOP BAR: TC DINÁMICO & LOGOUT */}
+        <div className="flex justify-between items-center mb-6 no-print w-full min-w-0">
+          <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+            <Lock className="w-4 h-4"/> Salir
+          </button>
+          
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto max-w-full">
              <div className="flex items-center gap-2">
                <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/20 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
