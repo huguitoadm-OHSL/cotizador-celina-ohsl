@@ -403,9 +403,9 @@ export default function App() {
           });
         }
 
-        // TABLA DE TRANSICIÓN INFINITA - NUEVO ALGORITMO DE CALENDARIO
+        // TABLA DE TRANSICIÓN INFINITA - NUEVO ALGORITMO DE CALENDARIO (ARRANCA EN AGOSTO)
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 6; // Arranca en Julio (índice 6)
+        let baseMonthIndex = 7; // Arranca en Agosto (índice 7)
         let baseYear = 26; // Año 2026
         
         for(let m=1; m<=meses; m++) {
