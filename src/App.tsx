@@ -68,8 +68,8 @@ export default function App() {
   // MODO DUAL DE COTIZACIÓN
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
-  // TC DINÁMICO A 10.50
-  const [tcFlexible, setTcFlexible] = useState(10.50);
+  // TC DINÁMICO A 10.70
+  const [tcFlexible, setTcFlexible] = useState(10.70);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -323,7 +323,7 @@ export default function App() {
     let planPagosArreglo = [];
     let transicionData = [];
     let totalAhorroTransicion = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.50;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.70;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
