@@ -86,8 +86,8 @@ export default function App() {
   // MODO DUAL DE COTIZACIÓN
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
-  // TC DINÁMICO A 10.70
-  const [tcFlexible, setTcFlexible] = useState(10.70);
+  // TC DINÁMICO A 10.75
+  const [tcFlexible, setTcFlexible] = useState(10.75);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -345,7 +345,7 @@ export default function App() {
     let costo_esperar_octubre = 0;
     let descPctOct = 0;
     
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.70;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.75;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
