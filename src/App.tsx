@@ -128,7 +128,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return; // Solo carga la BD si está autenticado
+    if (!isAuthenticated) return; 
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -144,7 +144,6 @@ export default function App() {
           rawData = await fallbackResponse.json();
         }
 
-        // Blindaje extra: asegurar que data es un array
         if (!Array.isArray(rawData)) {
             rawData = [];
         }
@@ -192,7 +191,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Blindaje de seguridad para proyectosPorRegional
     if (proyectosPorRegional[regional] && !proyectosPorRegional[regional].includes(proyecto)) {
       setProyecto(proyectosPorRegional[regional][0] || "OTRO");
     }
@@ -219,7 +217,6 @@ export default function App() {
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
 
-    // Valores estándar universales
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto]);
 
@@ -330,7 +327,7 @@ export default function App() {
     const valor_original = sup * prec;
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
     
-    // VARIABLES COMUNES
+    // VARIABLES COMUNES DE INICIALIZACIÓN
     let valor_final = 0;
     let ahorro_total = 0;
     let cuota_inicial = 0; 
@@ -342,6 +339,12 @@ export default function App() {
     let planPagosArreglo = [];
     let transicionData = [];
     let totalAhorroTransicion = 0;
+    
+    // VARIABLES DE URGENCIA (CONTADO)
+    let ahorro_contra_mercado = 0;
+    let costo_esperar_octubre = 0;
+    let descPctOct = 0;
+    
     const TC_FLEX_NUMBER = Number(tcFlexible) || 10.70;
 
     if (tipoCotizacion === 'contado') {
@@ -353,6 +356,16 @@ export default function App() {
         
         ahorro_total = monto_desc_contado_m2 + (base_post_m2 * descContadoPct);
         valor_final = valor_original - ahorro_total;
+
+        // CÁLCULO GATILLOS DE URGENCIA CONTADO
+        ahorro_contra_mercado = (valor_final * TC_FLEX_NUMBER) - (valor_final * TC_PROMOCIONAL);
+        
+        let baseDiscount = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100;
+        descPctOct = baseDiscount - 5;
+        if (descPctOct < 0) descPctOct = 0;
+        
+        let tc_octubre = TC_FLEX_NUMBER * (1 - (descPctOct / 100));
+        costo_esperar_octubre = (valor_final * tc_octubre) - (valor_final * TC_PROMOCIONAL);
 
     } else {
         const descCreditoPct = aplicarDescCreditoPct ? ((Number(descuentoCredito) || 0) / 100) : 0;
@@ -403,7 +416,6 @@ export default function App() {
           });
         }
 
-        // TABLA DE TRANSICIÓN INFINITA - NUEVO ALGORITMO DE CALENDARIO (ARRANCA EN AGOSTO)
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
         let baseMonthIndex = 7; // Arranca en Agosto (índice 7)
         let baseYear = 26; // Año 2026
@@ -435,7 +447,6 @@ export default function App() {
                     
                     tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
                     
-                    // Asegurar TC de 6.97 exacto para el primer periodo promocional
                     if (step === 0) tc_efectivo = TC_PROMOCIONAL; 
                     if (tc_efectivo > TC_FLEX_NUMBER) tc_efectivo = TC_FLEX_NUMBER;
                 }
@@ -476,6 +487,10 @@ export default function App() {
       ahorroTotalRaw: ahorro_total,
       ahorroTotal: formatMoney(ahorro_total),
       
+      ahorroContraMercado: formatMoney(ahorro_contra_mercado),
+      costoEsperarOctubre: formatMoney(costo_esperar_octubre),
+      descOctubre: descPctOct.toFixed(1),
+      
       descuentoContadoM2: aplicarDescContadoM2 ? Number(descuentoContadoM2) : 0,
       descuentoM2: aplicarDescM2 ? Number(descuentoM2) : 0,
       
@@ -506,7 +521,7 @@ export default function App() {
     if (resultado && !isCalculating) {
        try { calcular(); } catch(e) {}
     }
-  }, [aplicarBonificacion, tipoCotizacion]);
+  }, [aplicarBonificacion, tipoCotizacion, tcFlexible]);
 
   const getTextToCopy = () => {
     if (!resultado) return "";
@@ -527,9 +542,11 @@ export default function App() {
         if (arrContado.length > 0) contentStr += `¡Aplica descuento especial de ${arrContado.join(' + ')}!\n`;
         contentStr += `*Inversión Final:* $${resultado.valorFinal}\n`;
         contentStr += `(Equivalente a Bs. ${resultado.valorFinalBs} con TC promocional de 6.97 hasta Septiembre)\n\n`;
-        if (resultado.ahorroTotalRaw > 0) {
-            contentStr += `✨ Aproveche este ahorro neto de $${resultado.ahorroTotal} comprando al contado.\n\n`;
-        }
+        
+        contentStr += `🔥 *ANÁLISIS DE OPORTUNIDAD:*\n`;
+        contentStr += `• Ahorro real vs T.C. Calle (${tcFlexible}): *Bs. ${resultado.ahorroContraMercado}*\n`;
+        contentStr += `• Si espera a Octubre, el descuento bajará y usted *perderá Bs. ${resultado.costoEsperarOctubre}* adicionales.\n\n`;
+        
     } else {
         let arrCredito = [];
         if (resultado.descuentoM2 > 0) arrCredito.push(`$${resultado.descuentoM2}/m²`);
@@ -610,11 +627,11 @@ export default function App() {
     }
 
     return (
-      <div className={`bg-white border rounded-3xl p-6 relative overflow-hidden flex flex-col h-full shadow-md transition-all duration-300 ${isGuardado ? 'border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'border-blue-400 bg-blue-50/20' : 'border-emerald-400 bg-emerald-50/20')}`}>
-        <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl ${isGuardado ? 'bg-slate-200/50' : (data?.tipoCotizacion === 'contado' ? 'bg-blue-200/50' : 'bg-emerald-200/50')}`}></div>
+      <div className={`bg-white border rounded-3xl p-6 relative overflow-hidden flex flex-col h-full shadow-md transition-all duration-300 ${isGuardado ? 'border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'border-cyan-400 bg-cyan-50/20' : 'border-emerald-400 bg-emerald-50/20')}`}>
+        <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl ${isGuardado ? 'bg-slate-200/50' : (data?.tipoCotizacion === 'contado' ? 'bg-cyan-200/50' : 'bg-emerald-200/50')}`}></div>
         
         <div className="flex justify-between items-start mb-6 relative z-10">
-          <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${isGuardado ? 'bg-slate-100 text-slate-600 border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200')}`}>
+          <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${isGuardado ? 'bg-slate-100 text-slate-600 border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'bg-cyan-100 text-cyan-700 border-cyan-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200')}`}>
             {isGuardado ? 'Escenario A (Guardado)' : 'Escenario B (Actual)'}
           </div>
           {bestAhorro && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded border border-amber-200 flex items-center gap-1 shadow-sm"><TrendingUp className="w-3 h-3"/> Mayor Ahorro</span>}
@@ -638,7 +655,7 @@ export default function App() {
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-100">
             <span className="text-slate-500 text-sm font-bold">Ahorro Promocional:</span>
-            <span className={`font-black text-base ${data?.ahorroTotalRaw > 0 ? (data?.tipoCotizacion === 'contado' ? 'text-blue-600' : 'text-emerald-600') : 'text-slate-400'}`}>
+            <span className={`font-black text-base ${data?.ahorroTotalRaw > 0 ? (data?.tipoCotizacion === 'contado' ? 'text-cyan-600' : 'text-emerald-600') : 'text-slate-400'}`}>
               {data?.ahorroTotalRaw > 0 ? `$${data?.ahorroTotal}` : "$0.00"}
             </span>
           </div>
@@ -1184,7 +1201,7 @@ export default function App() {
 
                   {/* VISTA EXCLUSIVA AL CONTADO */}
                   {resultado.tipoCotizacion === 'contado' && (
-                    <div className="animate-in zoom-in-95 duration-500 mt-8">
+                    <div className="animate-in zoom-in-95 duration-500 mt-8 space-y-6">
                        <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900 via-blue-900 to-[#060b13] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(6,182,212,0.2)] border border-cyan-500/40 group text-center">
                           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
@@ -1203,10 +1220,10 @@ export default function App() {
                              </div>
 
                              {resultado.ahorroTotalRaw > 0 && (
-                               <div className="mt-8 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-center gap-4 shadow-inner max-w-xl mx-auto w-full">
-                                  <div className="bg-amber-500/20 p-3 rounded-full shrink-0"><Gift className="w-6 h-6 text-amber-400"/></div>
+                               <div className="mt-8 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-center gap-4 shadow-inner max-w-xl mx-auto w-full">
+                                  <div className="bg-emerald-500/20 p-3 rounded-full shrink-0"><Gift className="w-6 h-6 text-emerald-400"/></div>
                                   <div className="text-center sm:text-left">
-                                    <div className="text-amber-400 font-bold text-xs uppercase tracking-widest mb-1">Ahorro Promocional Aplicado</div>
+                                    <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">Ahorro Promocional Aplicado</div>
                                     <div className="text-2xl font-black text-white">$ {resultado.ahorroTotal}</div>
                                   </div>
                                </div>
@@ -1223,6 +1240,31 @@ export default function App() {
                                 </div>
                              </div>
                           </div>
+                       </div>
+
+                       {/* BLOQUES DE URGENCIA AL CONTADO */}
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {/* Bloque Dorado: Ahorro Total */}
+                         <div className="bg-gradient-to-br from-amber-500/20 to-amber-900/20 border border-amber-500/40 rounded-2xl p-5 sm:p-6 shadow-[0_0_20px_rgba(245,158,11,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-amber-500/60 transition-colors">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
+                            <div className="text-[10px] sm:text-xs font-black text-amber-400 uppercase tracking-widest mb-1 z-10 flex items-center gap-1.5">
+                              <Wallet className="w-3.5 h-3.5" /> Ahorro Total vs T.C. Mercado ({tcFlexible})
+                            </div>
+                            <div className="text-2xl sm:text-3xl font-black text-white z-10">
+                              Bs. {resultado.ahorroContraMercado}
+                            </div>
+                         </div>
+
+                         {/* Bloque Rojo: Costo por Esperar */}
+                         <div className="bg-gradient-to-br from-rose-500/20 to-rose-900/20 border border-rose-500/40 rounded-2xl p-5 sm:p-6 shadow-[0_0_20px_rgba(244,63,94,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-rose-500/60 transition-colors">
+                            <div className="absolute top-0 left-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all"></div>
+                            <div className="text-[10px] sm:text-xs font-black text-rose-400 uppercase tracking-widest mb-1 z-10 flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5" /> Costo por esperar a Octubre (Baja al {resultado.descOctubre}%)
+                            </div>
+                            <div className="text-2xl sm:text-3xl font-black text-white z-10">
+                              Pierde Bs. {resultado.costoEsperarOctubre}
+                            </div>
+                         </div>
                        </div>
                     </div>
                   )}
