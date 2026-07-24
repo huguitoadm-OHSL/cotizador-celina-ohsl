@@ -66,7 +66,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "SALMO23") {
+    if (passwordInput === "SALMO24") {
       setIsAuthenticated(true);
       setLoginError(false);
     } else {
