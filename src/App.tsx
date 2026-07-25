@@ -86,7 +86,7 @@ export default function App() {
   // MODO DUAL DE COTIZACIÓN
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
-  // TC DINÁMICO A 11.37
+  // TC DINÁMICO A 11.37 (configurable)
   const [tcFlexible, setTcFlexible] = useState(11.37);
   const TC_PROMOCIONAL = 6.97;
 
@@ -567,6 +567,7 @@ export default function App() {
                           `• Recién desde Abril 2027 pagará al TC de mercado actual.\n\n` +
                           `¡Usted asegura un ahorro de Bs. ${resultado.totalAhorroTransicion} gracias a este plan!\n\n`;
         }
+    }
 
     const cierre = `¿Le gustaría que agendemos una visita para conocer su próximo terreno? 🤝`;
 
@@ -1297,9 +1298,9 @@ export default function App() {
                       </div>
 
                       {/* TABLA DE TRANSICIÓN INFINITA CON TOGGLE CYBERPUNK */}
-                      <div className="bg-[#04070b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(6,182,212,0.1)] mt-8 relative w-full">
+                      <div className="bg-[#04070b] border border-emerald-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(16,185,129,0.1)] mt-8 relative w-full">
                           
-                          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-cyan-950/20 to-transparent">
+                          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/20 to-transparent">
                               <div>
                                 <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2">
                                   <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
@@ -1309,8 +1310,8 @@ export default function App() {
                               </div>
                               
                               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
-                                <div className={`flex items-center justify-between sm:justify-start gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner w-full sm:w-auto ${aplicarBonificacion ? 'bg-slate-900/80 border-cyan-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
-                                  <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${aplicarBonificacion ? 'text-cyan-400' : 'text-slate-500'}`}>
+                                <div className={`flex items-center justify-between sm:justify-start gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner w-full sm:w-auto ${aplicarBonificacion ? 'bg-slate-900/80 border-emerald-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
+                                  <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-500'}`}>
                                       Aplicar Descuento
                                   </span>
                                   <button 
@@ -1358,7 +1359,7 @@ export default function App() {
                             </table>
                           </div>
                           <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800">
-                            *Simulación referencial. La cuota en Bolivianos sube 5% gradualmente hasta alcanzar el TC de Mercado actual.
+                            *Simulación referencial. El descuento comercial se ajusta gradualmente hasta alcanzar el TC de Mercado actual.
                           </div>
                       </div>
 
@@ -1445,4 +1446,3 @@ export default function App() {
     </div>
   );
 }
-
