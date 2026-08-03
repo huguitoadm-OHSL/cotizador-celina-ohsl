@@ -66,7 +66,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "SALMO24") {
+    if (passwordInput === "ESPIRITUSANTO") {
       setIsAuthenticated(true);
       setLoginError(false);
     } else {
