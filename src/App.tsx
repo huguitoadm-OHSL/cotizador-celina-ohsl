@@ -345,7 +345,7 @@ export default function App() {
     let costo_esperar_octubre = 0;
     let descPctOct = 0;
     
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.70;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.08;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -1448,3 +1448,4 @@ export default function App() {
     </div>
   );
 }
+
