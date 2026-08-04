@@ -66,7 +66,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "ESPIRITUSANTO") {
+    if (passwordInput === "ELSEÑORESMIPASTOR") {
       setIsAuthenticated(true);
       setLoginError(false);
     } else {
@@ -86,8 +86,8 @@ export default function App() {
   // MODO DUAL DE COTIZACIÓN
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
-  // TC DINÁMICO A 12.13 (configurable)
-  const [tcFlexible, setTcFlexible] = useState(12.13);
+  // TC DINÁMICO A 12.08
+  const [tcFlexible, setTcFlexible] = useState(12.08);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -345,7 +345,7 @@ export default function App() {
     let costo_esperar_octubre = 0;
     let descPctOct = 0;
     
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.13;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 10.70;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -360,9 +360,7 @@ export default function App() {
         // CÁLCULO GATILLOS DE URGENCIA CONTADO
         ahorro_contra_mercado = (valor_final * TC_FLEX_NUMBER) - (valor_final * TC_PROMOCIONAL);
         
-        let baseDiscount = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100;
-        descPctOct = baseDiscount - 5;
-        if (descPctOct < 0) descPctOct = 0;
+        descPctOct = 28; // FIJO: Según nueva tabla corporativa (Octubre = 28%)
         
         let tc_octubre = TC_FLEX_NUMBER * (1 - (descPctOct / 100));
         costo_esperar_octubre = (valor_final * tc_octubre) - (valor_final * TC_PROMOCIONAL);
@@ -428,27 +426,31 @@ export default function App() {
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
             if (aplicarBonificacion) {
-                let step = -1;
-                if (currentY === 26) {
-                    if (currentMIndex >= 6 && currentMIndex <= 8) step = 0; // Jul, Ago, Sep
-                    else if (currentMIndex === 9) step = 1; // Oct
-                    else if (currentMIndex === 10) step = 2; // Nov
-                    else if (currentMIndex === 11) step = 3; // Dic
-                } else if (currentY === 27) {
-                    if (currentMIndex === 0) step = 4; // Ene
-                    else if (currentMIndex === 1) step = 5; // Feb
-                    else if (currentMIndex === 2) step = 6; // Mar
-                }
-
-                if (step >= 0) {
-                    let baseDiscount = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100;
-                    descPctExacto = baseDiscount - (5 * step);
-                    if (descPctExacto < 0) descPctExacto = 0;
-                    
+                if (currentY === 26 && currentMIndex <= 8) {
+                    // Hasta Septiembre 2026 (meses <= 8)
+                    tc_efectivo = TC_PROMOCIONAL; // 6.97
+                    descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100;
+                } else if (currentY === 26 && currentMIndex === 9) { // Octubre
+                    descPctExacto = 28;
                     tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
-                    
-                    if (step === 0) tc_efectivo = TC_PROMOCIONAL; 
-                    if (tc_efectivo > TC_FLEX_NUMBER) tc_efectivo = TC_FLEX_NUMBER;
+                } else if (currentY === 26 && currentMIndex === 10) { // Noviembre
+                    descPctExacto = 23;
+                    tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
+                } else if (currentY === 26 && currentMIndex === 11) { // Diciembre
+                    descPctExacto = 18;
+                    tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
+                } else if (currentY === 27 && currentMIndex === 0) { // Enero
+                    descPctExacto = 13;
+                    tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
+                } else if (currentY === 27 && currentMIndex === 1) { // Febrero
+                    descPctExacto = 8;
+                    tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
+                } else if (currentY === 27 && currentMIndex === 2) { // Marzo
+                    descPctExacto = 3;
+                    tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100));
+                } else { // Abril 2027 en adelante
+                    descPctExacto = 0;
+                    tc_efectivo = TC_FLEX_NUMBER;
                 }
             }
 
@@ -1446,4 +1448,3 @@ export default function App() {
     </div>
   );
 }
-
