@@ -64,14 +64,14 @@ const descGroup7_15PCT = ["ROSA RODALI"];
 // ============================================================================
 const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
   
-  // Capa Base: Líneas del Plano
+  // Capa Base: Líneas del Plano (Esqueleto)
   const lineLayer: LineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: {
       'line-color': '#0ea5e9',
-      'line-width': 1.5,
-      'line-opacity': 0.6
+      'line-width': 1,
+      'line-opacity': 0.3 // Opacidad baja para destacar los números
     }
   }), []);
 
@@ -84,23 +84,30 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
       'line-width': 4,
       'line-opacity': 1
     },
-    filter: ['==', ['get', 'name'], loteActivo || ''] // Filtra por el número de lote activo
+    filter: ['==', ['get', 'name'], loteActivo || ''] 
   }), [loteActivo]);
 
-  // Capa de Etiquetas: Muestra los números de lote
+  // Capa de Etiquetas: Muestra los números de lote y destruye la basura de AutoCAD
   const labelLayer: SymbolLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
-      'text-field': ['get', 'name'], // Extrae el texto del archivo KML/GeoJSON
-      'text-size': 11,
-      'text-anchor': 'center'
+      'text-field': ['get', 'name'],
+      'text-size': 13,
+      'text-anchor': 'center',
+      'text-allow-overlap': false 
     },
     paint: {
-      'text-color': '#38bdf8', // Color cyan para que contraste
-      'text-halo-color': '#020617', // Borde oscuro para legibilidad
-      'text-halo-width': 1.5
-    }
+      'text-color': '#38bdf8', // Cyan brillante
+      'text-halo-color': '#020617', // Borde oscuro
+      'text-halo-width': 2
+    },
+    // Filtro Quirúrgico: Destruye textos largos como "Línea [334EE0]", deja solo números
+    filter: [
+      'all',
+      ['has', 'name'],
+      ['<=', ['length', ['to-string', ['get', 'name']]], 4]
+    ]
   }), []);
 
   const handleMapClick = (event) => {
@@ -119,7 +126,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial</h3>
-             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">Toca el ícono de GPS abajo para ubicarte en terreno</p>
+             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">Toca el número de un terreno para cotizar</p>
            </div>
          </div>
       </div>
@@ -133,7 +140,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
           pitch: 45
         }}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-        interactiveLayerIds={['lotes-line']}
+        interactiveLayerIds={['lotes-labels']} // Solo permite clic en los números de lote
         onClick={handleMapClick}
         cursor="crosshair"
       >
@@ -141,7 +148,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
           position="bottom-right" 
           trackUserLocation={true} 
           showUserHeading={true} 
-          positionOptions={{ enableHighAccuracy: true }} // GPS de Alta Precisión
+          positionOptions={{ enableHighAccuracy: true }} // GPS de Alta Precisión activado
         />
         <Source id="muyurina-data" type="geojson" data="/muyurina.geojson">
           <Layer {...lineLayer} />
@@ -163,7 +170,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOS") {
+    if (passwordInput === "Yahvé") {
       setIsAuthenticated(true);
       setLoginError(false);
     } else {
@@ -191,17 +198,18 @@ export default function App() {
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
   const [superficie, setSuperficie] = useState("");
-  const [precio, setPrecio] = useState(""); // Ahora el precio iniciará vacío hasta cargar BD
+  const [precio, setPrecio] = useState(""); // Precio real de BD
   const [categoria, setCategoria] = useState("");
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
-  // DESCUENTOS UNIVERSALES PRECARGADOS (1$ Crédito, 2$ Contado)
+  
+  // DESCUENTOS UNIVERSALES ASIGNADOS CORRECTAMENTE (1$ Crédito, 2$ Contado)
   const [descuentoM2, setDescuentoM2] = useState(1);
-  const [descuentoInicial, setDescuentoInicial] = useState(0);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
+  const [descuentoInicial, setDescuentoInicial] = useState(0);
 
-  // Por defecto apagados
+  // Switches por defecto apagados
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
   const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(false);
   const [aplicarDescM2, setAplicarDescM2] = useState(false);
@@ -264,7 +272,7 @@ export default function App() {
             categoria: String(item?.categoria || item?.Categoria || item?.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
         }));
 
-        // REGLA DE EXCLUSIÓN INYECTADA
+        // REGLA DE EXCLUSIÓN
         const lotesPermitidos = normalizedData.filter(l => 
           (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "") &&
           !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto)
@@ -317,9 +325,9 @@ export default function App() {
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
 
-    // Se mantienen los descuentos universales base pre-cargados
+    // Mantenemos los descuentos pre-cargados a nivel sistema
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
-  }, [proyecto]);
+  }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
     if (!p) return [];
@@ -366,26 +374,26 @@ export default function App() {
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
+  // EXTRACCIÓN CORRECTA DEL PRECIO REAL DE BD
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
-        setPrecio(loteEncontrado.precio.toString()); // RESTAURADO: Lee el precio real de la base de datos
+        setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
       }
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => {
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; // Límites relajados para m2
+    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 };
   };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
     setDescuentoCredito(limites.maxCreditoPct);
     setDescuentoContado(limites.maxContadoPct);
-    // Ya no reseteamos el descuentoM2 a 1 para mantener el estado libre.
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
 
   const handleDescContadoChange = (e) => {
@@ -414,7 +422,7 @@ export default function App() {
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
   };
   
-  const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 3000); };
+  const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 4000); };
 
   const calcular = () => {
     const sup = Number(superficie) || 0; 
@@ -982,18 +990,37 @@ export default function App() {
         {/* MAPA INTERACTIVO - REEMPLAZO DE GOOGLE EARTH */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
            <MapaMuyurina 
-             loteActivo={lote} // Búsqueda bidireccional activada
+             loteActivo={lote}
              onLoteSeleccionado={(props) => {
-               setRegional("MONTERO");
-               setProyecto("MUYURINA");
+               const nombreLote = props.name || props.Name || "";
+               const nombreLayer = props.layer || props.Layer || "";
                
-               if (props.uv || props.UV) setUv(props.uv || props.UV);
-               if (props.manzano || props.MZN || props.layer) setMzn(props.manzano || props.MZN || props.layer);
-               if (props.numero || props.LOTE || props.name || props.Name) setLote(props.numero || props.LOTE || props.name || props.Name);
-               if (props.superficie || props.SUPERFICIE) setSuperficie((props.superficie || props.SUPERFICIE).toString());
-               if (props.categoria || props.CATEGORIA) setCategoria(props.categoria || props.CATEGORIA);
-               
-               showNotification("📍 Terreno sincronizado desde el mapa espacial");
+               const loteLimpio = String(nombreLote).trim();
+               const mznLimpio = String(nombreLayer).replace(/[^0-9]/g, '');
+
+               if (!loteLimpio) return;
+
+               const loteEnBD = baseDeDatosLotes.find(l => 
+                 l.proyecto === "MUYURINA" && 
+                 l.lote === loteLimpio && 
+                 (mznLimpio ? l.mzn === mznLimpio : true)
+               );
+
+               if (loteEnBD) {
+                 setRegional("MONTERO");
+                 setProyecto("MUYURINA");
+                 setUv(loteEnBD.uv);
+                 setMzn(loteEnBD.mzn);
+                 setLote(loteEnBD.lote);
+                 setSuperficie(loteEnBD.superficie.toString());
+                 setPrecio(loteEnBD.precio.toString()); // AQUÍ SE RESTAURA EL PRECIO REAL DE LA BD
+                 setCategoria(loteEnBD.categoria || "ESTÁNDAR");
+                 
+                 setResultado(null); 
+                 showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn}) enlazado y listo para cotizar`);
+               } else {
+                 showNotification(`⚠️ El Lote ${loteLimpio} no está disponible en la Base de Datos actual.`);
+               }
              }}
            />
         </div>
