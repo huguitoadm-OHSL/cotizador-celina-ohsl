@@ -6,6 +6,7 @@ import {
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
+import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // ============================================================================
@@ -106,6 +107,7 @@ const MapaMuyurina = ({ onLoteSeleccionado }) => {
       </div>
 
       <Map
+        mapLib={maplibregl} // Corrección clave: Forzar el uso de MapLibre de código abierto
         initialViewState={{
           longitude: -63.242,
           latitude: -17.364,
@@ -157,15 +159,15 @@ export default function App() {
   // MODO DUAL DE COTIZACIÓN
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
 
-  // TC DINÁMICO A 12.08
-  const [tcFlexible, setTcFlexible] = useState(12.08);
+  // TC DINÁMICO A 12.02
+  const [tcFlexible, setTcFlexible] = useState(12.02);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
   const [superficie, setSuperficie] = useState("");
-  const [precio, setPrecio] = useState("");
+  const [precio, setPrecio] = useState("1"); // Precio base por defecto
   const [categoria, setCategoria] = useState("");
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
@@ -197,6 +199,11 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   const resultadosRef = useRef(null);
+
+  // REGLA INMUTABLE: Forzar actualización de precio según el tipo de cotización
+  useEffect(() => {
+    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
+  }, [tipoCotizacion]);
 
   useEffect(() => {
     if (!isAuthenticated) return; 
@@ -237,7 +244,7 @@ export default function App() {
             categoria: String(item?.categoria || item?.Categoria || item?.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
         }));
 
-        // REGLA DE EXCLUSIÓN: Filtramos los proyectos obsoletos y estados ocupados
+        // REGLA DE EXCLUSIÓN INYECTADA
         const lotesPermitidos = normalizedData.filter(l => 
           (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "") &&
           !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto)
@@ -270,11 +277,13 @@ export default function App() {
   }, [regional]);
 
   const handleUvChange = (e) => {
-    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
+    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setCategoria("");
+    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
   };
 
   const handleMznChange = (e) => {
-    setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
+    setMzn(e.target.value); setLote(""); setSuperficie(""); setCategoria("");
+    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
   };
 
   const handleLoteChange = (e) => {
@@ -282,7 +291,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
+    setUv(""); setMzn(""); setLote(""); setSuperficie("");
+    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
     setResultado(null); setProyectoPersonalizado(""); 
     setEscenarioGuardado(null); setMostrarComparativa(false);
@@ -291,7 +301,7 @@ export default function App() {
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
 
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
-  }, [proyecto]);
+  }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
     if (!p) return [];
@@ -343,11 +353,11 @@ export default function App() {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
-        setPrecio(loteEncontrado.precio.toString());
+        setPrecio(tipoCotizacion === 'credito' ? "1" : "2"); // REGLA INMUTABLE
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
       }
     }
-  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto, tipoCotizacion]);
 
   const calcularLimitesMaximos = () => {
     return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 1, maxContadoM2: 2, maxBonoInicial: 500 };
@@ -418,7 +428,7 @@ export default function App() {
     let costo_esperar_octubre = 0;
     let descPctOct = 0;
     
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.08;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.02;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -965,7 +975,6 @@ export default function App() {
                if (props.superficie || props.SUPERFICIE) setSuperficie((props.superficie || props.SUPERFICIE).toString());
                if (props.categoria || props.CATEGORIA) setCategoria(props.categoria || props.CATEGORIA);
                
-               // Forzamos el precio universal en caso de que la BD no lo inyecte por un error de tipeo en AutoCAD
                setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
                
                showNotification("📍 Terreno sincronizado desde el mapa espacial");
@@ -1005,14 +1014,14 @@ export default function App() {
                 <div className="flex bg-[#060b13] p-1.5 rounded-2xl border border-slate-800 shadow-inner mb-6">
                   <button 
                     type="button"
-                    onClick={() => { setTipoCotizacion('credito'); setPrecio("1"); }}
+                    onClick={() => { setTipoCotizacion('credito'); }}
                     className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tipoCotizacion === 'credito' ? 'bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'text-slate-500 hover:text-emerald-400'}`}
                   >
                     <CreditCard className="w-4 h-4"/> A Crédito
                   </button>
                   <button 
                     type="button"
-                    onClick={() => { setTipoCotizacion('contado'); setPrecio("2"); }}
+                    onClick={() => { setTipoCotizacion('contado'); }}
                     className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tipoCotizacion === 'contado' ? 'bg-cyan-500 text-slate-900 shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-slate-500 hover:text-cyan-400'}`}
                   >
                     <Wallet className="w-4 h-4"/> Al Contado
@@ -1516,5 +1525,3 @@ export default function App() {
     </div>
   );
 }
-
-
