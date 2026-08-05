@@ -5,7 +5,7 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock
 } from "lucide-react";
-import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
+import Map, { Source, Layer, GeolocateControl, LineLayer, SymbolLayer } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -62,23 +62,44 @@ const descGroup7_15PCT = ["ROSA RODALI"];
 // ============================================================================
 // COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
 // ============================================================================
-const MapaMuyurina = ({ onLoteSeleccionado }) => {
-  const fillLayer = useMemo(() => ({
-    id: 'lotes-fill',
-    type: 'fill',
-    paint: {
-      'fill-color': '#0ea5e9',
-      'fill-opacity': 0.1
-    }
-  }), []);
-
-  const lineLayer = useMemo(() => ({
+const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
+  
+  // Capa Base: Líneas del Plano
+  const lineLayer: LineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: {
       'line-color': '#0ea5e9',
       'line-width': 1.5,
-      'line-opacity': 0.8
+      'line-opacity': 0.6
+    }
+  }), []);
+
+  // Capa Destacada: Ilumina el lote seleccionado en el formulario
+  const highlightLayer: LineLayer = useMemo(() => ({
+    id: 'lotes-highlight',
+    type: 'line',
+    paint: {
+      'line-color': '#f59e0b', // Dorado/Ámbar
+      'line-width': 4,
+      'line-opacity': 1
+    },
+    filter: ['==', ['get', 'name'], loteActivo || ''] // Filtra por el número de lote activo
+  }), [loteActivo]);
+
+  // Capa de Etiquetas: Muestra los números de lote
+  const labelLayer: SymbolLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    layout: {
+      'text-field': ['get', 'name'], // Extrae el texto del archivo KML/GeoJSON
+      'text-size': 11,
+      'text-anchor': 'center'
+    },
+    paint: {
+      'text-color': '#38bdf8', // Color cyan para que contraste
+      'text-halo-color': '#020617', // Borde oscuro para legibilidad
+      'text-halo-width': 1.5
     }
   }), []);
 
@@ -91,38 +112,41 @@ const MapaMuyurina = ({ onLoteSeleccionado }) => {
 
   return (
     <div className="relative w-full h-[450px] sm:h-[550px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13]">
-      <div className="absolute top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center">
+      <div className="absolute top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center pointer-events-none">
          <div className="flex items-center gap-3">
            <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
              <MapPin className="w-5 h-5 text-cyan-400" />
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial</h3>
-             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">Toca un terreno para cotizar</p>
+             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">Toca el ícono de GPS abajo para ubicarte en terreno</p>
            </div>
          </div>
-         <span className="text-[10px] font-black bg-cyan-950 text-cyan-400 px-4 py-2 rounded-full border border-cyan-500/50 animate-pulse flex items-center gap-2 shadow-[0_0_10px_rgba(34,211,238,0.2)]">
-           <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]"></div> GPS ACTIVO
-         </span>
       </div>
 
       <Map
-        mapLib={maplibregl} // Corrección clave: Forzar el uso de MapLibre de código abierto
+        mapLib={maplibregl}
         initialViewState={{
           longitude: -63.242,
           latitude: -17.364,
-          zoom: 15.5,
+          zoom: 16.5,
           pitch: 45
         }}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-        interactiveLayerIds={['lotes-fill', 'lotes-line']}
+        interactiveLayerIds={['lotes-line']}
         onClick={handleMapClick}
         cursor="crosshair"
       >
-        <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
+        <GeolocateControl 
+          position="bottom-right" 
+          trackUserLocation={true} 
+          showUserHeading={true} 
+          positionOptions={{ enableHighAccuracy: true }} // GPS de Alta Precisión
+        />
         <Source id="muyurina-data" type="geojson" data="/muyurina.geojson">
-          <Layer {...fillLayer} />
           <Layer {...lineLayer} />
+          <Layer {...highlightLayer} />
+          <Layer {...labelLayer} />
         </Source>
       </Map>
     </div>
@@ -139,7 +163,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "ELSEÑORESMIPASTOR") {
+    if (passwordInput === "DIOS") {
       setIsAuthenticated(true);
       setLoginError(false);
     } else {
@@ -167,11 +191,12 @@ export default function App() {
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
   const [superficie, setSuperficie] = useState("");
-  const [precio, setPrecio] = useState("1"); // Precio base por defecto
+  const [precio, setPrecio] = useState(""); // Ahora el precio iniciará vacío hasta cargar BD
   const [categoria, setCategoria] = useState("");
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
+  // DESCUENTOS UNIVERSALES PRECARGADOS (1$ Crédito, 2$ Contado)
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoInicial, setDescuentoInicial] = useState(0);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
@@ -199,11 +224,6 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   const resultadosRef = useRef(null);
-
-  // REGLA INMUTABLE: Forzar actualización de precio según el tipo de cotización
-  useEffect(() => {
-    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
-  }, [tipoCotizacion]);
 
   useEffect(() => {
     if (!isAuthenticated) return; 
@@ -277,13 +297,11 @@ export default function App() {
   }, [regional]);
 
   const handleUvChange = (e) => {
-    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setCategoria("");
-    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
+    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
   };
 
   const handleMznChange = (e) => {
-    setMzn(e.target.value); setLote(""); setSuperficie(""); setCategoria("");
-    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
+    setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria("");
   };
 
   const handleLoteChange = (e) => {
@@ -291,8 +309,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    setUv(""); setMzn(""); setLote(""); setSuperficie("");
-    setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
+    setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
     setResultado(null); setProyectoPersonalizado(""); 
     setEscenarioGuardado(null); setMostrarComparativa(false);
@@ -300,8 +317,9 @@ export default function App() {
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
 
+    // Se mantienen los descuentos universales base pre-cargados
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
-  }, [proyecto, tipoCotizacion]);
+  }, [proyecto]);
 
   const getAlias = (p) => {
     if (!p) return [];
@@ -353,22 +371,21 @@ export default function App() {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
-        setPrecio(tipoCotizacion === 'credito' ? "1" : "2"); // REGLA INMUTABLE
+        setPrecio(loteEncontrado.precio.toString()); // RESTAURADO: Lee el precio real de la base de datos
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
       }
     }
-  }, [modoBD, uv, mzn, lote, lotesDelProyecto, tipoCotizacion]);
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => {
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 1, maxContadoM2: 2, maxBonoInicial: 500 };
+    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; // Límites relajados para m2
   };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
     setDescuentoCredito(limites.maxCreditoPct);
     setDescuentoContado(limites.maxContadoPct);
-    setDescuentoM2(limites.maxDescM2);
-    setDescuentoContadoM2(limites.maxContadoM2);
+    // Ya no reseteamos el descuentoM2 a 1 para mantener el estado libre.
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
 
   const handleDescContadoChange = (e) => {
@@ -380,12 +397,12 @@ export default function App() {
     setDescuentoCredito(val > max ? max : val);
   };
   const handleDescM2Change = (e) => {
-    const val = Number(e.target.value); const max = calcularLimitesMaximos().maxDescM2;
-    setDescuentoM2(val > max ? max : val);
+    const val = Number(e.target.value);
+    setDescuentoM2(val);
   };
   const handleDescContadoM2Change = (e) => {
-    const val = Number(e.target.value); const max = calcularLimitesMaximos().maxContadoM2;
-    setDescuentoContadoM2(val > max ? max : val);
+    const val = Number(e.target.value); 
+    setDescuentoContadoM2(val);
   };
   const handleBonoInicialChange = (e) => {
     const val = Number(e.target.value);
@@ -965,17 +982,16 @@ export default function App() {
         {/* MAPA INTERACTIVO - REEMPLAZO DE GOOGLE EARTH */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
            <MapaMuyurina 
+             loteActivo={lote} // Búsqueda bidireccional activada
              onLoteSeleccionado={(props) => {
                setRegional("MONTERO");
                setProyecto("MUYURINA");
                
                if (props.uv || props.UV) setUv(props.uv || props.UV);
                if (props.manzano || props.MZN || props.layer) setMzn(props.manzano || props.MZN || props.layer);
-               if (props.numero || props.LOTE || props.Name) setLote(props.numero || props.LOTE || props.Name);
+               if (props.numero || props.LOTE || props.name || props.Name) setLote(props.numero || props.LOTE || props.name || props.Name);
                if (props.superficie || props.SUPERFICIE) setSuperficie((props.superficie || props.SUPERFICIE).toString());
                if (props.categoria || props.CATEGORIA) setCategoria(props.categoria || props.CATEGORIA);
-               
-               setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
                
                showNotification("📍 Terreno sincronizado desde el mapa espacial");
              }}
