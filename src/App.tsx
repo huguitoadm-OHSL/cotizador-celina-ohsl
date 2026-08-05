@@ -51,14 +51,6 @@ const proyectosPorRegional = {
   ]
 };
 
-const descGroup1_3USD = ["LOS JARDINES", "EL RENACER", "RANCHO NUEVO", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "EL ENCANTO FASE 2", "SAN JORGE", "EL PORVENIR", "EL PORVENIR FASE 2", "CELINA PAILÓN"];
-const descGroup2_4USD = ["CAÑAVERAL", "EL ENCANTO", "CELINA 7 FASE 3", "CELINA VII FASE 1", "CELINA VII FASE 2", "TAMARINDO"];
-const descGroup3_7USD = ["JARDINES DEL BOSQUE"];
-const descGroup4_30PCT = ["MUYURINA", "SANTA FE", "CLARA CHUCHIO", "CELINA 8", "CELINA X", "URUBÓ NORTE"];
-const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
-const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
-const descGroup7_15PCT = ["ROSA RODALI"];
-
 // ============================================================================
 // COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
 // ============================================================================
@@ -87,7 +79,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
     filter: ['==', ['get', 'name'], loteActivo || ''] 
   }), [loteActivo]);
 
-  // Capa de Etiquetas: Muestra los números de lote y destruye la basura de AutoCAD
+  // Capa de Etiquetas: Muestra los números de lote limpios
   const labelLayer: SymbolLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
@@ -102,7 +94,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
       'text-halo-color': '#020617', // Borde oscuro
       'text-halo-width': 2
     },
-    // Filtro Quirúrgico: Destruye textos largos como "Línea [334EE0]", deja solo números
+    // Filtro Quirúrgico: Solo muestra textos cortos (ej. "31", "1A")
     filter: [
       'all',
       ['has', 'name'],
@@ -140,7 +132,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
           pitch: 45
         }}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-        interactiveLayerIds={['lotes-labels']} // Solo permite clic en los números de lote
+        interactiveLayerIds={['lotes-labels']} // Solo permite clic en los números
         onClick={handleMapClick}
         cursor="crosshair"
       >
@@ -148,7 +140,7 @@ const MapaMuyurina = ({ onLoteSeleccionado, loteActivo }) => {
           position="bottom-right" 
           trackUserLocation={true} 
           showUserHeading={true} 
-          positionOptions={{ enableHighAccuracy: true }} // GPS de Alta Precisión activado
+          positionOptions={{ enableHighAccuracy: true }} // GPS de Alta Precisión
         />
         <Source id="muyurina-data" type="geojson" data="/muyurina.geojson">
           <Layer {...lineLayer} />
@@ -188,7 +180,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   // MODO DUAL DE COTIZACIÓN
-  const [tipoCotizacion, setTipoCotizacion] = useState("credito"); // 'credito' o 'contado'
+  const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
 
   // TC DINÁMICO A 12.02
   const [tcFlexible, setTcFlexible] = useState(12.02);
@@ -198,7 +190,7 @@ export default function App() {
   const [mzn, setMzn] = useState("");
   const [lote, setLote] = useState("");
   const [superficie, setSuperficie] = useState("");
-  const [precio, setPrecio] = useState(""); // Precio real de BD
+  const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
@@ -209,7 +201,7 @@ export default function App() {
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
   const [descuentoInicial, setDescuentoInicial] = useState(0);
 
-  // Switches por defecto apagados
+  // Switches por defecto
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
   const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(false);
   const [aplicarDescM2, setAplicarDescM2] = useState(false);
@@ -272,7 +264,7 @@ export default function App() {
             categoria: String(item?.categoria || item?.Categoria || item?.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
         }));
 
-        // REGLA DE EXCLUSIÓN
+        // REGLA DE EXCLUSIÓN INYECTADA
         const lotesPermitidos = normalizedData.filter(l => 
           (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "") &&
           !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto)
@@ -992,7 +984,8 @@ export default function App() {
            <MapaMuyurina 
              loteActivo={lote}
              onLoteSeleccionado={(props) => {
-               const nombreLote = props.name || props.Name || "";
+               // Extracción profunda para KMLs de AutoCAD
+               const nombreLote = props.name || props.Name || props.Text || props.text || "";
                const nombreLayer = props.layer || props.Layer || "";
                
                const loteLimpio = String(nombreLote).trim();
@@ -1000,20 +993,39 @@ export default function App() {
 
                if (!loteLimpio) return;
 
-               const loteEnBD = baseDeDatosLotes.find(l => 
-                 l.proyecto === "MUYURINA" && 
-                 l.lote === loteLimpio && 
-                 (mznLimpio ? l.mzn === mznLimpio : true)
-               );
+               // BÚSQUEDA FUZZY A PRUEBA DE BALAS
+               const numLoteClickeado = parseInt(loteLimpio, 10);
+               const numMznClickeado = mznLimpio ? parseInt(mznLimpio, 10) : null;
+
+               const loteEnBD = baseDeDatosLotes.find(l => {
+                 // 1. Validar Proyecto (ignora si dice CELINA MUYURINA, etc)
+                 const esMuyurina = l.proyecto.includes("MUYURINA");
+                 
+                 // 2. Match de Lote Numérico (031 === 31) o String exacto
+                 const lLoteNum = parseInt(l.lote, 10);
+                 const matchLote = (lLoteNum === numLoteClickeado) || (String(l.lote).trim() === loteLimpio);
+
+                 // 3. Match de Manzano
+                 let matchMzn = true;
+                 if (numMznClickeado) {
+                    const lMznNum = parseInt(l.mzn, 10);
+                    matchMzn = (lMznNum === numMznClickeado) || (String(l.mzn).trim() === mznLimpio);
+                 }
+
+                 return esMuyurina && matchLote && matchMzn;
+               });
 
                if (loteEnBD) {
+                 // Fijar la UI
                  setRegional("MONTERO");
-                 setProyecto("MUYURINA");
+                 setProyecto("MUYURINA"); // Se fija siempre en el nombre que espera tu Dropdown
+                 
+                 // Llenar el formulario con los datos reales
                  setUv(loteEnBD.uv);
                  setMzn(loteEnBD.mzn);
                  setLote(loteEnBD.lote);
                  setSuperficie(loteEnBD.superficie.toString());
-                 setPrecio(loteEnBD.precio.toString()); // AQUÍ SE RESTAURA EL PRECIO REAL DE LA BD
+                 setPrecio(loteEnBD.precio.toString()); 
                  setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                  setResultado(null); 
