@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { 
-  Calculator, Send, Map, DollarSign, Percent, Calendar, 
+  Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock
 } from "lucide-react";
+import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 // ============================================================================
 // BASE DE DATOS DE REGIONALES Y PROYECTOS
@@ -55,6 +57,75 @@ const descGroup4_30PCT = ["MUYURINA", "SANTA FE", "CLARA CHUCHIO", "CELINA 8", "
 const descGroup5_32PCT = ["CELINA 3", "CELINA 4", "CELINA 5", "VILLA BELLA VIVIENDAS"];
 const descGroup6_20PCT = ["PRADERAS DEL NORTE"];
 const descGroup7_15PCT = ["ROSA RODALI"];
+
+// ============================================================================
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
+// ============================================================================
+const MapaMuyurina = ({ onLoteSeleccionado }) => {
+  const fillLayer = useMemo(() => ({
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: {
+      'fill-color': '#0ea5e9',
+      'fill-opacity': 0.1
+    }
+  }), []);
+
+  const lineLayer = useMemo(() => ({
+    id: 'lotes-line',
+    type: 'line',
+    paint: {
+      'line-color': '#0ea5e9',
+      'line-width': 1.5,
+      'line-opacity': 0.8
+    }
+  }), []);
+
+  const handleMapClick = (event) => {
+    const feature = event.features?.[0];
+    if (feature && feature.properties) {
+      onLoteSeleccionado(feature.properties);
+    }
+  };
+
+  return (
+    <div className="relative w-full h-[450px] sm:h-[550px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13]">
+      <div className="absolute top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center">
+         <div className="flex items-center gap-3">
+           <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
+             <MapPin className="w-5 h-5 text-cyan-400" />
+           </div>
+           <div>
+             <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial</h3>
+             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">Toca un terreno para cotizar</p>
+           </div>
+         </div>
+         <span className="text-[10px] font-black bg-cyan-950 text-cyan-400 px-4 py-2 rounded-full border border-cyan-500/50 animate-pulse flex items-center gap-2 shadow-[0_0_10px_rgba(34,211,238,0.2)]">
+           <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]"></div> GPS ACTIVO
+         </span>
+      </div>
+
+      <Map
+        initialViewState={{
+          longitude: -63.242,
+          latitude: -17.364,
+          zoom: 15.5,
+          pitch: 45
+        }}
+        mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+        interactiveLayerIds={['lotes-fill', 'lotes-line']}
+        onClick={handleMapClick}
+        cursor="crosshair"
+      >
+        <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
+        <Source id="muyurina-data" type="geojson" data="/muyurina.geojson">
+          <Layer {...fillLayer} />
+          <Layer {...lineLayer} />
+        </Source>
+      </Map>
+    </div>
+  );
+};
 
 export default function App() {
   // ==========================================================================
@@ -166,8 +237,10 @@ export default function App() {
             categoria: String(item?.categoria || item?.Categoria || item?.CATEGORIA || "ESTÁNDAR").trim().toUpperCase()
         }));
 
+        // REGLA DE EXCLUSIÓN: Filtramos los proyectos obsoletos y estados ocupados
         const lotesPermitidos = normalizedData.filter(l => 
-          l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === ""
+          (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "") &&
+          !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto)
         );
 
         setBaseDeDatosLotes(lotesPermitidos);
@@ -689,7 +762,6 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 relative overflow-hidden font-['Plus_Jakarta_Sans']">
-        {/* Fondo animado estilo Quantum */}
         <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
           <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
           <div className="absolute bottom-[20%] right-[20%] w-[40rem] h-[40rem] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style={{animationDelay: "1s"}}></div>
@@ -754,7 +826,6 @@ export default function App() {
         .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .animate-toast { animation: slideUpFade 3s ease-in-out forwards; }
         
-        /* Dark Quantum Glassmorphism */
         .glass-panel { background: rgba(9, 14, 23, 0.75); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(6, 182, 212, 0.15); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 0 rgba(255,255,255,0.05); }
         .glass-input { background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); color: #f8fafc; }
         .glass-input:focus { background: rgba(15, 23, 42, 0.8); border-color: #06b6d4; box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15); outline: none;}
@@ -773,14 +844,12 @@ export default function App() {
         }
       `}</style>
 
-      {/* TOAST NOTIFICATIONS */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
         </div>
       )}
 
-      {/* MODAL DE COMPARATIVA */}
       {mostrarComparativa && escenarioGuardado && resultado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-300 no-print">
           <div className="bg-white border border-slate-200 rounded-[2.5rem] w-full max-w-5xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh]">
@@ -820,7 +889,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MAPA ISOMÉTRICO */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.15] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]" xmlns="http://www.w3.org/2000/svg">
           <g transform="translate(500, 400) scale(1.6)">
@@ -845,7 +913,6 @@ export default function App() {
 
       <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0">
         
-        {/* TOP BAR: TC DINÁMICO & LOGOUT */}
         <div className="flex justify-between items-center mb-6 no-print w-full min-w-0">
           <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
             <Lock className="w-4 h-4"/> Salir
@@ -870,7 +937,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* HEADER PRINCIPAL */}
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative no-print min-w-0">
           <div className="hidden md:block w-32"></div>
           <div className="text-center flex-1 flex flex-col items-center max-w-full">
@@ -886,9 +952,29 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
+        {/* MAPA INTERACTIVO - REEMPLAZO DE GOOGLE EARTH */}
+        <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
+           <MapaMuyurina 
+             onLoteSeleccionado={(props) => {
+               setRegional("MONTERO");
+               setProyecto("MUYURINA");
+               
+               if (props.uv || props.UV) setUv(props.uv || props.UV);
+               if (props.manzano || props.MZN || props.layer) setMzn(props.manzano || props.MZN || props.layer);
+               if (props.numero || props.LOTE || props.Name) setLote(props.numero || props.LOTE || props.Name);
+               if (props.superficie || props.SUPERFICIE) setSuperficie((props.superficie || props.SUPERFICIE).toString());
+               if (props.categoria || props.CATEGORIA) setCategoria(props.categoria || props.CATEGORIA);
+               
+               // Forzamos el precio universal en caso de que la BD no lo inyecte por un error de tipeo en AutoCAD
+               setPrecio(tipoCotizacion === 'credito' ? "1" : "2");
+               
+               showNotification("📍 Terreno sincronizado desde el mapa espacial");
+             }}
+           />
+        </div>
+
         <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
-          {/* PANEL IZQUIERDO: FORMULARIO */}
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0">
             <div className="bg-[#0d1420]/80 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
@@ -916,28 +1002,26 @@ export default function App() {
             <div className="p-5 sm:p-8 flex-1 bg-[#090e17]/50">
               <form onSubmit={handleProcesar} className="space-y-5 sm:space-y-6">
 
-                {/* TOGGLE MODO DE COTIZACIÓN */}
                 <div className="flex bg-[#060b13] p-1.5 rounded-2xl border border-slate-800 shadow-inner mb-6">
                   <button 
                     type="button"
-                    onClick={() => setTipoCotizacion('credito')}
+                    onClick={() => { setTipoCotizacion('credito'); setPrecio("1"); }}
                     className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tipoCotizacion === 'credito' ? 'bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'text-slate-500 hover:text-emerald-400'}`}
                   >
                     <CreditCard className="w-4 h-4"/> A Crédito
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setTipoCotizacion('contado')}
+                    onClick={() => { setTipoCotizacion('contado'); setPrecio("2"); }}
                     className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tipoCotizacion === 'contado' ? 'bg-cyan-500 text-slate-900 shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-slate-500 hover:text-cyan-400'}`}
                   >
                     <Wallet className="w-4 h-4"/> Al Contado
                   </button>
                 </div>
 
-                {/* REGIONAL Y PROYECTO */}
                 <div className="space-y-2.5">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Map className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> Regional
+                    <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> Regional
                   </label>
                   <div className="relative">
                     <select value={regional} onChange={e => setRegional(e.target.value)} className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}>
@@ -972,7 +1056,6 @@ export default function App() {
                   {proyecto === "OTRO" && <input type="text" value={proyectoPersonalizado} onChange={e => setProyectoPersonalizado(e.target.value)} className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop" placeholder="Escribe el nombre del proyecto..." />}
                 </div>
 
-                {/* UV / MZN / LOTE */}
                 <div className="pt-2 sm:pt-3">
                   <div className="bg-[#0d1420]/80 border border-slate-800/80 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-inner">
                     <div className="flex items-center justify-between mb-1">
@@ -1025,7 +1108,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* CATEGORIA, SUP & PRECIO */}
                 <div className="space-y-2.5 relative mt-4">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <LayoutTemplate className={`w-3 h-3 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> Categoría del Lote
@@ -1036,7 +1118,7 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mt-4">
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
-                      <span className="flex items-center gap-1.5"><Map className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
+                      <span className="flex items-center gap-1.5"><MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> Superficie <span className="text-slate-600 normal-case">(m²)</span></span>
                     </label>
                     <input type="number" required value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 240" className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? `bg-[#060b13] border border-slate-800 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}` : 'glass-input'}`} />
                   </div>
@@ -1048,7 +1130,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* DESCUENTOS OPCIONALES SEPARADOS POR MODO */}
                 <div className={`bg-slate-800/40 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 ${tipoCotizacion === 'contado' ? 'border-cyan-500/20' : 'border-emerald-500/20'}`}>
                   <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl transition-colors ${tipoCotizacion === 'contado' ? 'bg-cyan-500/10 group-hover:bg-cyan-400/20' : 'bg-emerald-500/10 group-hover:bg-emerald-400/20'}`}></div>
                   <div className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 ${tipoCotizacion === 'contado' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}>
@@ -1089,7 +1170,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* INICIAL & PLAZO (SOLO PARA CRÉDITO) */}
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative">
@@ -1148,7 +1228,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* PANEL DERECHO: RESULTADOS */}
           <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6 min-w-0 w-full">
             {!resultado || isCalculating ? (
               <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500">
@@ -1182,7 +1261,6 @@ export default function App() {
                 
                 <div className="relative z-10 space-y-6">
                   
-                  {/* Fila: Proyecto y Lote */}
                   <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-[#060b13]/80 p-4 rounded-2xl border border-slate-800 shadow-inner">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
                         <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 shrink-0">
@@ -1201,7 +1279,6 @@ export default function App() {
                       </div>
                   </div>
 
-                  {/* VISTA EXCLUSIVA AL CONTADO */}
                   {resultado.tipoCotizacion === 'contado' && (
                     <div className="animate-in zoom-in-95 duration-500 mt-8 space-y-6">
                        <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900 via-blue-900 to-[#060b13] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(6,182,212,0.2)] border border-cyan-500/40 group text-center">
@@ -1244,9 +1321,7 @@ export default function App() {
                           </div>
                        </div>
 
-                       {/* BLOQUES DE URGENCIA AL CONTADO */}
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         {/* Bloque Dorado: Ahorro Total */}
                          <div className="bg-gradient-to-br from-amber-500/20 to-amber-900/20 border border-amber-500/40 rounded-2xl p-5 sm:p-6 shadow-[0_0_20px_rgba(245,158,11,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-amber-500/60 transition-colors">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
                             <div className="text-[10px] sm:text-xs font-black text-amber-400 uppercase tracking-widest mb-1 z-10 flex items-center gap-1.5">
@@ -1257,7 +1332,6 @@ export default function App() {
                             </div>
                          </div>
 
-                         {/* Bloque Rojo: Costo por Esperar */}
                          <div className="bg-gradient-to-br from-rose-500/20 to-rose-900/20 border border-rose-500/40 rounded-2xl p-5 sm:p-6 shadow-[0_0_20px_rgba(244,63,94,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-rose-500/60 transition-colors">
                             <div className="absolute top-0 left-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all"></div>
                             <div className="text-[10px] sm:text-xs font-black text-rose-400 uppercase tracking-widest mb-1 z-10 flex items-center gap-1.5">
@@ -1271,7 +1345,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* VISTA A CRÉDITO */}
                   {resultado.tipoCotizacion === 'credito' && (
                     <div className="animate-in fade-in duration-500 space-y-6">
                       <div className="bg-gradient-to-br from-[#0d1420] to-[#060b13] p-5 sm:p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4 relative overflow-hidden">
@@ -1299,7 +1372,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* TABLA DE TRANSICIÓN INFINITA CON TOGGLE CYBERPUNK */}
                       <div className="bg-[#04070b] border border-emerald-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(16,185,129,0.1)] mt-8 relative w-full">
                           
                           <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/20 to-transparent">
@@ -1365,7 +1437,6 @@ export default function App() {
                           </div>
                       </div>
 
-                      {/* TABLA DE PLAN DE PAGOS (1 a 14 Años) */}
                       <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50 w-full">
                         <div className="bg-[#040810] p-4 border-b border-emerald-500/10 flex justify-between items-center">
                           <h3 className="text-slate-300 font-bold text-sm tracking-wide flex items-center gap-2">
@@ -1393,7 +1464,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* NUEVO: PANEL DE COMPARATIVA (BOTONES) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 no-print">
                     <button onClick={() => setEscenarioGuardado(resultado)} className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm">
                        <Scale className="w-4 h-4"/>
@@ -1406,7 +1476,6 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* BOTONERAS DE ACCIÓN */}
                   <div className="mt-8 pt-6 border-t border-slate-800 no-print">
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button onClick={() => window.print()} className="w-full sm:w-1/4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 sm:py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md">
@@ -1427,7 +1496,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* FOOTER OSCAR SARAVIA - FIRMA DE AUTOR */}
         <div className="mt-20 sm:mt-32 pt-12 sm:pt-16 border-t border-slate-800/40 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 no-print relative w-full">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
           
@@ -1448,4 +1516,3 @@ export default function App() {
     </div>
   );
 }
-
