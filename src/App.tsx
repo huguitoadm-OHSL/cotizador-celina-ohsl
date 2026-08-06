@@ -54,7 +54,6 @@ const MAP_STYLE_SAFE = {
     }
   ]
 };
-
 // ============================================================================
 // COMPONENTE: NAVEGADOR ESPACIAL WEBGIS 
 // ============================================================================
@@ -224,7 +223,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "ELSEÑORESMIPASTOR") {
+    if (passwordInput === "DIOSESMIGUIA") {
       setIsAuthenticated(true); 
       setIsAdmin(false); 
       setLoginError(false);
@@ -247,7 +246,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.08);
+  const [tcFlexible, setTcFlexible] = useState(11.86);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
