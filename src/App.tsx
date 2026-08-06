@@ -54,13 +54,14 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS 
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
 // ============================================================================
-const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes, isAdmin }) => {
+const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
+  // Extracción de lotes para semáforo de colores
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
@@ -81,15 +82,35 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
+  // Propiedad para leer textos sin importar el formato exportado por AutoCAD
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  const isLoteValido = ['<=', ['length', ['to-string', textProperty]], 4]; // Solo textos de 1 a 4 caracteres
 
+  // CAPA 1: Polígonos de relleno de color según estado (El Semáforo en el mapa)
+  const fillLayer = useMemo(() => ({
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: {
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.4)', // Verde transparente
+        rojos, 'rgba(239, 68, 68, 0.4)',  // Rojo transparente
+        azules, 'rgba(59, 130, 246, 0.4)', // Azul transparente
+        'transparent'
+      ],
+      'fill-opacity': 1
+    },
+    filter: ['all', ['has', 'name'], isLoteValido]
+  }), [verdes, rojos, azules]);
+
+  // CAPA 2: Esqueleto AutoCAD (Líneas Celestes)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.6 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 }
   }), []);
 
+  // CAPA 3: Borde iluminado dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
@@ -97,36 +118,22 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // Círculos grandes para visibilidad sobre satélite
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    filter: ['all', ['==', ['geometry-type'], 'Point'], ['<=', ['length', ['to-string', textProperty]], 4]],
-    paint: {
-      'circle-radius': 12, 
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#22c55e', // Verde
-        rojos, '#ef4444',  // Rojo
-        azules, '#3b82f6', // Azul
-        'rgba(51, 65, 85, 0.6)' 
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff' 
-    }
-  }), [verdes, rojos, azules]);
-
+  // CAPA 4: Números Limpios centrados
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 11,
+      'text-size': 11, // Tamaño perfecto tipo Google Earth
       'text-anchor': 'center',
-      'text-allow-overlap': true 
+      'text-allow-overlap': false 
     },
-    paint: { 'text-color': '#ffffff' },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], ['<=', ['length', ['to-string', textProperty]], 4]]
+    paint: { 
+      'text-color': '#ffffff',
+      'text-halo-color': '#020617',
+      'text-halo-width': 1.5
+    },
+    filter: ['all', ['has', 'name'], isLoteValido]
   }), []);
 
   const handleMapClick = (event) => {
@@ -140,6 +147,14 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
     if (!loteLimpio || isNaN(numLoteClickeado)) return;
 
+    // Extracción profunda
+    let uvExtraida = null; let mznExtraido = null;
+    const nombreLayer = properties.layer || properties.Layer || "";
+    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
+    if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
+    const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
+    if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
+
     let candidatos = baseDeDatosLotes.filter(l => 
       l.proyecto.includes(proyectoActivo) && parseInt(l.lote, 10) === numLoteClickeado
     );
@@ -147,22 +162,11 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // PRIORIDAD ABSOLUTA: Filtro por lo seleccionado en el formulario
+      // Filtro cruzado de precisión
       if (uvActiva && mznActivo) {
         const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
-        if (matchFormulario) {
-           loteFinal = matchFormulario;
-        }
-      } 
-      // Si no seleccionó, intentamos adivinar por la capa de AutoCAD
-      else {
-        let uvExtraida = null; let mznExtraido = null;
-        const nombreLayer = properties.layer || properties.Layer || "";
-        const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
-        if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
-        const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
-        if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
-
+        if (matchFormulario) loteFinal = matchFormulario;
+      } else {
         if (uvExtraida) {
           let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
           if (porUv.length > 0) {
@@ -174,7 +178,6 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
           }
         }
       }
-
       onLoteSeleccionado({ isError: false, data: loteFinal });
     } else {
       onLoteSeleccionado({ isError: true, lote: loteLimpio });
@@ -224,18 +227,18 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             zoom: 14.3, 
             pitch: 0 
           }}
-          maxZoom={17.5} // ESCUDO CONTRA PANTALLA BLANCA (Previene romper el satélite)
+          maxZoom={17.5} // ESCUDO ANTIBLANCO: Limita el zoom para no perder la foto satelital
           mapStyle={MAP_STYLE_SATELLITE as any} 
           style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['lotes-points', 'lotes-labels']} 
+          interactiveLayerIds={['lotes-fill', 'lotes-labels']} // Permite dar clic en el relleno y número
           onClick={handleMapClick}
           cursor="crosshair"
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+            <Layer {...fillLayer as any} />
             <Layer {...lineLayer as any} />
             <Layer {...highlightLayer as any} />
-            <Layer {...pointLayer as any} />
             <Layer {...labelLayer as any} />
           </Source>
         </Map>
@@ -252,7 +255,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSESMIGUIA") { 
+    if (passwordInput === "DIOSESMIGUIA") { // CLAVE ACTUALIZADA
       setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
     } else if (passwordInput === "DIRECTOR2026") { 
       setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
@@ -271,7 +274,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); 
+  const [tcFlexible, setTcFlexible] = useState(11.86); // TC ACTUALIZADO
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -306,10 +309,11 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Referencia para Autoscroll Mágico
+  const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return; 
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -362,7 +366,7 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, [isAuthenticated, isAdmin]);
+  }, [isAdmin]); // Carga en background incluso si no está autenticado
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -600,17 +604,20 @@ export default function App() {
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
-            transicionData.push({
-                mesNum: m, 
-                mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
-                pagoUsdNormal: cuota_final || 0, 
-                descPct: ahorroBs > 0 ? descPctExacto : 0,
-                conDescUsd: pagoUsdDesc || 0, 
-                montoBs: montoBs || 0, 
-                tcEfectivo: tc_efectivo || 0,
-                ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
-                isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
-            });
+            // SOLO GUARDAMOS LOS MESES QUE TIENEN DESCUENTO (Evita tabla infinita)
+            if (descPctExacto > 0) {
+              transicionData.push({
+                  mesNum: m, 
+                  mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
+                  pagoUsdNormal: cuota_final || 0, 
+                  descPct: ahorroBs > 0 ? descPctExacto : 0,
+                  conDescUsd: pagoUsdDesc || 0, 
+                  montoBs: montoBs || 0, 
+                  tcEfectivo: tc_efectivo || 0,
+                  ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
+                  isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
+              });
+            }
         }
     }
 
@@ -787,7 +794,7 @@ export default function App() {
   };
 
   // ==========================================================================
-  // PANTALLA DE LOGIN CON DISEÑO ESTÁTICO (NO SCROLL) Y BLUR
+  // RENDER PANTALLA DE BLOQUEO CON BLUR
   // ==========================================================================
   if (!isAuthenticated) {
     return (
@@ -940,13 +947,13 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Por favor, selecciona la UV/MZN manualmente.`);
+                  showNotification(`⚠️ Selecciona primero la UV en el panel de Datos para localizar el Lote ${respuesta.lote}.`);
                   return;
                }
 
                const loteEnBD = respuesta.data;
                
-               // Inyección directa de datos reales
+               // Autocompletado del formulario
                setRegional("MONTERO");
                setProyecto("MUYURINA");
                setUv(loteEnBD.uv);
@@ -957,12 +964,17 @@ export default function App() {
                setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado y listo`);
+               
+               // AUTOSCROLL MÁGICO AL FORMULARIO
+               if (formRef.current) {
+                 formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+               }
              }}
            />
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
+        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0 scroll-mt-24">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0">
             <div className="bg-[#0d1420]/80 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
@@ -1513,28 +1525,29 @@ export default function App() {
                                 </div>
                               </div>
                           </div>
-                          <div className="w-full">
+                          
+                          <div className="overflow-x-auto w-full">
                             {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
-                            <table className="w-full text-left text-[9px] sm:text-[11px]">
-                              <thead className="bg-[#090e17] z-30 border-b border-slate-800">
-                                <tr className="font-black text-slate-500 uppercase tracking-widest">
-                                  <th className="py-3 px-1 sm:px-2 text-center">Mes</th>
-                                  <th className="py-3 px-1 sm:px-2 text-center">Fijo ($)</th>
-                                  <th className={`py-3 px-1 sm:px-2 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
-                                  <th className={`py-3 px-1 sm:px-2 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>c/Desc ($)</th>
-                                  <th className="py-3 px-1 sm:px-2 text-center text-white">Real (Bs)</th>
-                                  <th className="py-3 px-1 sm:px-2 text-center">TC</th>
+                            <table className="w-full text-left text-xs whitespace-nowrap">
+                              <thead className="bg-[#090e17] border-b border-slate-800">
+                                <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                  <th className="p-3 text-center">Mes</th>
+                                  <th className="p-3 text-center">Pago Fijo ($)</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
+                                  <th className="p-3 text-center text-white">Monto Real (Bs)</th>
+                                  <th className="p-3 text-center">TC Efe.</th>
                                 </tr>
                               </thead>
                               <tbody className="font-semibold relative z-10">
                                 {resultado.transicionData?.map((row, i) => (
                                   <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-emerald-950/10' : 'text-slate-500'}`}>
-                                    <td className={`py-3 px-1 sm:px-2 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                    <td className="py-3 px-1 sm:px-2 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
-                                    <td className={`py-3 px-1 sm:px-2 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                    <td className={`py-3 px-1 sm:px-2 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
-                                    <td className={`py-3 px-1 sm:px-2 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
-                                    <td className="py-3 px-1 sm:px-2 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
+                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
+                                    <td className="p-3 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
+                                    <td className={`p-3 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
+                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
+                                    <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
+                                    <td className="p-3 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
                                   </tr>
                                 ))}
                               </tbody>
