@@ -54,17 +54,16 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (SEMÁFORO Y SNIPER V2)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS 
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes, isAdmin }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Clasificación dinámica de estados para semáforo (Verde, Rojo, Azul)
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
-    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes("MUYURINA"));
+    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
     
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
@@ -84,15 +83,13 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
-  // CAPA 1: Esqueleto de AutoCAD brillante sobre satélite
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 },
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.6 },
     filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
-  // CAPA 2: Borde dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
@@ -100,34 +97,33 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // CAPA 3: Puntos Inteligentes (El Semáforo de Disponibilidad)
+  // Círculos grandes para visibilidad sobre satélite
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
     filter: ['all', ['==', ['geometry-type'], 'Point'], ['<=', ['length', ['to-string', textProperty]], 4]],
     paint: {
-      'circle-radius': 9, // Tamaño del círculo detrás del número
+      'circle-radius': 12, 
       'circle-color': [
         'match', ['to-string', textProperty],
-        verdes, '#22c55e', // Verde: Disponible
-        rojos, '#ef4444',  // Rojo: Bloqueado
-        azules, '#3b82f6', // Azul: Vendido
-        '#334155'          // Gris Oscuro por defecto
+        verdes, '#22c55e', // Verde
+        rojos, '#ef4444',  // Rojo
+        azules, '#3b82f6', // Azul
+        'rgba(51, 65, 85, 0.6)' 
       ],
       'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff' // Borde blanco para que resalte en el satélite
+      'circle-stroke-color': '#ffffff' 
     }
   }), [verdes, rojos, azules]);
 
-  // CAPA 4: Textos Centrados Limpios
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 10,
+      'text-size': 11,
       'text-anchor': 'center',
-      'text-allow-overlap': true // Permite que se vean los puntos
+      'text-allow-overlap': true 
     },
     paint: { 'text-color': '#ffffff' },
     filter: ['all', ['==', ['geometry-type'], 'Point'], ['<=', ['length', ['to-string', textProperty]], 4]]
@@ -144,50 +140,41 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
     if (!loteLimpio || isNaN(numLoteClickeado)) return;
 
-    // ALGORITMO SNIPER V2: Extracción Profunda de Capas de AutoCAD
-    let uvExtraida = null;
-    let mznExtraido = null;
-    const nombreLayer = properties.layer || properties.Layer || "";
-    
-    // Rastrea UV14, U.V. 14, etc.
-    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
-    if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
-
-    // Rastrea MZN1, M-1, etc.
-    const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
-    if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
-
-    // Filtro maestro en Base de Datos
     let candidatos = baseDeDatosLotes.filter(l => 
-      l.proyecto.includes("MUYURINA") && parseInt(l.lote, 10) === numLoteClickeado
+      l.proyecto.includes(proyectoActivo) && parseInt(l.lote, 10) === numLoteClickeado
     );
 
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // 1. Filtrar por la UV extraída del click del mapa (Precisión militar)
-      if (uvExtraida) {
-        let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
-        if (porUv.length > 0) {
-          loteFinal = porUv[0];
-          // 2. Filtrar por Manzano extraído
-          if (mznExtraido) {
-            let porMzn = porUv.find(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
-            if (porMzn) loteFinal = porMzn;
-          }
+      // PRIORIDAD ABSOLUTA: Filtro por lo seleccionado en el formulario
+      if (uvActiva && mznActivo) {
+        const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
+        if (matchFormulario) {
+           loteFinal = matchFormulario;
         }
       } 
-      // 3. Fallback: Si AutoCAD no trajo UV en la capa, usar la UV que el asesor puso en el formulario
-      else if (uvActiva) {
-        let porUv = candidatos.filter(l => l.uv === uvActiva);
-        if (porUv.length > 0) {
-          loteFinal = porUv[0];
-          if (mznActivo) {
-            let porMzn = porUv.find(l => l.mzn === mznActivo);
-            if (porMzn) loteFinal = porMzn;
+      // Si no seleccionó, intentamos adivinar por la capa de AutoCAD
+      else {
+        let uvExtraida = null; let mznExtraido = null;
+        const nombreLayer = properties.layer || properties.Layer || "";
+        const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
+        if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
+        const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
+        if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
+
+        if (uvExtraida) {
+          let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
+          if (porUv.length > 0) {
+            loteFinal = porUv[0];
+            if (mznExtraido) {
+              let porMzn = porUv.find(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
+              if (porMzn) loteFinal = porMzn;
+            }
           }
         }
       }
+
       onLoteSeleccionado({ isError: false, data: loteFinal });
     } else {
       onLoteSeleccionado({ isError: true, lote: loteLimpio });
@@ -207,7 +194,11 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
-             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">🟢 Disponible | 🔴 Bloqueado | 🔵 Vendido</p>
+             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-2">
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Disponible</span>
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Bloqueado</span>
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Vendido</span>
+             </p>
            </div>
          </div>
          <div className="flex gap-2">
@@ -224,15 +215,16 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
          </div>
       </div>
 
-      <div className="flex-1 relative">
+      <div className="flex-1 relative bg-[#060b13]">
         <Map
           mapLib={maplibregl}
           initialViewState={{
             longitude: -63.2435,
             latitude: -17.3635,
-            zoom: 14.3, // Encuadre panorámico
+            zoom: 14.3, 
             pitch: 0 
           }}
+          maxZoom={17.5} // ESCUDO CONTRA PANTALLA BLANCA (Previene romper el satélite)
           mapStyle={MAP_STYLE_SATELLITE as any} 
           style={{ width: '100%', height: '100%' }}
           interactiveLayerIds={['lotes-points', 'lotes-labels']} 
@@ -260,9 +252,9 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSESMIGUIA") { // Clave General Actualizada
+    if (passwordInput === "DIOSESMIGUIA") { 
       setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
-    } else if (passwordInput === "DIRECTOR2026") { // Clave de Ascenso Secreta
+    } else if (passwordInput === "DIRECTOR2026") { 
       setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
     } else {
       setLoginError(true);
@@ -279,7 +271,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); // TC Actualizado
+  const [tcFlexible, setTcFlexible] = useState(11.86); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -558,7 +550,7 @@ export default function App() {
         }
 
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 8; // INICIA EXCLUSIVAMENTE EN SEPTIEMBRE
+        let baseMonthIndex = 8; // ARRANCA EN SEPTIEMBRE
         let baseYear = 26; 
         
         for(let m=1; m<=meses; m++) {
@@ -568,31 +560,31 @@ export default function App() {
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
             if (aplicarBonificacion) {
-                if (currentY === 26 && currentMIndex === 8) { // Sep 2026
+                if (currentY === 26 && currentMIndex === 8) { // Sep
                   tc_efectivo = TC_PROMOCIONAL; 
                   descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
-                else if (currentY === 26 && currentMIndex === 9) { // Oct 2026
+                else if (currentY === 26 && currentMIndex === 9) { // Oct
                   descPctExacto = 28; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 26 && currentMIndex === 10) { // Nov 2026
+                else if (currentY === 26 && currentMIndex === 10) { // Nov
                   descPctExacto = 23; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 26 && currentMIndex === 11) { // Dic 2026
+                else if (currentY === 26 && currentMIndex === 11) { // Dic
                   descPctExacto = 18; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 0) { // Ene 2027
+                else if (currentY === 27 && currentMIndex === 0) { // Ene
                   descPctExacto = 13; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 1) { // Feb 2027
+                else if (currentY === 27 && currentMIndex === 1) { // Feb
                   descPctExacto = 8; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 2) { // Mar 2027
+                else if (currentY === 27 && currentMIndex === 2) { // Mar
                   descPctExacto = 3; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
@@ -794,41 +786,52 @@ export default function App() {
     );
   };
 
+  // ==========================================================================
+  // PANTALLA DE LOGIN CON DISEÑO ESTÁTICO (NO SCROLL) Y BLUR
+  // ==========================================================================
+  if (!isAuthenticated) {
+    return (
+      <div className="fixed inset-0 w-screen h-screen z-[200] bg-[#020617] flex flex-col items-center justify-center p-4 font-['Plus_Jakarta_Sans'] overflow-hidden">
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+          <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
+          <div className="absolute bottom-[20%] right-[20%] w-[40rem] h-[40rem] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style={{animationDelay: "1s"}}></div>
+        </div>
+        <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+             <Lock className="w-10 h-10 text-[#020617]" />
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
+          <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
+          <form onSubmit={handleLogin} className="w-full space-y-6">
+            <div className="relative">
+              <input 
+                type="password" 
+                value={passwordInput} 
+                onChange={(e) => setPasswordInput(e.target.value)} 
+                placeholder="Contraseña" 
+                className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
+              />
+              {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
+            </div>
+            <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+              <Unlock className="w-5 h-5"/> Desbloquear Sistema
+            </button>
+          </form>
+          <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
+            <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
+            <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // RENDER PANTALLA PRINCIPAL
+  // ==========================================================================
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO */}
-      {!isAuthenticated && (
-        <div className="absolute inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
-          <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
-               <Lock className="w-10 h-10 text-[#020617]" />
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
-            <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
-            <form onSubmit={handleLogin} className="w-full space-y-6">
-              <div className="relative">
-                <input 
-                  type="password" 
-                  value={passwordInput} 
-                  onChange={(e) => setPasswordInput(e.target.value)} 
-                  placeholder="Contraseña" 
-                  className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
-                />
-                {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
-              </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
-                <Unlock className="w-5 h-5"/> Desbloquear Sistema
-              </button>
-            </form>
-            <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
-              <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
-              <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
@@ -937,7 +940,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD para la UV/MZN seleccionados.`);
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Por favor, selecciona la UV/MZN manualmente.`);
                   return;
                }
 
@@ -1510,11 +1513,10 @@ export default function App() {
                                 </div>
                               </div>
                           </div>
-                          {/* TABLA EXPANDIDA SIN SCROLL HORIZONTAL */}
-                          <div className="overflow-y-auto max-h-[400px] custom-scrollbar relative w-full">
+                          <div className="w-full">
                             {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
-                            <table className="w-full text-left text-[10px] sm:text-xs">
-                              <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-800">
+                            <table className="w-full text-left text-[9px] sm:text-[11px]">
+                              <thead className="bg-[#090e17] z-30 border-b border-slate-800">
                                 <tr className="font-black text-slate-500 uppercase tracking-widest">
                                   <th className="py-3 px-1 sm:px-2 text-center">Mes</th>
                                   <th className="py-3 px-1 sm:px-2 text-center">Fijo ($)</th>
