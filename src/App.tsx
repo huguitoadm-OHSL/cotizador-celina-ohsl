@@ -82,16 +82,34 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // Detector robusto de textos de AutoCAD
-  const textProperty = ['coalesce', ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'Name'], ['get', 'name'], ''];
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  const isLoteValido = ['<=', ['length', ['to-string', textProperty]], 4];
 
+  // CAPA 1: Polígonos de relleno de color según estado (El Semáforo)
+  const fillLayer = useMemo(() => ({
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: {
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.4)', 
+        rojos, 'rgba(239, 68, 68, 0.4)',  
+        azules, 'rgba(59, 130, 246, 0.4)', 
+        'transparent'
+      ],
+      'fill-opacity': 1
+    },
+    filter: ['all', ['has', 'name'], isLoteValido]
+  }), [verdes, rojos, azules]);
+
+  // CAPA 2: Esqueleto AutoCAD (Líneas Celestes)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 }
   }), []);
 
+  // CAPA 3: Borde iluminado dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
@@ -99,37 +117,22 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // Círculos (Semáforo)
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    filter: ['==', ['geometry-type'], 'Point'],
-    paint: {
-      'circle-radius': 11, 
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#22c55e', // Verde
-        rojos, '#ef4444',  // Rojo
-        azules, '#3b82f6', // Azul
-        'rgba(51, 65, 85, 0.7)' 
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff' 
-    }
-  }), [verdes, rojos, azules]);
-
-  // Números centrados
+  // CAPA 4: Números Limpios centrados
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 11,
+      'text-size': 11, 
       'text-anchor': 'center',
-      'text-allow-overlap': true 
+      'text-allow-overlap': false 
     },
-    paint: { 'text-color': '#ffffff' },
-    filter: ['==', ['geometry-type'], 'Point']
+    paint: { 
+      'text-color': '#ffffff',
+      'text-halo-color': '#020617',
+      'text-halo-width': 1.5
+    },
+    filter: ['all', ['has', 'name'], isLoteValido]
   }), []);
 
   const handleMapClick = (event) => {
@@ -139,7 +142,6 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     const properties = feature.properties;
     const nombreRaw = properties.TextString || properties.Text || properties.text || properties.Name || properties.name || properties.RefName || "";
     
-    // EXTRACCIÓN REGEX: Solo atrapa números, ignorando "Polilínea", "Lote", etc.
     const loteLimpio = String(nombreRaw).trim();
     const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
 
@@ -175,7 +177,6 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
         }
       }
       
-      // Magia UX: Si estaba en Fullscreen, lo cierra y viaja al formulario
       setIsFullscreen(false);
       onLoteSeleccionado({ isError: false, data: loteFinal });
     } else {
@@ -183,13 +184,14 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     }
   };
 
+  // AQUÍ ESTÁ LA CORRECCIÓN MAESTRA: Se añadió "flex flex-col" al contenedor normal para que el mapa ocupe todo el espacio y no se vea negro.
   const containerClasses = isFullscreen 
     ? "fixed inset-0 z-[150] bg-[#020617] w-screen h-screen flex flex-col" 
-    : "relative w-full h-[500px] sm:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13]";
+    : "relative w-full h-[450px] sm:h-[550px] lg:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13] flex flex-col";
 
   return (
     <div className={containerClasses}>
-      <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center shadow-lg">
+      <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center shadow-lg shrink-0">
          <div className="flex items-center gap-3">
            <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
              <MapPin className="w-5 h-5 text-cyan-400" />
@@ -217,7 +219,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
          </div>
       </div>
 
-      <div className="flex-1 relative bg-[#060b13]">
+      <div className="flex-1 relative bg-[#060b13] w-full h-full overflow-hidden">
         <Map
           mapLib={maplibregl}
           initialViewState={{
@@ -226,18 +228,18 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             zoom: 14.3, 
             pitch: 0 
           }}
-          maxZoom={16.5} // ESCUDO ANTIBLANCO: Límite estricto de satélite
+          maxZoom={16.5} // ESCUDO ANTIBLANCO: Límite de satélite
           mapStyle={MAP_STYLE_SATELLITE as any} 
           style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill']} 
+          interactiveLayerIds={['lotes-labels', 'lotes-fill']} 
           onClick={handleMapClick}
           cursor="crosshair"
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+            <Layer {...fillLayer as any} />
             <Layer {...lineLayer as any} />
             <Layer {...highlightLayer as any} />
-            <Layer {...pointLayer as any} />
             <Layer {...labelLayer as any} />
           </Source>
         </Map>
@@ -311,7 +313,6 @@ export default function App() {
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
-  // La BD carga silenciosamente en segundo plano
   useEffect(() => {
     const cargarLotes = async () => {
       try {
@@ -553,7 +554,7 @@ export default function App() {
         }
 
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 8; // ARRANCA EN SEPTIEMBRE (8)
+        let baseMonthIndex = 8; // SEPTIEMBRE (8)
         let baseYear = 26; 
         
         for(let m=1; m<=meses; m++) {
@@ -597,7 +598,7 @@ export default function App() {
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
-            // SOLO GUARDAMOS HASTA ABRIL 2027 (Evita tabla infinita hacia abajo)
+            // SOLO GUARDAMOS HASTA ABRIL 2027
             if (descPctExacto > 0 || isAbril2027) {
               transicionData.push({
                   mesNum: m, 
@@ -789,9 +790,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN INMERSIVO (BLUR) */}
+      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[500] bg-[#020617]/70 backdrop-blur-xl flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
           <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                <Lock className="w-10 h-10 text-[#020617]" />
@@ -929,7 +930,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Selecciona UV y MZN primero.`);
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Por favor, selecciona la UV/MZN manualmente.`);
                   return;
                }
 
@@ -946,7 +947,7 @@ export default function App() {
                setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) seleccionado con éxito`);
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado y listo`);
                
                // AUTOSCROLL HACIA EL FORMULARIO DESPUÉS DE TOCAR EL MAPA
                setTimeout(() => {
@@ -1481,7 +1482,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* ACORDEÓN DESPLEGABLE: DESCUENTO ESCALONADO */}
                       <details className="group bg-[#04070b] border border-emerald-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(16,185,129,0.1)] mt-8 cursor-pointer">
                           <summary className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/20 to-transparent outline-none list-none [&::-webkit-details-marker]:hidden">
                               <div className="flex items-center gap-3">
