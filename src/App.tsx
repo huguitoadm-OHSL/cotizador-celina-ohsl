@@ -30,30 +30,49 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (COLORES DINÁMICOS Y SNIPER CLICK)
+// CONFIGURACIÓN DE MAPA SATELITAL (TIPO GOOGLE EARTH)
 // ============================================================================
-const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
+const MAP_STYLE_SATELLITE = {
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+    }
+  },
+  layers: [
+    {
+      id: 'satellite-layer',
+      type: 'raster',
+      source: 'esri-satellite',
+      minzoom: 0,
+      maxzoom: 22
+    }
+  ]
+};
+
+// ============================================================================
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (SEMÁFORO Y SNIPER V2)
+// ============================================================================
+const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes, isAdmin }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Clasificación dinámica de estados para pintar los polígonos
+  // Clasificación dinámica de estados para semáforo (Verde, Rojo, Azul)
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
-    
-    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
+    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes("MUYURINA"));
     
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
 
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') {
-        v.push(numLote);
-      } else if (est === 'BLOQUEADO' || est === 'RESERVADO') {
-        r.push(numLote);
-      } else if (est === 'VENDIDO') {
-        a.push(numLote);
-      }
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
+      else if (est === 'VENDIDO') a.push(numLote);
     });
 
     return { 
@@ -63,58 +82,55 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // Detector de Textos de AutoCAD
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
-  // CAPA 1: Polígonos de relleno pintados por estado
-  const fillLayer = useMemo(() => ({
-    id: 'lotes-fill',
-    type: 'fill',
-    paint: {
-      'fill-color': [
-        'match',
-        ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.35)', // Verde
-        rojos, 'rgba(239, 68, 68, 0.35)',  // Rojo
-        azules, 'rgba(59, 130, 246, 0.35)', // Azul
-        'rgba(14, 165, 233, 0.05)'         // Cyan transparente por defecto
-      ],
-      'fill-opacity': 1
-    },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] // Evita pintar la basura de AutoCAD
-  }), [verdes, rojos, azules]);
-
-  // CAPA 2: Esqueleto de líneas
+  // CAPA 1: Esqueleto de AutoCAD brillante sobre satélite
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1, 'line-opacity': 0.4 }
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 },
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
-  // CAPA 3: Borde iluminado al seleccionar
+  // CAPA 2: Borde dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 1 },
+    paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // CAPA 4: Números tamaño Google Earth
+  // CAPA 3: Puntos Inteligentes (El Semáforo de Disponibilidad)
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    filter: ['all', ['==', ['geometry-type'], 'Point'], ['<=', ['length', ['to-string', textProperty]], 4]],
+    paint: {
+      'circle-radius': 9, // Tamaño del círculo detrás del número
+      'circle-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', // Verde: Disponible
+        rojos, '#ef4444',  // Rojo: Bloqueado
+        azules, '#3b82f6', // Azul: Vendido
+        '#334155'          // Gris Oscuro por defecto
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#ffffff' // Borde blanco para que resalte en el satélite
+    }
+  }), [verdes, rojos, azules]);
+
+  // CAPA 4: Textos Centrados Limpios
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 10.5, // Tamaño reducido tipo Google Earth
+      'text-size': 10,
       'text-anchor': 'center',
-      'text-allow-overlap': false 
+      'text-allow-overlap': true // Permite que se vean los puntos
     },
-    paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': '#020617',
-      'text-halo-width': 1 // Borde fino
-    },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    paint: { 'text-color': '#ffffff' },
+    filter: ['all', ['==', ['geometry-type'], 'Point'], ['<=', ['length', ['to-string', textProperty]], 4]]
   }), []);
 
   const handleMapClick = (event) => {
@@ -128,25 +144,40 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
     if (!loteLimpio || isNaN(numLoteClickeado)) return;
 
-    // ALGORITMO SNIPER: Extracción de Manzano desde AutoCAD
+    // ALGORITMO SNIPER V2: Extracción Profunda de Capas de AutoCAD
+    let uvExtraida = null;
     let mznExtraido = null;
     const nombreLayer = properties.layer || properties.Layer || "";
+    
+    // Rastrea UV14, U.V. 14, etc.
+    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
+    if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
+
+    // Rastrea MZN1, M-1, etc.
     const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
     if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
 
+    // Filtro maestro en Base de Datos
     let candidatos = baseDeDatosLotes.filter(l => 
-      l.proyecto.includes(proyectoActivo) && parseInt(l.lote, 10) === numLoteClickeado
+      l.proyecto.includes("MUYURINA") && parseInt(l.lote, 10) === numLoteClickeado
     );
 
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // 1. Filtrar por el Manzano extraído del mapa
-      if (mznExtraido) {
-        const matchMzn = candidatos.filter(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
-        if (matchMzn.length > 0) loteFinal = matchMzn[0];
+      // 1. Filtrar por la UV extraída del click del mapa (Precisión militar)
+      if (uvExtraida) {
+        let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
+        if (porUv.length > 0) {
+          loteFinal = porUv[0];
+          // 2. Filtrar por Manzano extraído
+          if (mznExtraido) {
+            let porMzn = porUv.find(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
+            if (porMzn) loteFinal = porMzn;
+          }
+        }
       } 
-      // 2. Si el mapa no tiene el manzano, filtrar por la UV que el asesor seleccionó manualmente
+      // 3. Fallback: Si AutoCAD no trajo UV en la capa, usar la UV que el asesor puso en el formulario
       else if (uvActiva) {
         let porUv = candidatos.filter(l => l.uv === uvActiva);
         if (porUv.length > 0) {
@@ -164,8 +195,8 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
   };
 
   const containerClasses = isFullscreen 
-    ? "fixed inset-0 z-[100] bg-[#020617] w-screen h-screen flex flex-col" 
-    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13]";
+    ? "fixed inset-0 z-[150] bg-[#020617] w-screen h-screen flex flex-col" 
+    : "relative w-full h-[500px] sm:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13]";
 
   return (
     <div className={containerClasses}>
@@ -199,20 +230,20 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
           initialViewState={{
             longitude: -63.2435,
             latitude: -17.3635,
-            zoom: 14.3, // Encuadre perfecto sin pantalla completa obligatoria
+            zoom: 14.3, // Encuadre panorámico
             pitch: 0 
           }}
-          mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-          interactiveLayerIds={['lotes-fill', 'lotes-labels']} // Permitimos clic tanto en el relleno como en la etiqueta
+          mapStyle={MAP_STYLE_SATELLITE as any} 
+          style={{ width: '100%', height: '100%' }}
+          interactiveLayerIds={['lotes-points', 'lotes-labels']} 
           onClick={handleMapClick}
           cursor="crosshair"
-          style={{ width: '100%', height: '100%' }}
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-            <Layer {...fillLayer as any} />
             <Layer {...lineLayer as any} />
             <Layer {...highlightLayer as any} />
+            <Layer {...pointLayer as any} />
             <Layer {...labelLayer as any} />
           </Source>
         </Map>
@@ -222,9 +253,6 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 };
 
 export default function App() {
-  // ==========================================================================
-  // ESTADO DE AUTENTICACIÓN
-  // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
@@ -232,14 +260,10 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSESMIGUIA") { // Nueva contraseña maestra
-      setIsAuthenticated(true); 
-      setIsAdmin(false); 
-      setLoginError(false);
-    } else if (passwordInput === "DIRECTOR2026") { // Modo Supervisor Oculto
-      setIsAuthenticated(true); 
-      setIsAdmin(true); 
-      setLoginError(false);
+    if (passwordInput === "DIOSESMIGUIA") { // Clave General Actualizada
+      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
+    } else if (passwordInput === "DIRECTOR2026") { // Clave de Ascenso Secreta
+      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
@@ -255,7 +279,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); // Actualizado por defecto
+  const [tcFlexible, setTcFlexible] = useState(11.86); // TC Actualizado
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -331,7 +355,7 @@ export default function App() {
         }));
 
         const lotesPermitidos = normalizedData.filter(l => {
-          const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL Norte'].includes(l.proyecto);
+          const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto);
           if (isAdmin) return esValido;
           return esValido && (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "");
         });
@@ -362,17 +386,9 @@ export default function App() {
     }
   }, [regional]);
 
-  const handleUvChange = (e) => { 
-    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); 
-  };
-  
-  const handleMznChange = (e) => { 
-    setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); 
-  };
-  
-  const handleLoteChange = (e) => { 
-    setLote(e.target.value); 
-  };
+  const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleLoteChange = (e) => { setLote(e.target.value); };
 
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
@@ -441,9 +457,7 @@ export default function App() {
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
-  const calcularLimitesMaximos = () => { 
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; 
-  };
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
@@ -544,8 +558,8 @@ export default function App() {
         }
 
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 8; // ARRANCA DIRECTAMENTE EN SEPTIEMBRE (Índice 8)
-        let baseYear = 26; // Año 2026
+        let baseMonthIndex = 8; // INICIA EXCLUSIVAMENTE EN SEPTIEMBRE
+        let baseYear = 26; 
         
         for(let m=1; m<=meses; m++) {
             let tc_efectivo = TC_FLEX_NUMBER; 
@@ -554,31 +568,31 @@ export default function App() {
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
             if (aplicarBonificacion) {
-                if (currentY === 26 && currentMIndex === 8) { // Septiembre 2026
+                if (currentY === 26 && currentMIndex === 8) { // Sep 2026
                   tc_efectivo = TC_PROMOCIONAL; 
                   descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
-                else if (currentY === 26 && currentMIndex === 9) { // Octubre 2026
+                else if (currentY === 26 && currentMIndex === 9) { // Oct 2026
                   descPctExacto = 28; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 26 && currentMIndex === 10) { // Noviembre 2026
+                else if (currentY === 26 && currentMIndex === 10) { // Nov 2026
                   descPctExacto = 23; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 26 && currentMIndex === 11) { // Diciembre 2026
+                else if (currentY === 26 && currentMIndex === 11) { // Dic 2026
                   descPctExacto = 18; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 0) { // Enero 2027
+                else if (currentY === 27 && currentMIndex === 0) { // Ene 2027
                   descPctExacto = 13; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 1) { // Febrero 2027
+                else if (currentY === 27 && currentMIndex === 1) { // Feb 2027
                   descPctExacto = 8; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 2) { // Marzo 2027
+                else if (currentY === 27 && currentMIndex === 2) { // Mar 2027
                   descPctExacto = 3; 
                   tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
@@ -780,50 +794,41 @@ export default function App() {
     );
   };
 
-  const showDescM2 = true;
-  const showDescContadoM2 = true;
-  const showBonoInicial = proyecto === "OTRO";
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 relative overflow-hidden font-['Plus_Jakarta_Sans']">
-        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-          <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
-          <div className="absolute bottom-[20%] right-[20%] w-[40rem] h-[40rem] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style={{animationDelay: "1s"}}></div>
-        </div>
-        <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
-             <Lock className="w-10 h-10 text-[#020617]" />
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
-          <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
-          <form onSubmit={handleLogin} className="w-full space-y-6">
-            <div className="relative">
-              <input 
-                type="password" 
-                value={passwordInput} 
-                onChange={(e) => setPasswordInput(e.target.value)} 
-                placeholder="Contraseña" 
-                className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
-              />
-              {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
-            </div>
-            <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
-              <Unlock className="w-5 h-5"/> Desbloquear Sistema
-            </button>
-          </form>
-          <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
-            <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
-            <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
+      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO */}
+      {!isAuthenticated && (
+        <div className="absolute inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
+          <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+               <Lock className="w-10 h-10 text-[#020617]" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
+            <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
+            <form onSubmit={handleLogin} className="w-full space-y-6">
+              <div className="relative">
+                <input 
+                  type="password" 
+                  value={passwordInput} 
+                  onChange={(e) => setPasswordInput(e.target.value)} 
+                  placeholder="Contraseña" 
+                  className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
+                />
+                {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
+              </div>
+              <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+                <Unlock className="w-5 h-5"/> Desbloquear Sistema
+              </button>
+            </form>
+            <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
+              <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
+              <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
@@ -932,7 +937,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en el Manzano activo. Selecciona MZN primero.`);
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD para la UV/MZN seleccionados.`);
                   return;
                }
 
@@ -1505,28 +1510,29 @@ export default function App() {
                                 </div>
                               </div>
                           </div>
-                          <div className="overflow-x-auto overflow-y-auto max-h-[400px] custom-scrollbar relative w-full">
+                          {/* TABLA EXPANDIDA SIN SCROLL HORIZONTAL */}
+                          <div className="overflow-y-auto max-h-[400px] custom-scrollbar relative w-full">
                             {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
-                            <table className="w-full text-left text-xs whitespace-nowrap min-w-[700px]">
+                            <table className="w-full text-left text-[10px] sm:text-xs">
                               <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-800">
-                                <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                  <th className="p-3 text-center">Mes</th>
-                                  <th className="p-3 text-center">Pago Fijo ($)</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
-                                  <th className="p-3 text-center text-white">Monto Real (Bs)</th>
-                                  <th className="p-3 text-center">TC Efe.</th>
+                                <tr className="font-black text-slate-500 uppercase tracking-widest">
+                                  <th className="py-3 px-1 sm:px-2 text-center">Mes</th>
+                                  <th className="py-3 px-1 sm:px-2 text-center">Fijo ($)</th>
+                                  <th className={`py-3 px-1 sm:px-2 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
+                                  <th className={`py-3 px-1 sm:px-2 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>c/Desc ($)</th>
+                                  <th className="py-3 px-1 sm:px-2 text-center text-white">Real (Bs)</th>
+                                  <th className="py-3 px-1 sm:px-2 text-center">TC</th>
                                 </tr>
                               </thead>
                               <tbody className="font-semibold relative z-10">
                                 {resultado.transicionData?.map((row, i) => (
                                   <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-emerald-950/10' : 'text-slate-500'}`}>
-                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                    <td className="p-3 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
-                                    <td className={`p-3 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
-                                    <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
-                                    <td className="p-3 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
+                                    <td className={`py-3 px-1 sm:px-2 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
+                                    <td className="py-3 px-1 sm:px-2 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
+                                    <td className={`py-3 px-1 sm:px-2 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
+                                    <td className={`py-3 px-1 sm:px-2 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
+                                    <td className={`py-3 px-1 sm:px-2 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
+                                    <td className="py-3 px-1 sm:px-2 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
                                   </tr>
                                 ))}
                               </tbody>
