@@ -39,7 +39,7 @@ const MAP_STYLE_SATELLITE = {
       type: 'raster',
       tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      maxzoom: 17, // Escudo anti-pantalla blanca
+      maxzoom: 17, 
       attribution: '&copy; Esri, Maxar, Earthstar Geographics'
     }
   },
@@ -55,114 +55,52 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (AISLAMIENTO DE CAPAS)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO BARE METAL - SIN SEMÁFOROS)
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // 1. EL SEMÁFORO (Solo para colores)
-  const { verdes, rojos, azules } = useMemo(() => {
-    let v = []; let r = []; let a = [];
-    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
-    
-    lotesFiltrados.forEach(l => {
-      const numLote = String(parseInt(l.lote, 10) || l.lote);
-      const est = String(l.estado).toUpperCase();
-      const variations = [numLote, ` ${numLote}`, `${numLote} `, `  ${numLote}  `, `0${numLote}`];
+  // TRAMPA INFALIBLE: Busca cualquier texto. Si no hay NADA en el archivo, imprime un '0'.
+  const textProperty = ['to-string', ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ['get', 'RefName'], '0']];
 
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variations);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variations);
-      else if (est === 'VENDIDO') a.push(...variations);
-    });
-
-    return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
-    };
-  }, [baseDeDatosLotes, proyectoActivo]);
-
-  // 2. EL BUSCADOR DE TEXTOS UNIVERSAL
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
-
-  // CAPA DE RELLENO (COLOR)
-  const fillLayer = useMemo(() => ({
-    id: 'lotes-fill',
-    type: 'fill',
-    paint: {
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.4)', 
-        rojos, 'rgba(239, 68, 68, 0.4)',  
-        azules, 'rgba(59, 130, 246, 0.4)', 
-        'transparent'
-      ],
-      'fill-opacity': 1
-    },
-    filter: ['!=', textProperty, '']
-  }), [verdes, rojos, azules]);
-
-  // CAPA DE LÍNEAS
+  // CAPA 1: Esqueleto AutoCAD Crudo (Sin colores dinámicos)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 }
   }), []);
 
-  // CAPA DE HIGHLIGHT
+  // CAPA 2: Borde iluminado dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
     filter: [
       'any',
-      ['==', ['to-string', textProperty], loteActivo || ''],
-      ['==', ['to-string', textProperty], ` ${loteActivo}` || ''],
-      ['==', ['to-string', textProperty], `${loteActivo} ` || '']
+      ['==', textProperty, loteActivo || ''],
+      ['==', textProperty, ` ${loteActivo}` || ''],
+      ['==', textProperty, `${loteActivo} ` || '']
     ]
   }), [loteActivo]);
 
-  // CAPA DE PUNTOS (COLOR)
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    paint: {
-      'circle-radius': 11, 
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.9)', 
-        rojos, 'rgba(239, 68, 68, 0.9)',  
-        azules, 'rgba(59, 130, 246, 0.9)', 
-        'rgba(51, 65, 85, 0.7)' 
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff' 
-    },
-    filter: ['==', ['geometry-type'], 'Point']
-  }), [verdes, rojos, azules]);
-
-  // ==========================================
-  // CAPA AISLADA DE TEXTOS (DIBUJA TODO, SIN IMPORTAR EL COLOR)
-  // ==========================================
+  // CAPA 3: NÚMEROS FORZADOS (Sin filtros, imprime absolutamente todo lo que pise el mapa)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
-      'text-field': textProperty, // Imprime lo que sea que encuentre
-      'text-size': 12,
+      'text-field': textProperty,
+      'text-size': 13,
       'text-anchor': 'center',
-      'text-allow-overlap': true, // Evita que se oculten si están muy cerca
+      'text-allow-overlap': true,
       'symbol-placement': 'point'
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
-    },
-    filter: ['!=', textProperty, ''] // Única regla: Si no está vacío, dibújalo.
+    }
   }), []);
 
   const handleMapClick = (event) => {
@@ -170,13 +108,12 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (!feature || !feature.properties) return;
     
     const properties = feature.properties;
-    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || "";
+    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || properties.RefName || "";
     
     const loteLimpio = String(nombreRaw).trim();
     const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
 
-    // Ignora basuras largas de AutoCAD
-    if (isNaN(numLoteClickeado) || loteLimpio.length > 5) return;
+    if (isNaN(numLoteClickeado)) return;
 
     let uvExtraida = null; let mznExtraido = null;
     const nombreLayer = properties.layer || properties.Layer || "";
@@ -228,10 +165,8 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
-             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-2">
-               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Disponible</span>
-               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Bloqueado</span>
-               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Vendido</span>
+             <p className="text-amber-400 text-[9px] uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1">
+               <AlertCircle className="w-3 h-3" /> MODO RAYOS X ACTIVADO (SIN SEMÁFORO)
              </p>
            </div>
          </div>
@@ -262,16 +197,14 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             maxZoom={20} 
             mapStyle={MAP_STYLE_SATELLITE as any} 
             style={{ width: '100%', height: '100%' }}
-            interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill']} 
+            interactiveLayerIds={['lotes-labels', 'lotes-line']} 
             onClick={handleMapClick}
             cursor="crosshair"
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
           </Map>
@@ -320,7 +253,6 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
-  // Regla comercial estricta: 1$ por M2 a crédito y 2$ por M2 al contado
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
   const [descuentoInicial, setDescuentoInicial] = useState(0);
@@ -963,7 +895,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ Lote ${respuesta.lote} no encontrado en la BD. Revisa si pertenece a esta urbanización.`);
+                  showNotification(`⚠️ Lote ${respuesta.lote} no se encontró en la BD. Revisa si pertenece a esta urbanización.`);
                   return;
                }
 
