@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// CONFIGURACIÓN DE MAPA SATELITAL (OVERZOOMING PARA EVITAR BLANCO)
+// CONFIGURACIÓN DE MAPA SATELITAL
 // ============================================================================
 const MAP_STYLE_SATELLITE = {
   version: 8,
@@ -39,7 +39,7 @@ const MAP_STYLE_SATELLITE = {
       type: 'raster',
       tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      maxzoom: 17, // Límite real del satélite. A partir de aquí se estira.
+      maxzoom: 17, // Escudo anti-pantalla blanca
       attribution: '&copy; Esri, Maxar, Earthstar Geographics'
     }
   },
@@ -55,14 +55,14 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN A VERSIÓN ESTABLE)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (AISLAMIENTO DE CAPAS)
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Matriz de variaciones para atrapar lotes con espacios invisibles de AutoCAD
+  // 1. EL SEMÁFORO (Solo para colores)
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
@@ -70,8 +70,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
-
-      const variations = [numLote, ` ${numLote}`, `${numLote} `, `  ${numLote}`, `${numLote}  `, `0${numLote}`];
+      const variations = [numLote, ` ${numLote}`, `${numLote} `, `  ${numLote}  `, `0${numLote}`];
 
       if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variations);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variations);
@@ -85,13 +84,16 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // CAPA 1: Polígonos (Si existen)
+  // 2. EL BUSCADOR DE TEXTOS UNIVERSAL
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+
+  // CAPA DE RELLENO (COLOR)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', ['to-string', ['get', 'name']],
+        'match', ['to-string', textProperty],
         verdes, 'rgba(34, 197, 94, 0.4)', 
         rojos, 'rgba(239, 68, 68, 0.4)',  
         azules, 'rgba(59, 130, 246, 0.4)', 
@@ -99,10 +101,10 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       ],
       'fill-opacity': 1
     },
-    filter: ['all', ['has', 'name'], ['<=', ['length', ['to-string', ['get', 'name']]], 5]]
+    filter: ['!=', textProperty, '']
   }), [verdes, rojos, azules]);
 
-  // CAPA 2: Esqueleto de Líneas de AutoCAD
+  // CAPA DE LÍNEAS
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
@@ -110,14 +112,27 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
-  // CAPA 3: Puntos de Color (Semáforo perfecto sobre las bolitas de AutoCAD)
+  // CAPA DE HIGHLIGHT
+  const highlightLayer = useMemo(() => ({
+    id: 'lotes-highlight',
+    type: 'line',
+    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
+    filter: [
+      'any',
+      ['==', ['to-string', textProperty], loteActivo || ''],
+      ['==', ['to-string', textProperty], ` ${loteActivo}` || ''],
+      ['==', ['to-string', textProperty], `${loteActivo} ` || '']
+    ]
+  }), [loteActivo]);
+
+  // CAPA DE PUNTOS (COLOR)
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
     paint: {
       'circle-radius': 11, 
       'circle-color': [
-        'match', ['to-string', ['get', 'name']],
+        'match', ['to-string', textProperty],
         verdes, 'rgba(34, 197, 94, 0.9)', 
         rojos, 'rgba(239, 68, 68, 0.9)',  
         azules, 'rgba(59, 130, 246, 0.9)', 
@@ -126,55 +141,43 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       'circle-stroke-width': 1.5,
       'circle-stroke-color': '#ffffff' 
     },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'name']]
+    filter: ['==', ['geometry-type'], 'Point']
   }), [verdes, rojos, azules]);
 
-  // CAPA 4: Borde iluminado al tocar
-  const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
-    type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
-    filter: [
-      'any',
-      ['==', ['to-string', ['get', 'name']], loteActivo || ''],
-      ['==', ['to-string', ['get', 'name']], ` ${loteActivo}` || ''],
-      ['==', ['to-string', ['get', 'name']], `${loteActivo} ` || '']
-    ]
-  }), [loteActivo]);
-
-  // CAPA 5: NÚMEROS RESTAURADOS A LA VERSIÓN ESTABLE DE AYER
+  // ==========================================
+  // CAPA AISLADA DE TEXTOS (DIBUJA TODO, SIN IMPORTAR EL COLOR)
+  // ==========================================
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
-      'text-field': ['to-string', ['get', 'name']],
+      'text-field': textProperty, // Imprime lo que sea que encuentre
       'text-size': 12,
       'text-anchor': 'center',
-      'text-allow-overlap': true 
+      'text-allow-overlap': true, // Evita que se oculten si están muy cerca
+      'symbol-placement': 'point'
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
     },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'name']]
+    filter: ['!=', textProperty, ''] // Única regla: Si no está vacío, dibújalo.
   }), []);
 
-  // LÓGICA DE CLIC (EL SNIPER DE UV SE MANTIENE SEPARADO DEL DIBUJO)
   const handleMapClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     
     const properties = feature.properties;
-    // Buscamos cualquier rastro del nombre
-    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || "";
+    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || "";
+    
     const loteLimpio = String(nombreRaw).trim();
     const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
 
-    // Si toca una línea sin número, ignora el clic
-    if (isNaN(numLoteClickeado)) return;
+    // Ignora basuras largas de AutoCAD
+    if (isNaN(numLoteClickeado) || loteLimpio.length > 5) return;
 
-    // Extracción táctica de AutoCAD
     let uvExtraida = null; let mznExtraido = null;
     const nombreLayer = properties.layer || properties.Layer || "";
     const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
@@ -189,12 +192,10 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // PRIORIDAD 1: Respeta lo que elegiste a la izquierda
       if (uvActiva && mznActivo) {
         const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
         if (matchFormulario) loteFinal = matchFormulario;
       } else {
-        // PRIORIDAD 2: Adivina por la capa del archivo AutoCAD
         if (uvExtraida) {
           let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
           if (porUv.length > 0) {
@@ -258,7 +259,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
               zoom: 14.3, 
               pitch: 0 
             }}
-            maxZoom={20} // El zoom sin límite. Al pasar de 17, el satélite se estirará sin ponerse blanco.
+            maxZoom={20} 
             mapStyle={MAP_STYLE_SATELLITE as any} 
             style={{ width: '100%', height: '100%' }}
             interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill']} 
@@ -319,6 +320,7 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
+  // Regla comercial estricta: 1$ por M2 a crédito y 2$ por M2 al contado
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
   const [descuentoInicial, setDescuentoInicial] = useState(0);
@@ -1518,7 +1520,7 @@ export default function App() {
                               <div className="flex items-center gap-3">
                                 <div className="bg-emerald-500/20 p-2 rounded-xl transition-transform group-open:rotate-90">
                                   <ChevronRight className="w-5 h-5 text-emerald-400" />
-                                 </div>
+                                </div>
                                 <div>
                                   <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2">
                                     <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
