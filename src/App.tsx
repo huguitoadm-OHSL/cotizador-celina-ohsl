@@ -4,7 +4,7 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye
+  Maximize, Minimize, Eye, Crosshair
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -55,43 +55,62 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO BARE METAL - SIN SEMÁFOROS)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO PURAMENTE VISUAL)
 // ============================================================================
-const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
+const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [loteVisual, setLoteVisual] = useState(""); // Estado aislado solo para iluminar en el mapa
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // TRAMPA INFALIBLE: Busca cualquier texto. Si no hay NADA en el archivo, imprime un '0'.
-  const textProperty = ['to-string', ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ['get', 'RefName'], '0']];
+  // Extracción de cualquier texto que venga de AutoCAD
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+  const isLoteValido = ['all', ['!=', textProperty, ''], ['<=', ['length', ['to-string', textProperty]], 6]];
 
-  // CAPA 1: Esqueleto AutoCAD Crudo (Sin colores dinámicos)
+  // CAPA 1: Esqueleto de AutoCAD (Líneas Celestes)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 }
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
-  // CAPA 2: Borde iluminado dorado al seleccionar
+  // CAPA 2: Puntos base si existen en AutoCAD
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    paint: {
+      'circle-radius': 11, 
+      'circle-color': 'rgba(14, 165, 233, 0.2)', // Azul cyber
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#0ea5e9' 
+    },
+    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
+  }), []);
+
+  // CAPA 3: Borde iluminado DORADO (Responde al clic en el mapa O al formulario)
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
     filter: [
       'any',
-      ['==', textProperty, loteActivo || ''],
-      ['==', textProperty, ` ${loteActivo}` || ''],
-      ['==', textProperty, `${loteActivo} ` || '']
+      ['==', ['to-string', textProperty], loteVisual],
+      ['==', ['to-string', textProperty], ` ${loteVisual}`],
+      ['==', ['to-string', textProperty], `${loteVisual} `],
+      ['==', ['to-string', textProperty], loteActivoFormulario],
+      ['==', ['to-string', textProperty], ` ${loteActivoFormulario}`],
+      ['==', ['to-string', textProperty], `${loteActivoFormulario} `]
     ]
-  }), [loteActivo]);
+  }), [loteVisual, loteActivoFormulario]);
 
-  // CAPA 3: NÚMEROS FORZADOS (Sin filtros, imprime absolutamente todo lo que pise el mapa)
+  // CAPA 4: NÚMEROS FORZADOS (Usando el código estable original)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 13,
+      'text-size': 12,
       'text-anchor': 'center',
       'text-allow-overlap': true,
       'symbol-placement': 'point'
@@ -100,56 +119,20 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
-    }
+    },
+    filter: isLoteValido
   }), []);
 
+  // LÓGICA DE CLIC AISLADA: Solo actualiza el estado visual del mapa (ilumina), no toca el cotizador
   const handleMapClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     
-    const properties = feature.properties;
-    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || properties.RefName || "";
-    
+    const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.TextString || feature.properties.Text || feature.properties.text || feature.properties.LOTE || feature.properties.Lote || "";
     const loteLimpio = String(nombreRaw).trim();
-    const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
-
-    if (isNaN(numLoteClickeado)) return;
-
-    let uvExtraida = null; let mznExtraido = null;
-    const nombreLayer = properties.layer || properties.Layer || "";
-    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
-    if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
-    const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
-    if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
-
-    let candidatos = baseDeDatosLotes.filter(l => 
-      l.proyecto.includes(proyectoActivo) && parseInt(l.lote, 10) === numLoteClickeado
-    );
-
-    if (candidatos.length > 0) {
-      let loteFinal = candidatos[0];
-      
-      if (uvActiva && mznActivo) {
-        const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
-        if (matchFormulario) loteFinal = matchFormulario;
-      } else {
-        if (uvExtraida) {
-          let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
-          if (porUv.length > 0) {
-            loteFinal = porUv[0];
-            if (mznExtraido) {
-              let porMzn = porUv.find(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
-              if (porMzn) loteFinal = porMzn;
-            }
-          }
-        }
-      }
-      
-      setIsFullscreen(false); 
-      onLoteSeleccionado({ isError: false, data: loteFinal });
-    } else {
-      onLoteSeleccionado({ isError: true, lote: numLoteClickeado });
-    }
+    
+    // Almacena el texto crudo para que el HighlightLayer lo ilumine
+    setLoteVisual(loteLimpio);
   };
 
   const containerClasses = isFullscreen 
@@ -165,8 +148,8 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
-             <p className="text-amber-400 text-[9px] uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1">
-               <AlertCircle className="w-3 h-3" /> MODO RAYOS X ACTIVADO (SIN SEMÁFORO)
+             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1 font-bold">
+               <Crosshair className="w-3 h-3 text-cyan-500" /> Módulo de Geolocalización Activo
              </p>
            </div>
          </div>
@@ -197,7 +180,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             maxZoom={20} 
             mapStyle={MAP_STYLE_SATELLITE as any} 
             style={{ width: '100%', height: '100%' }}
-            interactiveLayerIds={['lotes-labels', 'lotes-line']} 
+            interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill', 'lotes-line']} 
             onClick={handleMapClick}
             cursor="crosshair"
           >
@@ -205,6 +188,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
+              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
           </Map>
@@ -253,6 +237,7 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
+  // Regla comercial estricta: 1$ por M2 a crédito y 2$ por M2 al contado
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
   const [descuentoInicial, setDescuentoInicial] = useState(0);
@@ -884,43 +869,12 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* MAPA INTERACTIVO */}
+        {/* MAPA INTERACTIVO DESACOPLADO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
            <MapaEspacial 
-             loteActivo={lote}
-             uvActiva={uv}
-             mznActivo={mzn}
+             loteActivoFormulario={lote}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
-             isAdmin={isAdmin}
-             onLoteSeleccionado={(respuesta) => {
-               if (respuesta.isError) {
-                  showNotification(`⚠️ Lote ${respuesta.lote} no se encontró en la BD. Revisa si pertenece a esta urbanización.`);
-                  return;
-               }
-
-               const loteEnBD = respuesta.data;
-               
-               // Autocompletado del formulario
-               setRegional("MONTERO");
-               setProyecto("MUYURINA");
-               setUv(loteEnBD.uv);
-               setMzn(loteEnBD.mzn);
-               setLote(loteEnBD.lote);
-               setSuperficie(loteEnBD.superficie.toString());
-               setPrecio(loteEnBD.precio.toString()); 
-               setCategoria(loteEnBD.categoria || "ESTÁNDAR");
-                 
-               setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado y listo`);
-               
-               // AUTOSCROLL MÁGICO AL FORMULARIO
-               setTimeout(() => {
-                 if (formRef.current) {
-                   formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                 }
-               }, 300);
-             }}
            />
         </div>
 
@@ -998,13 +952,9 @@ export default function App() {
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <button 
-                        type="button" 
-                        onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
-                      >
+                      <span className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30') : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}>
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
-                      </button>
+                      </span>
                     ) : null}
                   </div>
                   <div className="relative">
@@ -1038,11 +988,6 @@ export default function App() {
                         <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
-                      {!usarBD && tieneBD && (
-                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
-                          <Edit2 className="w-3 h-3"/> Ingreso Manual
-                        </span>
-                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
