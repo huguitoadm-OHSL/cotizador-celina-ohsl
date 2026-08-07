@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// CONFIGURACIÓN DE MAPA SATELITAL (OVERZOOMING SEGURO)
+// CONFIGURACIÓN DE MAPA SATELITAL
 // ============================================================================
 const MAP_STYLE_SATELLITE = {
   version: 8,
@@ -55,7 +55,7 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN TOTAL DE NÚMEROS)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -84,11 +84,11 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // LA RESTAURACIÓN: Búsqueda universal de textos, sin filtros geométricos destructivos
+  // EL MOTOR DE TEXTO RESTAURADO Y POTENCIADO
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
   const isLoteValido = ['all', ['!=', textProperty, ''], ['<=', ['length', ['to-string', textProperty]], 6]];
 
-  // CAPA 1: Polígonos de Relleno 
+  // CAPA 1: Polígonos de Relleno
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
@@ -105,7 +105,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: isLoteValido
   }), [verdes, rojos, azules]);
 
-  // CAPA 2: Esqueleto AutoCAD
+  // CAPA 2: Esqueleto de Líneas
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
@@ -113,15 +113,15 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
-  // CAPA 3: Borde iluminado dorado al seleccionar
+  // CAPA 3: Borde iluminado dorado
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
+    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // CAPA 4: Puntos Circulares de Color
+  // CAPA 4: Puntos de Color
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
@@ -129,18 +129,18 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       'circle-radius': 11, 
       'circle-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.9)', 
-        rojos, 'rgba(239, 68, 68, 0.9)',  
-        azules, 'rgba(59, 130, 246, 0.9)', 
-        'rgba(51, 65, 85, 0.8)' 
+        verdes, 'rgba(34, 197, 94, 0.85)', 
+        rojos, 'rgba(239, 68, 68, 0.85)',  
+        azules, 'rgba(59, 130, 246, 0.85)', 
+        'rgba(51, 65, 85, 0.7)' 
       ],
       'circle-stroke-width': 1.5,
       'circle-stroke-color': '#ffffff' 
     },
-    filter: isLoteValido // Dibujará círculos donde haya números cortos, sin importar la geometría
+    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
   }), [verdes, rojos, azules]);
 
-  // CAPA 5: NÚMEROS RESTAURADOS
+  // CAPA 5: NÚMEROS FORZADOS AL CENTRO
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
@@ -148,14 +148,15 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       'text-field': textProperty,
       'text-size': 12,
       'text-anchor': 'center',
-      'text-allow-overlap': true 
+      'text-allow-overlap': true,
+      'symbol-placement': 'point' // Fuerza bruta para estampar el número siempre
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
     },
-    filter: isLoteValido // Mismo filtro que ayer: si es corto, lo dibuja. Punto final.
+    filter: isLoteValido
   }), []);
 
   const handleMapClick = (event) => {
@@ -165,11 +166,9 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     const properties = feature.properties;
     const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || "";
     
-    // Extracción limpia cortando espacios muertos
     const loteLimpio = String(nombreRaw).trim();
     const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
 
-    // Ignorar si toca una entidad larga de AutoCAD
     if (isNaN(numLoteClickeado) || loteLimpio.length > 5) return;
 
     let uvExtraida = null; let mznExtraido = null;
@@ -186,7 +185,6 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // PRIORIDAD DEL FRANCOTIRADOR
       if (uvActiva && mznActivo) {
         const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
         if (matchFormulario) loteFinal = matchFormulario;
@@ -244,31 +242,34 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
          </div>
       </div>
 
-      <div className="flex-1 relative bg-[#060b13] w-full h-full overflow-hidden">
-        <Map
-          mapLib={maplibregl}
-          initialViewState={{
-            longitude: -63.2435,
-            latitude: -17.3635,
-            zoom: 14.3, 
-            pitch: 0 
-          }}
-          maxZoom={20} // Permitimos ultra-zoom, la capa satelital estirará su foto base
-          mapStyle={MAP_STYLE_SATELLITE as any} 
-          style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill', 'lotes-line']} 
-          onClick={handleMapClick}
-          cursor="crosshair"
-        >
-          <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
-          <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-            <Layer {...fillLayer as any} />
-            <Layer {...lineLayer as any} />
-            <Layer {...highlightLayer as any} />
-            <Layer {...pointLayer as any} />
-            <Layer {...labelLayer as any} />
-          </Source>
-        </Map>
+      {/* LA SOLUCIÓN AL CORTE NEGRO: absolute inset-0 obliga al mapa a llenar la caja */}
+      <div className="flex-1 relative bg-[#060b13] w-full overflow-hidden">
+        <div className="absolute inset-0">
+          <Map
+            mapLib={maplibregl}
+            initialViewState={{
+              longitude: -63.2435,
+              latitude: -17.3635,
+              zoom: 14.3, 
+              pitch: 0 
+            }}
+            maxZoom={20} // Permitimos ultra-zoom
+            mapStyle={MAP_STYLE_SATELLITE as any} 
+            style={{ width: '100%', height: '100%' }}
+            interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill', 'lotes-line']} 
+            onClick={handleMapClick}
+            cursor="crosshair"
+          >
+            <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
+            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+              <Layer {...fillLayer as any} />
+              <Layer {...lineLayer as any} />
+              <Layer {...highlightLayer as any} />
+              <Layer {...pointLayer as any} />
+              <Layer {...labelLayer as any} />
+            </Source>
+          </Map>
+        </div>
       </div>
     </div>
   );
@@ -580,7 +581,7 @@ export default function App() {
         }
 
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 8; 
+        let baseMonthIndex = 8; // ARRANCA EN SEPTIEMBRE
         let baseYear = 26; 
         
         for(let m=1; m<=meses; m++) {
@@ -815,9 +816,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN INMERSIVO */}
+      {/* OVERLAY DE LOGIN INMERSIVO (BLUR) */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[200] bg-[#020617]/70 backdrop-blur-xl flex flex-col items-center justify-center p-4 overflow-hidden">
           <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                <Lock className="w-10 h-10 text-[#020617]" />
