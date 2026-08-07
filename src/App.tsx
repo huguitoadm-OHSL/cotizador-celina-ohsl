@@ -39,7 +39,7 @@ const MAP_STYLE_SATELLITE = {
       type: 'raster',
       tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      maxzoom: 17, // MAGIA OVERZOOMING: Estira la foto para que jamás se corte
+      maxzoom: 17, 
       attribution: '&copy; Esri, Maxar, Earthstar Geographics'
     }
   },
@@ -55,14 +55,13 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN DE PUNTOS Y NÚMEROS)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN DE LECTOR ORIGINAL)
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Clasificación de estados para semáforo visual
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
@@ -71,12 +70,9 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
 
-      // Variaciones para evitar fallos de AutoCAD (" 13", "13 ", "013")
-      const variations = [numLote, ` ${numLote}`, `${numLote} `, `  ${numLote}  `, `0${numLote}`];
-
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variations);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variations);
-      else if (est === 'VENDIDO') a.push(...variations);
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
+      else if (est === 'VENDIDO') a.push(numLote);
     });
 
     return { 
@@ -86,74 +82,93 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // Propiedad Maestra que atrapa el texto de AutoCAD sin importar cómo lo nombren
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+  // RESTAURACIÓN AL LECTOR ORIGINAL QUE FUNCIONABA PERFECTO
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ''];
+  const isLoteValido = ['<=', ['length', ['to-string', textProperty]], 4]; // Restricción para ignorar IDs largos de AutoCAD
 
-  // CAPA 1: Esqueleto de AutoCAD (Líneas Celestes)
+  // CAPA 1: Polígonos de relleno de color según estado (El Semáforo)
+  const fillLayer = useMemo(() => ({
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: {
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.35)', 
+        rojos, 'rgba(239, 68, 68, 0.35)',  
+        azules, 'rgba(59, 130, 246, 0.35)', 
+        'transparent'
+      ],
+      'fill-opacity': 1
+    },
+    filter: ['all', ['!=', textProperty, ''], isLoteValido]
+  }), [verdes, rojos, azules]);
+
+  // CAPA 2: Esqueleto AutoCAD (Líneas Celestes)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 },
     filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
-
-  // CAPA 2: Puntos de Color (Semáforo sobre los redonditos de AutoCAD)
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    paint: {
-      'circle-radius': 11, 
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.85)', // Verde Libre
-        rojos, 'rgba(239, 68, 68, 0.85)',  // Rojo Bloqueado
-        azules, 'rgba(59, 130, 246, 0.85)', // Azul Vendido
-        'rgba(51, 65, 85, 0.7)' // Gris oscuro por defecto
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff' 
-    },
-    filter: ['==', ['geometry-type'], 'Point']
-  }), [verdes, rojos, azules]);
 
   // CAPA 3: Borde iluminado dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
+    paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // CAPA 4: Números Centrados en los Puntos
+  // CAPA 4: Puntos de Color y Números Limpios centrados
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    paint: {
+      'circle-radius': 10, 
+      'circle-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.85)', 
+        rojos, 'rgba(239, 68, 68, 0.85)',  
+        azules, 'rgba(59, 130, 246, 0.85)', 
+        'rgba(51, 65, 85, 0.7)' 
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#ffffff' 
+    },
+    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
+  }), [verdes, rojos, azules]);
+
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 12,
+      'text-size': 11, 
       'text-anchor': 'center',
-      'text-allow-overlap': true // IMPORTANTÍSIMO: Evita que el mapa esconda números cercanos
+      'text-allow-overlap': false 
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
     },
-    filter: ['==', ['geometry-type'], 'Point']
+    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
   }), []);
 
+  // EL CEREBRO DEL CLIC (SIN REGEX DESTRUCTIVOS)
   const handleMapClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     
     const properties = feature.properties;
-    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || "";
+    const nombreRaw = properties.name || properties.Name || properties.Text || "";
     
-    // Extracción limpia cortando espacios muertos
+    // Extracción simple (La que funcionaba en la tarde)
     const loteLimpio = String(nombreRaw).trim();
-    const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
+    const numLoteClickeado = parseInt(loteLimpio, 10);
 
-    if (isNaN(numLoteClickeado)) return;
+    // Si toca una línea de AutoCAD que no es un número (Ej. ID 358430), se ignora
+    if (isNaN(numLoteClickeado) || loteLimpio.length > 4) return;
 
     let uvExtraida = null; let mznExtraido = null;
     const nombreLayer = properties.layer || properties.Layer || "";
@@ -169,7 +184,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // PRIORIDAD DEL FRANCOTIRADOR: Si el formulario tiene datos, manda el formulario
+      // ALGORITMO SNIPER: Prioridad al formulario
       if (uvActiva && mznActivo) {
         const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
         if (matchFormulario) loteFinal = matchFormulario;
@@ -187,8 +202,8 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
         }
       }
       
-      setIsFullscreen(false); // Sale de pantalla completa automático
-      onLoteSeleccionado({ isError: false, data: loteFinal, warning: candidatos.length > 1 && !uvActiva });
+      setIsFullscreen(false); 
+      onLoteSeleccionado({ isError: false, data: loteFinal });
     } else {
       onLoteSeleccionado({ isError: true, lote: numLoteClickeado });
     }
@@ -237,15 +252,16 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             zoom: 14.3, 
             pitch: 0 
           }}
-          maxZoom={20} // Permitimos ultra-zoom, la capa satelital estirará su foto base
+          maxZoom={17.5} // ESCUDO ANTIBLANCO
           mapStyle={MAP_STYLE_SATELLITE as any} 
           style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-line']} 
+          interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill']} 
           onClick={handleMapClick}
           cursor="crosshair"
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+            <Layer {...fillLayer as any} />
             <Layer {...lineLayer as any} />
             <Layer {...highlightLayer as any} />
             <Layer {...pointLayer as any} />
@@ -798,9 +814,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN INMERSIVO */}
+      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO Y MAPA DE FONDO */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
           <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                <Lock className="w-10 h-10 text-[#020617]" />
@@ -938,7 +954,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ Lote ${respuesta.lote} no se encontró en la BD. Revisa si pertenece a esta urbanización.`);
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Por favor, selecciona la UV/MZN manualmente.`);
                   return;
                }
 
@@ -955,12 +971,7 @@ export default function App() {
                setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                setResultado(null); 
-               
-               if (respuesta.warning) {
-                 showNotification(`⚠️ Se encontraron varios Lotes ${loteEnBD.lote}. Seleccionando el de UV ${loteEnBD.uv}. Si no es el correcto, usa el formulario manual.`);
-               } else {
-                 showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado y listo`);
-               }
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
                
                // AUTOSCROLL MÁGICO AL FORMULARIO
                setTimeout(() => {
@@ -1193,7 +1204,7 @@ export default function App() {
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5">
-                        <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'textemerald-500'}`} /> 
+                        <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> 
                         Superficie <span className="text-slate-600 normal-case">(m²)</span>
                       </span>
                     </label>
