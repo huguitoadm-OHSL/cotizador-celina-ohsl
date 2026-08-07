@@ -37,25 +37,30 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Estilo de mapa base satelital (Esri World Imagery HD)
+  // Estilo de mapa base satelital corregido con Glyphs y Background
   const satelliteMapStyle = {
     version: 8,
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf", // <-- SOLUCIÓN PANTALLA NEGRA
     sources: {
       'esri-satellite': {
         type: 'raster',
         tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
         tileSize: 256,
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        attribution: 'Tiles &copy; Esri'
       }
     },
     layers: [
+      {
+        id: 'background',
+        type: 'background',
+        paint: { 'background-color': '#020617' }
+      },
       {
         id: 'satellite-layer',
         type: 'raster',
         source: 'esri-satellite',
         paint: {
-          'raster-contrast': 1.05,
-          'raster-saturation': 0.1 
+          'raster-opacity': 0.85 // Integración cinematográfica con el UI oscuro
         }
       }
     ]
