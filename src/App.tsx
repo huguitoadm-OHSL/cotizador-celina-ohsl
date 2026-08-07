@@ -55,85 +55,36 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO PURAMENTE VISUAL)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO VISUAL PRÍSTINO)
 // ============================================================================
 const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loteVisual, setLoteVisual] = useState(""); // Estado aislado solo para iluminar en el mapa
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Extracción de cualquier texto que venga de AutoCAD
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
-  const isLoteValido = ['all', ['!=', textProperty, ''], ['<=', ['length', ['to-string', textProperty]], 6]];
+  // Propiedad de texto para iluminar en caso de que el archivo tenga algún dato
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'LOTE'], ['get', 'Lote'], ''];
 
-  // CAPA 1: Esqueleto de AutoCAD (Líneas Celestes)
+  // CAPA ÚNICA 1: Esqueleto de AutoCAD (Líneas Celestes Limpias)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
+    filter: ['!=', ['geometry-type'], 'Point'] // Filtra toda la basura de vértices
   }), []);
 
-  // CAPA 2: Puntos base si existen en AutoCAD
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    paint: {
-      'circle-radius': 11, 
-      'circle-color': 'rgba(14, 165, 233, 0.2)', // Azul cyber
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#0ea5e9' 
-    },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
-  }), []);
-
-  // CAPA 3: Borde iluminado DORADO (Responde al clic en el mapa O al formulario)
+  // CAPA ÚNICA 2: Borde iluminado DORADO (Responde al formulario si los datos coinciden)
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
+    paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
     filter: [
       'any',
-      ['==', ['to-string', textProperty], loteVisual],
-      ['==', ['to-string', textProperty], ` ${loteVisual}`],
-      ['==', ['to-string', textProperty], `${loteVisual} `],
-      ['==', ['to-string', textProperty], loteActivoFormulario],
-      ['==', ['to-string', textProperty], ` ${loteActivoFormulario}`],
-      ['==', ['to-string', textProperty], `${loteActivoFormulario} `]
+      ['==', ['to-string', textProperty], loteActivoFormulario || ''],
+      ['==', ['to-string', textProperty], ` ${loteActivoFormulario}` || ''],
+      ['==', ['to-string', textProperty], `${loteActivoFormulario} ` || '']
     ]
-  }), [loteVisual, loteActivoFormulario]);
-
-  // CAPA 4: NÚMEROS FORZADOS (Usando el código estable original)
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    layout: {
-      'text-field': textProperty,
-      'text-size': 12,
-      'text-anchor': 'center',
-      'text-allow-overlap': true,
-      'symbol-placement': 'point'
-    },
-    paint: { 
-      'text-color': '#ffffff',
-      'text-halo-color': '#020617',
-      'text-halo-width': 1.5
-    },
-    filter: isLoteValido
-  }), []);
-
-  // LÓGICA DE CLIC AISLADA: Solo actualiza el estado visual del mapa (ilumina), no toca el cotizador
-  const handleMapClick = (event) => {
-    const feature = event.features?.[0];
-    if (!feature || !feature.properties) return;
-    
-    const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.TextString || feature.properties.Text || feature.properties.text || feature.properties.LOTE || feature.properties.Lote || "";
-    const loteLimpio = String(nombreRaw).trim();
-    
-    // Almacena el texto crudo para que el HighlightLayer lo ilumine
-    setLoteVisual(loteLimpio);
-  };
+  }), [loteActivoFormulario]);
 
   const containerClasses = isFullscreen 
     ? "fixed inset-0 z-[150] bg-[#020617] w-screen h-screen flex flex-col" 
@@ -149,7 +100,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
              <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1 font-bold">
-               <Crosshair className="w-3 h-3 text-cyan-500" /> Módulo de Geolocalización Activo
+               <Crosshair className="w-3 h-3 text-cyan-500" /> Módulo de Referencia Visual Activo
              </p>
            </div>
          </div>
@@ -168,7 +119,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
       </div>
 
       <div className="flex-1 relative bg-[#060b13] w-full h-full overflow-hidden">
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 pointer-events-auto">
           <Map
             mapLib={maplibregl}
             initialViewState={{
@@ -180,16 +131,13 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
             maxZoom={20} 
             mapStyle={MAP_STYLE_SATELLITE as any} 
             style={{ width: '100%', height: '100%' }}
-            interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill', 'lotes-line']} 
-            onClick={handleMapClick}
-            cursor="crosshair"
+            interactiveLayerIds={[]} // Quitamos la interacción para evitar errores de clics
+            cursor="grab"
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              <Layer {...pointLayer as any} />
-              <Layer {...labelLayer as any} />
             </Source>
           </Map>
         </div>
@@ -869,7 +817,7 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* MAPA INTERACTIVO DESACOPLADO */}
+        {/* MAPA INTERACTIVO DESACOPLADO (SOLO VISUAL) */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
            <MapaEspacial 
              loteActivoFormulario={lote}
