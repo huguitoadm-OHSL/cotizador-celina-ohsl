@@ -30,40 +30,23 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (VISUAL TRACKER PURO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (VISUAL TRACKER PURO & ESTABLE)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showLoader, setShowLoader] = useState(true);
   const mapRef = useRef(null);
-
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // FIX: Temporizador estético de seguridad. Desaparece el loader obligatoriamente a los 1.5s
+  // Forzar redibujado al cambiar de tamaño para evitar la pantalla negra de MapLibre
   useEffect(() => {
-    setShowLoader(true);
-    const splashTimer = setTimeout(() => {
-      setShowLoader(false);
-    }, 1500);
-    return () => clearTimeout(splashTimer);
-  }, [proyectoActivo, isFullscreen]);
-
-  // Doble forzado de redibujado (Resize) para aniquilar la pantalla negra de MapLibre
-  useEffect(() => {
-    const handleResize = () => { if (mapRef.current) mapRef.current.resize(); };
-    window.addEventListener('resize', handleResize);
-    
-    const timeout1 = setTimeout(handleResize, 50);
-    const timeout2 = setTimeout(handleResize, 350);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timeout1);
-      clearTimeout(timeout2);
-    };
+    if (mapRef.current) {
+      setTimeout(() => mapRef.current.resize(), 50);
+      setTimeout(() => mapRef.current.resize(), 300);
+    }
   }, [isFullscreen]);
 
-  const satelliteMapStyle = {
+  // Objeto de Estilo Satelital Blindado
+  const satelliteMapStyle = useMemo(() => ({
     version: 8,
     glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     sources: {
@@ -71,7 +54,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         type: 'raster',
         tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
         tileSize: 256,
-        maxzoom: 16, // <-- FIX ESTÉTICO: Bloquea las baldosas grises en zoom extremo
+        maxzoom: 17, // MAGIA ANTI-PANTALLA BLANCA: Fuerza overzoom a partir de zoom 17
         attribution: 'Tiles &copy; Esri'
       }
     },
@@ -86,12 +69,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         type: 'raster',
         source: 'esri-satellite',
         paint: {
-          'raster-opacity': 0.85,
-          'raster-contrast': 1.05
+          'raster-opacity': 0.90, // Satélite más visible
+          'raster-contrast': 1.10
         }
       }
     ]
-  };
+  }), []);
 
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
@@ -118,9 +101,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     paint: {
       'fill-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.40)', 
-        rojos, 'rgba(239, 68, 68, 0.40)',  
-        azules, 'rgba(59, 130, 246, 0.40)', 
+        verdes, 'rgba(34, 197, 94, 0.45)', 
+        rojos, 'rgba(239, 68, 68, 0.45)',  
+        azules, 'rgba(59, 130, 246, 0.45)', 
         'rgba(14, 165, 233, 0.05)'         
       ],
       'fill-opacity': 1
@@ -134,7 +117,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
   }), []);
 
-  // Borde iluminado reacciona SÓLO al input del formulario (Visual Tracker)
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
@@ -159,16 +141,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
+  // Clases estáticas para evitar que las animaciones CSS rompan el canvas de WebGL
   const containerClasses = isFullscreen 
-    ? "fixed inset-0 z-[9999] bg-[#020617] w-screen h-screen flex flex-col animate-in zoom-in-95 duration-300" 
-    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500 hover:shadow-[0_0_60px_rgba(14,165,233,0.3)]";
+    ? "fixed inset-0 z-[99999] bg-[#020617] w-screen h-screen flex flex-col animate-in zoom-in-95 duration-300" 
+    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13]";
 
   return (
     <div className={containerClasses}>
       
-      {/* HEADER: Oculto en modo inmersivo (Fullscreen) para priorizar 100% el plano */}
+      {/* HEADER DE MAPA */}
       {!isFullscreen && (
-        <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative overflow-hidden shrink-0">
+        <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
            <div className="flex items-center gap-3 relative z-10">
              <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/40 shadow-[inset_0_0_10px_rgba(34,211,238,0.2)]">
@@ -194,7 +177,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <button 
                type="button"
                onClick={() => setIsFullscreen(true)} 
-               className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:shadow-[0_0_25px_rgba(34,211,238,0.4)]"
+               className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.2)]"
                title="Pantalla Completa"
              >
                <Maximize className="w-5 h-5"/>
@@ -213,20 +196,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </button>
       )}
 
+      {/* LIENZO DE MAPA PURO Y DURO */}
       <div className="flex-1 relative w-full h-full bg-[#020617]">
-        {/* PANTALLA DE CARGA CON DESVANECIMIENTO SEGURO */}
-        {showLoader && (
-          <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center animate-out fade-out duration-500 fill-mode-forwards" style={{ animationDelay: '1s' }}>
-            <div className="relative flex items-center justify-center">
-               <div className="absolute w-24 h-24 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
-               <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
-               <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
-            </div>
-            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Enlazando Satélite...</div>
-          </div>
-        )}
-
-        {/* MAPA */}
         <div className="absolute inset-0 z-10">
           <Map
             ref={mapRef}
@@ -238,8 +209,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               pitch: 0 
             }}
             mapStyle={satelliteMapStyle}
-            maxZoom={19} 
-            interactiveLayerIds={[]} // FIX: Al vaciar esto, se deshabilita la mano y el click. 100% Tracking Visual.
+            maxZoom={19} // Límite de zoom físico, pero Esri se estira desde el 17
+            interactiveLayerIds={[]} // Bloquea clicks accidentales, tracker manual 100%
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -258,7 +229,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
 export default function App() {
   // ==========================================================================
-  // ESTADO DE AUTENTICACIÓN
+  // ESTADO DE AUTENTICACIÓN Y VARIABLES
   // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
@@ -284,7 +255,6 @@ export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
-  
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
@@ -328,7 +298,6 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   useEffect(() => {
-    // La Base de Datos se carga inmediatamente en segundo plano
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -397,17 +366,9 @@ export default function App() {
     }
   }, [regional]);
 
-  const handleUvChange = (e) => { 
-    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); 
-  };
-  
-  const handleMznChange = (e) => { 
-    setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); 
-  };
-  
-  const handleLoteChange = (e) => { 
-    setLote(e.target.value); 
-  };
+  const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleLoteChange = (e) => { setLote(e.target.value); };
 
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
@@ -416,7 +377,6 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto, tipoCotizacion]);
 
@@ -447,16 +407,13 @@ export default function App() {
   };
 
   const currentAliases = getAlias(proyecto);
-
   const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
     currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
   ) || [];
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
-  
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-  
   const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
@@ -476,9 +433,7 @@ export default function App() {
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
-  const calcularLimitesMaximos = () => { 
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; 
-  };
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
@@ -900,8 +855,9 @@ export default function App() {
 
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-all duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none blur-md scale-[0.98]' : 'opacity-100 scale-100'}`}>
         
-        <div className="flex justify-between items-center mb-6 no-print w-full min-w-0">
-          <div className="flex gap-3">
+        {/* CABECERA (Responsive Fix: Flex-col en móviles) */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
+          <div className="flex gap-3 w-full sm:w-auto justify-center sm:justify-start">
              <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
@@ -912,7 +868,7 @@ export default function App() {
              )}
           </div>
           
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto max-w-full hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
              <div className="flex items-center gap-2">
                <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
@@ -927,7 +883,7 @@ export default function App() {
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-24 sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
