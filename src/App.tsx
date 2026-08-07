@@ -4,7 +4,7 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair, Radar
+  Maximize, Minimize, Eye, Crosshair
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -63,10 +63,11 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Propiedad de extracción universal de textos AutoCAD
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+  // EXTRACCIÓN ORIGINAL RESTAURADA: Precisión absoluta basada en la arquitectura base
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  const isLoteValido = ['<=', ['length', ['to-string', textProperty]], 4];
 
-  // CAPA 1: Esqueleto de Líneas Celestes (Elegante y Limpio)
+  // CAPA 1: Esqueleto de Líneas Celestes
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
@@ -90,35 +91,33 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
     ]
   }), [loteVisual, loteActivoFormulario]);
 
-  // CAPA 3: NÚMEROS BLANCOS (El código que funcionaba perfecto ayer)
+  // CAPA 3: NÚMEROS BLANCOS (Restaurados de la versión de éxito)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 12,
+      'text-size': 11,
       'text-anchor': 'center',
-      'text-allow-overlap': true,
-      'symbol-placement': 'point'
+      'text-allow-overlap': false
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
-      'text-halo-width': 1.5
+      'text-halo-width': 1
     },
-    filter: ['!=', textProperty, ''] // Única regla: si hay texto, dibújalo. Cero complicaciones.
+    filter: isLoteValido
   }), []);
 
-  // EVENTO DE CLIC: Puramente visual, no toca la base de datos.
+  // EVENTO DE CLIC: Puramente visual, solo ilumina el terreno en pantalla.
   const handleMapClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     
-    const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.TextString || feature.properties.Text || feature.properties.text || feature.properties.LOTE || feature.properties.Lote || "";
+    const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.Text || feature.properties.text || "";
     const loteLimpio = String(nombreRaw).trim();
     
-    // Solo ilumina el lote en la pantalla
-    if (loteLimpio) {
+    if (loteLimpio && loteLimpio.length <= 4) {
       setLoteVisual(loteLimpio);
     }
   };
@@ -136,9 +135,8 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
-             {/* NUEVO MENSAJE TÉCNICO ELEGANTE */}
              <p className="text-emerald-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5 font-bold">
-               <Radar className="w-3 h-3 text-emerald-500" /> Módulo Visual Desacoplado | En Línea
+               <Crosshair className="w-3 h-3 text-emerald-500" /> Módulo Visual Desacoplado | En Línea
              </p>
            </div>
          </div>
@@ -156,7 +154,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
          </div>
       </div>
 
-      {/* SOLUCIÓN PANTALLA NEGRA: position: absolute asegura que llene todo el contenedor */}
+      {/* BLINDAJE CONTRA PANTALLA NEGRA: Estructura absoluta garantizada */}
       <div className="flex-1 relative bg-[#060b13] w-full h-full min-h-[400px]">
         <Map
           mapLib={maplibregl}
@@ -390,7 +388,29 @@ export default function App() {
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
-  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
+  const calcularLimitesMaximos = () => { 
+    let maxCreditoPct = 0;
+    
+    // REGLA DE ORO INYECTADA SILENCIOSAMENTE: MUYURINA 5% -> 23%
+    if (proyecto === "MUYURINA") {
+       const sup = Number(superficie) || 0;
+       const prec = Number(precio) || 0;
+       const valor_original = sup * prec;
+       let pct_efectivo = 0;
+       
+       if (modoInicial === 'porcentaje') {
+          pct_efectivo = Number(inicialPorcentaje) || 0;
+       } else if (valor_original > 0) {
+          pct_efectivo = ((Number(inicialMonto) || 0) / valor_original) * 100;
+       }
+
+       if (pct_efectivo >= 5) {
+          maxCreditoPct = 23;
+       }
+    }
+
+    return { maxCreditoPct, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; 
+  };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
@@ -937,13 +957,9 @@ export default function App() {
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <button 
-                        type="button" 
-                        onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
-                      >
+                      <span className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30') : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}>
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
-                      </button>
+                      </span>
                     ) : null}
                   </div>
                   <div className="relative">
@@ -977,11 +993,6 @@ export default function App() {
                         <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
-                      {!usarBD && tieneBD && (
-                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
-                          <Edit2 className="w-3 h-3"/> Ingreso Manual
-                        </span>
-                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
