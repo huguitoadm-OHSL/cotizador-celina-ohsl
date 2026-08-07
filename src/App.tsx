@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// CONFIGURACIÓN DE MAPA SATELITAL 
+// CONFIGURACIÓN DE MAPA SATELITAL (OVERZOOMING PARA EVITAR BLANCO)
 // ============================================================================
 const MAP_STYLE_SATELLITE = {
   version: 8,
@@ -39,7 +39,7 @@ const MAP_STYLE_SATELLITE = {
       type: 'raster',
       tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      maxzoom: 17, 
+      maxzoom: 17, // Estira la foto para que jamás se corte
       attribution: '&copy; Esri, Maxar, Earthstar Geographics'
     }
   },
@@ -55,13 +55,14 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO ESCÁNER ACTIVADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (OMNIDIRECCIONAL PARA AUTOCAD)
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
+  // ALGORITMO CAZADOR DE ESPACIOS: Genera variaciones para que Match funcione siempre
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
@@ -70,9 +71,12 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
 
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else if (est === 'VENDIDO') a.push(numLote);
+      // Variaciones para evitar fallos de AutoCAD (" 13", "13 ", "013")
+      const variations = [numLote, ` ${numLote}`, `${numLote} `, `  ${numLote}  `, `0${numLote}`];
+
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variations);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variations);
+      else if (est === 'VENDIDO') a.push(...variations);
     });
 
     return { 
@@ -82,23 +86,16 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // ALGORITMO ESCÁNER: Busca en todas las posibles columnas que AutoCAD haya creado
-  const textProperty = [
-    'to-string',
-    [
-      'coalesce', 
-      ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], 
-      ['get', 'LOTE'], ['get', 'Lote'], ['get', 'lote'], ['get', 'NUMERO'], ['get', 'numero'], 
-      '❓' // Si no encuentra nada, dibuja una interrogación para avisarnos
-    ]
-  ];
+  // Detector masivo de textos de AutoCAD
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
 
+  // CAPA 1: Polígonos de Relleno (Si existen)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', textProperty,
+        'match', ['to-string', textProperty],
         verdes, 'rgba(34, 197, 94, 0.35)', 
         rojos, 'rgba(239, 68, 68, 0.35)',  
         azules, 'rgba(59, 130, 246, 0.35)', 
@@ -106,41 +103,41 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       ],
       'fill-opacity': 1
     },
-    filter: ['!=', textProperty, ''] 
+    filter: ['!=', textProperty, '']
   }), [verdes, rojos, azules]);
 
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    paint: {
-      'circle-radius': 11, 
-      'circle-color': [
-        'match', textProperty,
-        verdes, 'rgba(34, 197, 94, 0.8)', 
-        rojos, 'rgba(239, 68, 68, 0.8)',  
-        azules, 'rgba(59, 130, 246, 0.8)', 
-        'rgba(51, 65, 85, 0.7)' 
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#ffffff' 
-    },
-    filter: ['==', ['geometry-type'], 'Point'] // Filtra correctamente a los centros
-  }), [verdes, rojos, azules]);
-
+  // CAPA 2: LÍNEAS DINÁMICAS (Pinta las rayas si AutoCAD no hizo polígonos cerrados)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
-  }), []);
+    paint: { 
+      'line-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', 
+        rojos, '#ef4444',  
+        azules, '#3b82f6', 
+        '#0ea5e9' // Cyan base
+      ],
+      'line-width': [
+        'match', ['to-string', textProperty],
+        verdes, 2.5, 
+        rojos, 2.5,  
+        azules, 2.5, 
+        1.5
+      ],
+      'line-opacity': 0.9 
+    }
+  }), [verdes, rojos, azules]);
 
+  // CAPA 3: Borde iluminado dorado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
+    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
+  // CAPA 4: Números centrados (Funciona en Líneas, Puntos y Polígonos)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
@@ -148,14 +145,14 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       'text-field': textProperty,
       'text-size': 13,
       'text-anchor': 'center',
-      'text-allow-overlap': true 
+      'text-allow-overlap': false 
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
     },
-    filter: ['==', ['geometry-type'], 'Point'] // Pinta los textos exclusivamente encima de los puntos
+    filter: ['!=', textProperty, '']
   }), []);
 
   const handleMapClick = (event) => {
@@ -163,8 +160,9 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (!feature || !feature.properties) return;
     
     const properties = feature.properties;
-    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.numero || "";
+    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || "";
     
+    // Extracción limpia cortando espacios muertos y extrayendo solo números
     const loteLimpio = String(nombreRaw).trim();
     const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
 
@@ -200,7 +198,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
         }
       }
       
-      setIsFullscreen(false);
+      setIsFullscreen(false); // Sale de pantalla completa automático
       onLoteSeleccionado({ isError: false, data: loteFinal });
     } else {
       onLoteSeleccionado({ isError: true, lote: numLoteClickeado });
@@ -213,7 +211,7 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
   return (
     <div className={containerClasses}>
-      <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center shadow-lg shrink-0">
+      <div className="bg-slate-900/90 backdrop-blur-md p-3 sm:p-5 z-10 border-b border-cyan-500/30 flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 shadow-lg shrink-0">
          <div className="flex items-center gap-3">
            <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
              <MapPin className="w-5 h-5 text-cyan-400" />
@@ -250,17 +248,16 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             zoom: 14.3, 
             pitch: 0 
           }}
-          maxZoom={20} 
+          maxZoom={20} // Permitimos ultra-zoom, la capa satelital estirará su foto base
           mapStyle={MAP_STYLE_SATELLITE as any} 
           style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['lotes-fill', 'lotes-points', 'lotes-labels', 'lotes-line']} 
+          interactiveLayerIds={['lotes-fill', 'lotes-line', 'lotes-labels']} 
           onClick={handleMapClick}
           cursor="crosshair"
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
             <Layer {...fillLayer as any} />
-            <Layer {...pointLayer as any} />
             <Layer {...lineLayer as any} />
             <Layer {...highlightLayer as any} />
             <Layer {...labelLayer as any} />
@@ -812,9 +809,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN INMERSIVO */}
+      {/* OVERLAY DE LOGIN CON BLUR Y RESPONSIVIDAD TOTAL */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
           <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                <Lock className="w-10 h-10 text-[#020617]" />
@@ -893,19 +890,20 @@ export default function App() {
 
       <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0">
         
-        <div className="flex justify-between items-center mb-6 no-print w-full min-w-0">
-          <div className="flex gap-3">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+        {/* CABECERA SUPERIOR RESPONSIVA MEJORADA */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6 no-print w-full min-w-0">
+          <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+             <button onClick={() => setIsAuthenticated(false)} className="flex-1 sm:flex-none bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-3 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="flex-1 sm:flex-none bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
           </div>
           
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto max-w-full">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-3 sm:p-3 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto">
              <div className="flex items-center gap-2">
                <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/20 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
@@ -913,14 +911,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0">
+             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner" 
                 />
              </div>
           </div>
@@ -952,7 +950,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Selecciona UV y MZN primero.`);
+                  showNotification(`⚠️ Lote ${respuesta.lote} no encontrado. Revisa la base de datos o limpia los campos.`);
                   return;
                }
 
@@ -969,9 +967,9 @@ export default function App() {
                setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado y listo`);
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
                
-               // AUTOSCROLL MÁGICO AL FORMULARIO
+               // AUTOSCROLL HACIA EL FORMULARIO DESPUÉS DE TOCAR EL MAPA
                setTimeout(() => {
                  if (formRef.current) {
                    formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
