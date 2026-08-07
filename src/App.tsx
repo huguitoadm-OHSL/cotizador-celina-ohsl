@@ -37,7 +37,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const mapRef = useRef(null);
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Forzar redibujado al cambiar de tamaño para evitar la pantalla negra de MapLibre
+  // Forzar redibujado preciso para aniquilar la pantalla negra en móviles
   useEffect(() => {
     if (mapRef.current) {
       setTimeout(() => mapRef.current.resize(), 50);
@@ -54,8 +54,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         type: 'raster',
         tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
         tileSize: 256,
-        maxzoom: 17, // MAGIA ANTI-PANTALLA BLANCA: Fuerza overzoom a partir de zoom 17
-        attribution: 'Tiles &copy; Esri'
+        maxzoom: 17, // Fuerza overzoom fotográfico sin perder imagen
+        attribution: 'Celina Quantum v3.0'
       }
     },
     layers: [
@@ -69,8 +69,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         type: 'raster',
         source: 'esri-satellite',
         paint: {
-          'raster-opacity': 0.90, // Satélite más visible
-          'raster-contrast': 1.10
+          'raster-opacity': 0.95,
+          'raster-contrast': 1.05,
+          'raster-saturation': 0.1
         }
       }
     ]
@@ -141,10 +142,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
-  // Clases estáticas para evitar que las animaciones CSS rompan el canvas de WebGL
+  // 100dvh asegura que el navegador móvil no corte el mapa por la barra de direcciones
   const containerClasses = isFullscreen 
-    ? "fixed inset-0 z-[99999] bg-[#020617] w-screen h-screen flex flex-col animate-in zoom-in-95 duration-300" 
-    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13]";
+    ? "fixed inset-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
+    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
 
   return (
     <div className={containerClasses}>
@@ -186,19 +187,19 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN */}
+      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN EN MÓVILES */}
       {isFullscreen && (
         <button 
           onClick={() => setIsFullscreen(false)}
-          className="absolute top-6 right-6 z-[10000] bg-slate-900/80 backdrop-blur-md text-cyan-400 p-3.5 rounded-2xl border border-cyan-500/50 hover:bg-slate-800 hover:text-white transition-all shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:scale-105 group"
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-[10000] bg-slate-900/90 backdrop-blur-md text-cyan-400 p-3.5 rounded-2xl border border-cyan-500/50 hover:bg-slate-800 hover:text-white transition-all shadow-[0_0_30px_rgba(34,211,238,0.5)] group"
         >
-          <Minimize className="w-6 h-6 group-hover:rotate-180 transition-transform duration-500" />
+          <Minimize className="w-6 h-6 group-hover:scale-110 transition-transform duration-300" />
         </button>
       )}
 
       {/* LIENZO DE MAPA PURO Y DURO */}
-      <div className="flex-1 relative w-full h-full bg-[#020617]">
-        <div className="absolute inset-0 z-10">
+      <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
+        <div className="absolute inset-0 z-10 w-full h-full">
           <Map
             ref={mapRef}
             mapLib={maplibregl}
@@ -209,7 +210,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               pitch: 0 
             }}
             mapStyle={satelliteMapStyle}
-            maxZoom={19} // Límite de zoom físico, pero Esri se estira desde el 17
+            maxZoom={19} 
             interactiveLayerIds={[]} // Bloquea clicks accidentales, tracker manual 100%
             style={{ width: '100%', height: '100%' }}
           >
@@ -298,6 +299,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   useEffect(() => {
+    // La Base de Datos se carga inmediatamente en segundo plano
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -853,11 +855,12 @@ export default function App() {
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-all duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none blur-md scale-[0.98]' : 'opacity-100 scale-100'}`}>
+      {/* CONTENEDOR PRINCIPAL - LIBRE DE CLASES "TRANSFORM" QUE ROMPAN EL FULLSCREEN */}
+      <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
-        {/* CABECERA (Responsive Fix: Flex-col en móviles) */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
-          <div className="flex gap-3 w-full sm:w-auto justify-center sm:justify-start">
+        {/* CABECERA (FLEX-WRAP PARA EVITAR COLAPSO EN MÓVILES) */}
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
+          <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
              <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
@@ -868,7 +871,7 @@ export default function App() {
              )}
           </div>
           
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] w-full sm:w-auto hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
              <div className="flex items-center gap-2">
                <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
@@ -876,14 +879,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0">
+             <div className="relative shrink-0 flex-1 sm:flex-none">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-24 sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -907,7 +910,7 @@ export default function App() {
         </div>
 
         {/* MAPA INTERACTIVO (VISUAL TRACKER PURE) */}
-        <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivo={lote}
              proyectoActivo={proyecto}
