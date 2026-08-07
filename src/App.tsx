@@ -30,12 +30,36 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (COLORES DINÁMICOS Y SNIPER CLICK)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (SATELITAL + SNIPER CLICK)
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
+
+  // Estilo de mapa base satelital (Esri World Imagery HD)
+  const satelliteMapStyle = {
+    version: 8,
+    sources: {
+      'esri-satellite': {
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+      }
+    },
+    layers: [
+      {
+        id: 'satellite-layer',
+        type: 'raster',
+        source: 'esri-satellite',
+        paint: {
+          'raster-contrast': 1.05,
+          'raster-saturation': 0.1 
+        }
+      }
+    ]
+  };
 
   // Clasificación dinámica de estados para pintar los polígonos
   const { verdes, rojos, azules } = useMemo(() => {
@@ -63,10 +87,9 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // Detector de Textos de AutoCAD
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
-  // CAPA 1: Polígonos de relleno pintados por estado
+  // CAPA 1: Polígonos de relleno con opacidad para ver el satélite
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
@@ -74,45 +97,45 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       'fill-color': [
         'match',
         ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.35)', // Verde
-        rojos, 'rgba(239, 68, 68, 0.35)',  // Rojo
-        azules, 'rgba(59, 130, 246, 0.35)', // Azul
-        'rgba(14, 165, 233, 0.05)'         // Cyan transparente por defecto
+        verdes, 'rgba(34, 197, 94, 0.45)', // Verde más sólido
+        rojos, 'rgba(239, 68, 68, 0.45)',  // Rojo
+        azules, 'rgba(59, 130, 246, 0.45)', // Azul
+        'rgba(14, 165, 233, 0.15)'         // Cyan transparente
       ],
       'fill-opacity': 1
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] // Evita pintar la basura de AutoCAD
+    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
   }), [verdes, rojos, azules]);
 
-  // CAPA 2: Esqueleto de líneas
+  // CAPA 2: Esqueleto de líneas neon
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1, 'line-opacity': 0.4 }
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
   }), []);
 
   // CAPA 3: Borde iluminado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 1 },
+    paint: { 'line-color': '#fbbf24', 'line-width': 4, 'line-opacity': 1 },
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // CAPA 4: Números tamaño Google Earth
+  // CAPA 4: Números
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 10.5, // Tamaño reducido tipo Google Earth
+      'text-size': 11.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
     },
     paint: {
       'text-color': '#ffffff', 
-      'text-halo-color': '#020617',
-      'text-halo-width': 1 // Borde fino
+      'text-halo-color': '#000000',
+      'text-halo-width': 1.5 
     },
     filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
@@ -128,11 +151,21 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
 
     if (!loteLimpio || isNaN(numLoteClickeado)) return;
 
-    // ALGORITMO SNIPER: Extracción de Manzano desde AutoCAD
+    // ALGORITMO SNIPER V3: Extracción de MZN y UV
     let mznExtraido = null;
+    let uvExtraida = null;
     const nombreLayer = properties.layer || properties.Layer || "";
+    
     const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
     if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
+
+    // Buscar UV en el nombre del layer o en propiedades directas del GIS
+    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)|UV-(\d+)/i);
+    if (uvMatch) {
+      uvExtraida = uvMatch[1] || uvMatch[2] || uvMatch[3];
+    } else if (properties.UV || properties.uv) {
+      uvExtraida = String(properties.UV || properties.uv).match(/\d+/)?.[0];
+    }
 
     let candidatos = baseDeDatosLotes.filter(l => 
       l.proyecto.includes(proyectoActivo) && parseInt(l.lote, 10) === numLoteClickeado
@@ -141,12 +174,17 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // 1. Filtrar por el Manzano extraído del mapa
-      if (mznExtraido) {
+      // 1. Filtrar por UV y MZN si el mapa provee ambos
+      if (uvExtraida && mznExtraido) {
+        const matchExacto = candidatos.filter(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10) && l.uv === uvExtraida);
+        if (matchExacto.length > 0) loteFinal = matchExacto[0];
+      }
+      // 2. Filtrar solo por Manzano extraído del mapa
+      else if (mznExtraido) {
         const matchMzn = candidatos.filter(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
         if (matchMzn.length > 0) loteFinal = matchMzn[0];
       } 
-      // 2. Si el mapa no tiene el manzano, filtrar por la UV que el asesor seleccionó manualmente
+      // 3. Filtrar por la UV manual si el mapa no la tiene
       else if (uvActiva) {
         let porUv = candidatos.filter(l => l.uv === uvActiva);
         if (porUv.length > 0) {
@@ -199,21 +237,21 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
           initialViewState={{
             longitude: -63.2435,
             latitude: -17.3635,
-            zoom: 14.3, // Encuadre perfecto sin pantalla completa obligatoria
+            zoom: 14.3, 
             pitch: 0 
           }}
-          mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-          interactiveLayerIds={['lotes-fill', 'lotes-labels']} // Permitimos clic tanto en el relleno como en la etiqueta
+          mapStyle={satelliteMapStyle}
+          interactiveLayerIds={['lotes-fill', 'lotes-labels']}
           onClick={handleMapClick}
           cursor="crosshair"
           style={{ width: '100%', height: '100%' }}
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-            <Layer {...fillLayer as any} />
-            <Layer {...lineLayer as any} />
-            <Layer {...highlightLayer as any} />
-            <Layer {...labelLayer as any} />
+            <Layer {...fillLayer} />
+            <Layer {...lineLayer} />
+            <Layer {...highlightLayer} />
+            <Layer {...labelLayer} />
           </Source>
         </Map>
       </div>
@@ -232,11 +270,11 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSESMIGUIA") { // Nueva contraseña maestra
+    if (passwordInput === "DIOSESMIGUIA") { 
       setIsAuthenticated(true); 
       setIsAdmin(false); 
       setLoginError(false);
-    } else if (passwordInput === "DIRECTOR2026") { // Modo Supervisor Oculto
+    } else if (passwordInput === "DIRECTOR2026") { 
       setIsAuthenticated(true); 
       setIsAdmin(true); 
       setLoginError(false);
@@ -255,7 +293,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); // Actualizado por defecto
+  const [tcFlexible, setTcFlexible] = useState(11.86); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -293,7 +331,8 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return; 
+    // La Base de Datos se carga inmediatamente, independiente del login,
+    // para que el mapa espacial de fondo se pinte dinámicamente con la data real.
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -331,7 +370,7 @@ export default function App() {
         }));
 
         const lotesPermitidos = normalizedData.filter(l => {
-          const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL Norte'].includes(l.proyecto);
+          const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto);
           if (isAdmin) return esValido;
           return esValido && (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "");
         });
@@ -346,7 +385,7 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, [isAuthenticated, isAdmin]);
+  }, [isAdmin]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -780,50 +819,43 @@ export default function App() {
     );
   };
 
-  const showDescM2 = true;
-  const showDescContadoM2 = true;
-  const showBonoInicial = proyecto === "OTRO";
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 relative overflow-hidden font-['Plus_Jakarta_Sans']">
-        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-          <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
-          <div className="absolute bottom-[20%] right-[20%] w-[40rem] h-[40rem] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style={{animationDelay: "1s"}}></div>
-        </div>
-        <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
-             <Lock className="w-10 h-10 text-[#020617]" />
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
-          <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
-          <form onSubmit={handleLogin} className="w-full space-y-6">
-            <div className="relative">
-              <input 
-                type="password" 
-                value={passwordInput} 
-                onChange={(e) => setPasswordInput(e.target.value)} 
-                placeholder="Contraseña" 
-                className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
-              />
-              {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
-            </div>
-            <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
-              <Unlock className="w-5 h-5"/> Desbloquear Sistema
-            </button>
-          </form>
-          <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
-            <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
-            <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
+      {/* ==============================================================================
+          PANTALLA DE LOGIN CON GLASSMORPHISM FLOTANTE (Deja ver el mapa de fondo)
+      ============================================================================== */}
+      {!isAuthenticated && (
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/70 backdrop-blur-xl animate-in fade-in duration-500">
+          <div className="bg-[#0f172a]/80 backdrop-blur-2xl border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_50px_rgba(6,182,212,0.15)] flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+               <Lock className="w-10 h-10 text-[#020617]" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
+            <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
+            <form onSubmit={handleLogin} className="w-full space-y-6">
+              <div className="relative">
+                <input 
+                  type="password" 
+                  value={passwordInput} 
+                  onChange={(e) => setPasswordInput(e.target.value)} 
+                  placeholder="Contraseña" 
+                  className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
+                />
+                {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
+              </div>
+              <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+                <Unlock className="w-5 h-5"/> Desbloquear Sistema
+              </button>
+            </form>
+            <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
+              <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
+              <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
@@ -871,7 +903,7 @@ export default function App() {
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0">
+      <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-500 ${!isAuthenticated ? 'opacity-30 pointer-events-none select-none blur-sm' : 'opacity-100'}`}>
         
         <div className="flex justify-between items-center mb-6 no-print w-full min-w-0">
           <div className="flex gap-3">
@@ -932,7 +964,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en el Manzano activo. Selecciona MZN primero.`);
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró. Selecciona UV o MZN primero si es necesario.`);
                   return;
                }
 
