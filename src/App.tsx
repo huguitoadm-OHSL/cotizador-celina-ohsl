@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// CONFIGURACIÓN DE MAPA SATELITAL (ESCUDO ANTI PANTALLA BLANCA)
+// CONFIGURACIÓN DE MAPA SATELITAL (OVERZOOMING SEGURO)
 // ============================================================================
 const MAP_STYLE_SATELLITE = {
   version: 8,
@@ -55,7 +55,7 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN DE LECTOR ORIGINAL)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN TOTAL DE NÚMEROS)
 // ============================================================================
 const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -70,9 +70,11 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
 
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else if (est === 'VENDIDO') a.push(numLote);
+      const variations = [numLote, ` ${numLote}`, `${numLote} `, `  ${numLote}  `, `0${numLote}`];
+
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variations);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variations);
+      else if (est === 'VENDIDO') a.push(...variations);
     });
 
     return { 
@@ -82,32 +84,32 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // RESTAURACIÓN AL LECTOR ORIGINAL QUE FUNCIONABA PERFECTO
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ''];
-  const isLoteValido = ['<=', ['length', ['to-string', textProperty]], 4]; // Restricción para ignorar IDs largos de AutoCAD
+  // LA RESTAURACIÓN: Búsqueda universal de textos, sin filtros geométricos destructivos
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+  const isLoteValido = ['all', ['!=', textProperty, ''], ['<=', ['length', ['to-string', textProperty]], 6]];
 
-  // CAPA 1: Polígonos de relleno de color según estado (El Semáforo)
+  // CAPA 1: Polígonos de Relleno 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.35)', 
-        rojos, 'rgba(239, 68, 68, 0.35)',  
-        azules, 'rgba(59, 130, 246, 0.35)', 
+        verdes, 'rgba(34, 197, 94, 0.4)', 
+        rojos, 'rgba(239, 68, 68, 0.4)',  
+        azules, 'rgba(59, 130, 246, 0.4)', 
         'transparent'
       ],
       'fill-opacity': 1
     },
-    filter: ['all', ['!=', textProperty, ''], isLoteValido]
+    filter: isLoteValido
   }), [verdes, rojos, azules]);
 
-  // CAPA 2: Esqueleto AutoCAD (Líneas Celestes)
+  // CAPA 2: Esqueleto AutoCAD
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.7 },
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
     filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
@@ -119,56 +121,56 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     filter: ['==', textProperty, loteActivo || ''] 
   }), [loteActivo]);
 
-  // CAPA 4: Puntos de Color y Números Limpios centrados
+  // CAPA 4: Puntos Circulares de Color
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
     paint: {
-      'circle-radius': 10, 
+      'circle-radius': 11, 
       'circle-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.85)', 
-        rojos, 'rgba(239, 68, 68, 0.85)',  
-        azules, 'rgba(59, 130, 246, 0.85)', 
-        'rgba(51, 65, 85, 0.7)' 
+        verdes, 'rgba(34, 197, 94, 0.9)', 
+        rojos, 'rgba(239, 68, 68, 0.9)',  
+        azules, 'rgba(59, 130, 246, 0.9)', 
+        'rgba(51, 65, 85, 0.8)' 
       ],
       'circle-stroke-width': 1.5,
       'circle-stroke-color': '#ffffff' 
     },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
+    filter: isLoteValido // Dibujará círculos donde haya números cortos, sin importar la geometría
   }), [verdes, rojos, azules]);
 
+  // CAPA 5: NÚMEROS RESTAURADOS
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 11, 
+      'text-size': 12,
       'text-anchor': 'center',
-      'text-allow-overlap': false 
+      'text-allow-overlap': true 
     },
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
       'text-halo-width': 1.5
     },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], isLoteValido]
+    filter: isLoteValido // Mismo filtro que ayer: si es corto, lo dibuja. Punto final.
   }), []);
 
-  // EL CEREBRO DEL CLIC (SIN REGEX DESTRUCTIVOS)
   const handleMapClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     
     const properties = feature.properties;
-    const nombreRaw = properties.name || properties.Name || properties.Text || "";
+    const nombreRaw = properties.name || properties.Name || properties.TextString || properties.Text || properties.text || properties.LOTE || properties.Lote || "";
     
-    // Extracción simple (La que funcionaba en la tarde)
+    // Extracción limpia cortando espacios muertos
     const loteLimpio = String(nombreRaw).trim();
-    const numLoteClickeado = parseInt(loteLimpio, 10);
+    const numLoteClickeado = parseInt(loteLimpio.replace(/[^0-9]/g, ''), 10);
 
-    // Si toca una línea de AutoCAD que no es un número (Ej. ID 358430), se ignora
-    if (isNaN(numLoteClickeado) || loteLimpio.length > 4) return;
+    // Ignorar si toca una entidad larga de AutoCAD
+    if (isNaN(numLoteClickeado) || loteLimpio.length > 5) return;
 
     let uvExtraida = null; let mznExtraido = null;
     const nombreLayer = properties.layer || properties.Layer || "";
@@ -184,12 +186,11 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
     if (candidatos.length > 0) {
       let loteFinal = candidatos[0];
       
-      // ALGORITMO SNIPER: Prioridad al formulario
+      // PRIORIDAD DEL FRANCOTIRADOR
       if (uvActiva && mznActivo) {
         const matchFormulario = candidatos.find(l => String(l.uv) === String(uvActiva) && String(l.mzn) === String(mznActivo));
         if (matchFormulario) loteFinal = matchFormulario;
       } else {
-        // Fallback: Adivina por la capa de AutoCAD
         if (uvExtraida) {
           let porUv = candidatos.filter(l => parseInt(l.uv, 10) === parseInt(uvExtraida, 10));
           if (porUv.length > 0) {
@@ -252,10 +253,10 @@ const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, pro
             zoom: 14.3, 
             pitch: 0 
           }}
-          maxZoom={17.5} // ESCUDO ANTIBLANCO
+          maxZoom={20} // Permitimos ultra-zoom, la capa satelital estirará su foto base
           mapStyle={MAP_STYLE_SATELLITE as any} 
           style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill']} 
+          interactiveLayerIds={['lotes-points', 'lotes-labels', 'lotes-fill', 'lotes-line']} 
           onClick={handleMapClick}
           cursor="crosshair"
         >
@@ -814,9 +815,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO Y MAPA DE FONDO */}
+      {/* OVERLAY DE LOGIN INMERSIVO */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4 overflow-hidden">
           <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                <Lock className="w-10 h-10 text-[#020617]" />
@@ -954,7 +955,7 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Por favor, selecciona la UV/MZN manualmente.`);
+                  showNotification(`⚠️ Lote ${respuesta.lote} no encontrado. Verifique la UV/MZN en el formulario.`);
                   return;
                }
 
@@ -971,14 +972,14 @@ export default function App() {
                setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado y listo`);
                
                // AUTOSCROLL MÁGICO AL FORMULARIO
                setTimeout(() => {
                  if (formRef.current) {
                    formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
                  }
-               }, 300);
+               }, 400);
              }}
            />
         </div>
