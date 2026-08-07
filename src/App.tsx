@@ -4,7 +4,7 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair
+  Maximize, Minimize, Eye
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -30,114 +30,153 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// CONFIGURACIÓN DE MAPA SATELITAL
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (COLORES DINÁMICOS Y SNIPER CLICK)
 // ============================================================================
-const MAP_STYLE_SATELLITE = {
-  version: 8,
-  sources: {
-    'esri-satellite': {
-      type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      maxzoom: 17, 
-      attribution: '&copy; Esri, Maxar, Earthstar Geographics'
-    }
-  },
-  layers: [
-    {
-      id: 'satellite-layer',
-      type: 'raster',
-      source: 'esri-satellite',
-      minzoom: 0,
-      maxzoom: 22
-    }
-  ]
-};
-
-// ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MÓDULO VISUAL DESACOPLADO)
-// ============================================================================
-const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
+const MapaEspacial = ({ onLoteSeleccionado, loteActivo, uvActiva, mznActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loteVisual, setLoteVisual] = useState("");
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // EXTRACCIÓN ORIGINAL RESTAURADA: Precisión absoluta basada en la arquitectura base
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
-  const isLoteValido = ['<=', ['length', ['to-string', textProperty]], 4];
+  // Clasificación dinámica de estados para pintar los polígonos
+  const { verdes, rojos, azules } = useMemo(() => {
+    let v = []; let r = []; let a = [];
+    
+    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
+    
+    lotesFiltrados.forEach(l => {
+      const numLote = String(parseInt(l.lote, 10) || l.lote);
+      const est = String(l.estado).toUpperCase();
 
-  // CAPA 1: Esqueleto de Líneas Celestes
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') {
+        v.push(numLote);
+      } else if (est === 'BLOQUEADO' || est === 'RESERVADO') {
+        r.push(numLote);
+      } else if (est === 'VENDIDO') {
+        a.push(numLote);
+      }
+    });
+
+    return { 
+      verdes: v.length > 0 ? v : ['__NONE__'], 
+      rojos: r.length > 0 ? r : ['__NONE__'],
+      azules: a.length > 0 ? a : ['__NONE__']
+    };
+  }, [baseDeDatosLotes, proyectoActivo]);
+
+  // Detector de Textos de AutoCAD
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+
+  // CAPA 1: Polígonos de relleno pintados por estado
+  const fillLayer = useMemo(() => ({
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: {
+      'fill-color': [
+        'match',
+        ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.35)', // Verde
+        rojos, 'rgba(239, 68, 68, 0.35)',  // Rojo
+        azules, 'rgba(59, 130, 246, 0.35)', // Azul
+        'rgba(14, 165, 233, 0.05)'         // Cyan transparente por defecto
+      ],
+      'fill-opacity': 1
+    },
+    filter: ['<=', ['length', ['to-string', textProperty]], 4] // Evita pintar la basura de AutoCAD
+  }), [verdes, rojos, azules]);
+
+  // CAPA 2: Esqueleto de líneas
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1, 'line-opacity': 0.4 }
   }), []);
 
-  // CAPA 2: Borde Dorado Brillante (Responde al Clic en Mapa O al Formulario)
+  // CAPA 3: Borde iluminado al seleccionar
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
-    filter: [
-      'any',
-      ['==', ['to-string', textProperty], loteVisual],
-      ['==', ['to-string', textProperty], ` ${loteVisual}`],
-      ['==', ['to-string', textProperty], `${loteVisual} `],
-      ['==', ['to-string', textProperty], loteActivoFormulario],
-      ['==', ['to-string', textProperty], ` ${loteActivoFormulario}`],
-      ['==', ['to-string', textProperty], `${loteActivoFormulario} `]
-    ]
-  }), [loteVisual, loteActivoFormulario]);
+    paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 1 },
+    filter: ['==', textProperty, loteActivo || ''] 
+  }), [loteActivo]);
 
-  // CAPA 3: NÚMEROS BLANCOS (Restaurados de la versión de éxito)
+  // CAPA 4: Números tamaño Google Earth
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 11,
+      'text-size': 10.5, // Tamaño reducido tipo Google Earth
       'text-anchor': 'center',
-      'text-allow-overlap': false
+      'text-allow-overlap': false 
     },
-    paint: { 
-      'text-color': '#ffffff',
+    paint: {
+      'text-color': '#ffffff', 
       'text-halo-color': '#020617',
-      'text-halo-width': 1
+      'text-halo-width': 1 // Borde fino
     },
-    filter: isLoteValido
+    filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
-  // EVENTO DE CLIC: Puramente visual, solo ilumina el terreno en pantalla.
   const handleMapClick = (event) => {
     const feature = event.features?.[0];
     if (!feature || !feature.properties) return;
     
-    const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.Text || feature.properties.text || "";
-    const loteLimpio = String(nombreRaw).trim();
-    
-    if (loteLimpio && loteLimpio.length <= 4) {
-      setLoteVisual(loteLimpio);
+    const properties = feature.properties;
+    const nombreLote = properties.name || properties.Name || properties.Text || properties.text || "";
+    const loteLimpio = String(nombreLote).trim();
+    const numLoteClickeado = parseInt(loteLimpio, 10);
+
+    if (!loteLimpio || isNaN(numLoteClickeado)) return;
+
+    // ALGORITMO SNIPER: Extracción de Manzano desde AutoCAD
+    let mznExtraido = null;
+    const nombreLayer = properties.layer || properties.Layer || "";
+    const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
+    if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
+
+    let candidatos = baseDeDatosLotes.filter(l => 
+      l.proyecto.includes(proyectoActivo) && parseInt(l.lote, 10) === numLoteClickeado
+    );
+
+    if (candidatos.length > 0) {
+      let loteFinal = candidatos[0];
+      
+      // 1. Filtrar por el Manzano extraído del mapa
+      if (mznExtraido) {
+        const matchMzn = candidatos.filter(l => parseInt(l.mzn, 10) === parseInt(mznExtraido, 10));
+        if (matchMzn.length > 0) loteFinal = matchMzn[0];
+      } 
+      // 2. Si el mapa no tiene el manzano, filtrar por la UV que el asesor seleccionó manualmente
+      else if (uvActiva) {
+        let porUv = candidatos.filter(l => l.uv === uvActiva);
+        if (porUv.length > 0) {
+          loteFinal = porUv[0];
+          if (mznActivo) {
+            let porMzn = porUv.find(l => l.mzn === mznActivo);
+            if (porMzn) loteFinal = porMzn;
+          }
+        }
+      }
+      onLoteSeleccionado({ isError: false, data: loteFinal });
+    } else {
+      onLoteSeleccionado({ isError: true, lote: loteLimpio });
     }
   };
 
   const containerClasses = isFullscreen 
-    ? "fixed inset-0 z-[150] bg-[#020617] w-screen h-screen flex flex-col" 
-    : "relative w-full h-[450px] sm:h-[550px] lg:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13] flex flex-col";
+    ? "fixed inset-0 z-[100] bg-[#020617] w-screen h-screen flex flex-col" 
+    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13]";
 
   return (
     <div className={containerClasses}>
-      <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center shadow-lg shrink-0">
+      <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex justify-between items-center shadow-lg">
          <div className="flex items-center gap-3">
            <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
              <MapPin className="w-5 h-5 text-cyan-400" />
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
-             <p className="text-emerald-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5 font-bold">
-               <Crosshair className="w-3 h-3 text-emerald-500" /> Módulo Visual Desacoplado | En Línea
-             </p>
+             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5">🟢 Disponible | 🔴 Bloqueado | 🔵 Vendido</p>
            </div>
          </div>
          <div className="flex gap-2">
@@ -154,25 +193,24 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
          </div>
       </div>
 
-      {/* BLINDAJE CONTRA PANTALLA NEGRA: Estructura absoluta garantizada */}
-      <div className="flex-1 relative bg-[#060b13] w-full h-full min-h-[400px]">
+      <div className="flex-1 relative">
         <Map
           mapLib={maplibregl}
           initialViewState={{
             longitude: -63.2435,
             latitude: -17.3635,
-            zoom: 14.3, 
+            zoom: 14.3, // Encuadre perfecto sin pantalla completa obligatoria
             pitch: 0 
           }}
-          maxZoom={20} 
-          mapStyle={MAP_STYLE_SATELLITE as any} 
-          style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-          interactiveLayerIds={['lotes-line', 'lotes-labels']} 
+          mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+          interactiveLayerIds={['lotes-fill', 'lotes-labels']} // Permitimos clic tanto en el relleno como en la etiqueta
           onClick={handleMapClick}
           cursor="crosshair"
+          style={{ width: '100%', height: '100%' }}
         >
           <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
           <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+            <Layer {...fillLayer as any} />
             <Layer {...lineLayer as any} />
             <Layer {...highlightLayer as any} />
             <Layer {...labelLayer as any} />
@@ -184,6 +222,9 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
 };
 
 export default function App() {
+  // ==========================================================================
+  // ESTADO DE AUTENTICACIÓN
+  // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
@@ -191,10 +232,14 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSESMIGUIA") { 
-      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
-    } else if (passwordInput === "DIRECTOR2026") { 
-      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
+    if (passwordInput === "DIOSESMIGUIA") { // Nueva contraseña maestra
+      setIsAuthenticated(true); 
+      setIsAdmin(false); 
+      setLoginError(false);
+    } else if (passwordInput === "DIRECTOR2026") { // Modo Supervisor Oculto
+      setIsAuthenticated(true); 
+      setIsAdmin(true); 
+      setLoginError(false);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
@@ -210,7 +255,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); 
+  const [tcFlexible, setTcFlexible] = useState(11.86); // Actualizado por defecto
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -245,10 +290,10 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
   useEffect(() => {
+    if (!isAuthenticated) return; 
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -286,7 +331,7 @@ export default function App() {
         }));
 
         const lotesPermitidos = normalizedData.filter(l => {
-          const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto);
+          const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL Norte'].includes(l.proyecto);
           if (isAdmin) return esValido;
           return esValido && (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "");
         });
@@ -301,7 +346,7 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, [isAdmin]);
+  }, [isAuthenticated, isAdmin]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -317,9 +362,17 @@ export default function App() {
     }
   }, [regional]);
 
-  const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleLoteChange = (e) => { setLote(e.target.value); };
+  const handleUvChange = (e) => { 
+    setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); 
+  };
+  
+  const handleMznChange = (e) => { 
+    setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); 
+  };
+  
+  const handleLoteChange = (e) => { 
+    setLote(e.target.value); 
+  };
 
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
@@ -389,27 +442,7 @@ export default function App() {
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => { 
-    let maxCreditoPct = 0;
-    
-    // REGLA DE ORO INYECTADA SILENCIOSAMENTE: MUYURINA 5% -> 23%
-    if (proyecto === "MUYURINA") {
-       const sup = Number(superficie) || 0;
-       const prec = Number(precio) || 0;
-       const valor_original = sup * prec;
-       let pct_efectivo = 0;
-       
-       if (modoInicial === 'porcentaje') {
-          pct_efectivo = Number(inicialPorcentaje) || 0;
-       } else if (valor_original > 0) {
-          pct_efectivo = ((Number(inicialMonto) || 0) / valor_original) * 100;
-       }
-
-       if (pct_efectivo >= 5) {
-          maxCreditoPct = 23;
-       }
-    }
-
-    return { maxCreditoPct, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; 
+    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; 
   };
 
   useEffect(() => {
@@ -511,8 +544,8 @@ export default function App() {
         }
 
         const mesesNombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-        let baseMonthIndex = 8; 
-        let baseYear = 26; 
+        let baseMonthIndex = 8; // ARRANCA DIRECTAMENTE EN SEPTIEMBRE (Índice 8)
+        let baseYear = 26; // Año 2026
         
         for(let m=1; m<=meses; m++) {
             let tc_efectivo = TC_FLEX_NUMBER; 
@@ -520,32 +553,38 @@ export default function App() {
             let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
-            const isAbril2027 = (currentY === 27 && currentMIndex === 3);
-
             if (aplicarBonificacion) {
-                if (currentY === 26 && currentMIndex === 8) { // Sep
-                  tc_efectivo = TC_PROMOCIONAL; descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
+                if (currentY === 26 && currentMIndex === 8) { // Septiembre 2026
+                  tc_efectivo = TC_PROMOCIONAL; 
+                  descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
-                else if (currentY === 26 && currentMIndex === 9) { // Oct
-                  descPctExacto = 28; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                else if (currentY === 26 && currentMIndex === 9) { // Octubre 2026
+                  descPctExacto = 28; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 26 && currentMIndex === 10) { // Nov
-                  descPctExacto = 23; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                else if (currentY === 26 && currentMIndex === 10) { // Noviembre 2026
+                  descPctExacto = 23; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 26 && currentMIndex === 11) { // Dic
-                  descPctExacto = 18; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                else if (currentY === 26 && currentMIndex === 11) { // Diciembre 2026
+                  descPctExacto = 18; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 0) { // Ene
-                  descPctExacto = 13; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                else if (currentY === 27 && currentMIndex === 0) { // Enero 2027
+                  descPctExacto = 13; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 1) { // Feb
-                  descPctExacto = 8; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                else if (currentY === 27 && currentMIndex === 1) { // Febrero 2027
+                  descPctExacto = 8; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
-                else if (currentY === 27 && currentMIndex === 2) { // Mar
-                  descPctExacto = 3; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                else if (currentY === 27 && currentMIndex === 2) { // Marzo 2027
+                  descPctExacto = 3; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else { 
-                  descPctExacto = 0; tc_efectivo = TC_FLEX_NUMBER; 
+                  descPctExacto = 0; 
+                  tc_efectivo = TC_FLEX_NUMBER; 
                 }
             }
 
@@ -555,19 +594,17 @@ export default function App() {
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
-            if (descPctExacto > 0 || isAbril2027) {
-              transicionData.push({
-                  mesNum: m, 
-                  mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
-                  pagoUsdNormal: cuota_final || 0, 
-                  descPct: ahorroBs > 0 ? descPctExacto : 0,
-                  conDescUsd: pagoUsdDesc || 0, 
-                  montoBs: montoBs || 0, 
-                  tcEfectivo: tc_efectivo || 0,
-                  ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
-                  isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
-              });
-            }
+            transicionData.push({
+                mesNum: m, 
+                mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
+                pagoUsdNormal: cuota_final || 0, 
+                descPct: ahorroBs > 0 ? descPctExacto : 0,
+                conDescUsd: pagoUsdDesc || 0, 
+                montoBs: montoBs || 0, 
+                tcEfectivo: tc_efectivo || 0,
+                ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
+                isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
+            });
         }
     }
 
@@ -743,41 +780,50 @@ export default function App() {
     );
   };
 
+  const showDescM2 = true;
+  const showDescContadoM2 = true;
+  const showBonoInicial = proyecto === "OTRO";
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 relative overflow-hidden font-['Plus_Jakarta_Sans']">
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+          <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
+          <div className="absolute bottom-[20%] right-[20%] w-[40rem] h-[40rem] bg-teal-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style={{animationDelay: "1s"}}></div>
+        </div>
+        <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+             <Lock className="w-10 h-10 text-[#020617]" />
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
+          <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
+          <form onSubmit={handleLogin} className="w-full space-y-6">
+            <div className="relative">
+              <input 
+                type="password" 
+                value={passwordInput} 
+                onChange={(e) => setPasswordInput(e.target.value)} 
+                placeholder="Contraseña" 
+                className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
+              />
+              {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
+            </div>
+            <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+              <Unlock className="w-5 h-5"/> Desbloquear Sistema
+            </button>
+          </form>
+          <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
+            <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
+            <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO Y MAPA DE FONDO */}
-      {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
-          <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
-               <Lock className="w-10 h-10 text-[#020617]" />
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
-            <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
-            <form onSubmit={handleLogin} className="w-full space-y-6">
-              <div className="relative">
-                <input 
-                  type="password" 
-                  value={passwordInput} 
-                  onChange={(e) => setPasswordInput(e.target.value)} 
-                  placeholder="Contraseña" 
-                  className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
-                />
-                {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
-              </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
-                <Unlock className="w-5 h-5"/> Desbloquear Sistema
-              </button>
-            </form>
-            <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
-              <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
-              <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
@@ -827,19 +873,19 @@ export default function App() {
 
       <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0">
         
-        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6 no-print w-full min-w-0">
-          <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
-             <button onClick={() => setIsAuthenticated(false)} className="flex-1 sm:flex-none bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-3 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+        <div className="flex justify-between items-center mb-6 no-print w-full min-w-0">
+          <div className="flex gap-3">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="flex-1 sm:flex-none bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
           </div>
           
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-3 sm:p-3 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto max-w-full">
              <div className="flex items-center gap-2">
                <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/20 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
@@ -847,14 +893,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
+             <div className="relative shrink-0">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner" 
                 />
              </div>
           </div>
@@ -875,15 +921,40 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* MAPA INTERACTIVO DESACOPLADO (SOLO VISUAL) */}
+        {/* MAPA INTERACTIVO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
            <MapaEspacial 
-             loteActivoFormulario={lote}
+             loteActivo={lote}
+             uvActiva={uv}
+             mznActivo={mzn}
              proyectoActivo={proyecto}
+             baseDeDatosLotes={baseDeDatosLotes}
+             isAdmin={isAdmin}
+             onLoteSeleccionado={(respuesta) => {
+               if (respuesta.isError) {
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en el Manzano activo. Selecciona MZN primero.`);
+                  return;
+               }
+
+               const loteEnBD = respuesta.data;
+               
+               // Inyección directa de datos reales
+               setRegional("MONTERO");
+               setProyecto("MUYURINA");
+               setUv(loteEnBD.uv);
+               setMzn(loteEnBD.mzn);
+               setLote(loteEnBD.lote);
+               setSuperficie(loteEnBD.superficie.toString());
+               setPrecio(loteEnBD.precio.toString()); 
+               setCategoria(loteEnBD.categoria || "ESTÁNDAR");
+                 
+               setResultado(null); 
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
+             }}
            />
         </div>
 
-        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0 scroll-mt-24">
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0">
             <div className="bg-[#0d1420]/80 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
@@ -957,9 +1028,13 @@ export default function App() {
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <span className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30') : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}>
+                      <button 
+                        type="button" 
+                        onClick={() => setUsarBD(!usarBD)} 
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                      >
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
-                      </span>
+                      </button>
                     ) : null}
                   </div>
                   <div className="relative">
@@ -993,6 +1068,11 @@ export default function App() {
                         <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
+                      {!usarBD && tieneBD && (
+                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
+                          <Edit2 className="w-3 h-3"/> Ingreso Manual
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
@@ -1397,19 +1477,14 @@ export default function App() {
                         </div>
                       </div>
 
-                      <details className="group bg-[#04070b] border border-emerald-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(16,185,129,0.1)] mt-8 cursor-pointer">
-                          <summary className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/20 to-transparent outline-none list-none [&::-webkit-details-marker]:hidden">
-                              <div className="flex items-center gap-3">
-                                <div className="bg-emerald-500/20 p-2 rounded-xl transition-transform group-open:rotate-90">
-                                  <ChevronRight className="w-5 h-5 text-emerald-400" />
-                                </div>
-                                <div>
-                                  <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2">
-                                    <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
-                                    Descuento Escalonado
-                                  </h3>
-                                  <p className="text-slate-400 text-[9px] sm:text-[10px] mt-1">Clic para expandir • Pago regular: ${resultado.mensual}</p>
-                                </div>
+                      <div className="bg-[#04070b] border border-emerald-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(16,185,129,0.1)] mt-8 relative w-full">
+                          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/20 to-transparent">
+                              <div>
+                                <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2">
+                                  <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
+                                  Descuento Escalonado
+                                </h3>
+                                <p className="text-slate-400 text-[9px] sm:text-[10px] mt-1">Pago regular: ${resultado.mensual} · TC Mercado: {tcFlexible}</p>
                               </div>
                               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
                                 <div className={`flex items-center justify-between sm:justify-start gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner w-full sm:w-auto ${aplicarBonificacion ? 'bg-slate-900/80 border-emerald-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
@@ -1418,7 +1493,7 @@ export default function App() {
                                   </span>
                                   <button 
                                     type="button" 
-                                    onClick={(e) => { e.preventDefault(); setAplicarBonificacion(!aplicarBonificacion); }} 
+                                    onClick={() => setAplicarBonificacion(!aplicarBonificacion)} 
                                     className={`relative inline-flex h-6 w-12 shrink-0 items-center rounded-full transition-all duration-300 focus:outline-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] ${aplicarBonificacion ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'bg-slate-800 border border-slate-700'}`}
                                   >
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${aplicarBonificacion ? 'translate-x-7 shadow-[0_0_10px_rgba(255,255,255,0.9)]' : 'translate-x-1'}`} />
@@ -1429,38 +1504,38 @@ export default function App() {
                                   <div className={`text-lg sm:text-xl font-black truncate ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
                                 </div>
                               </div>
-                          </summary>
-                          <div className="w-full relative bg-[#060b13]/50">
+                          </div>
+                          <div className="overflow-x-auto overflow-y-auto max-h-[400px] custom-scrollbar relative w-full">
                             {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
-                            <table className="w-full text-left text-[10px] sm:text-xs">
-                              <thead className="bg-[#090e17] border-b border-slate-800">
-                                <tr className="font-black text-slate-500 uppercase tracking-widest">
-                                  <th className="py-3 px-2 sm:px-4 text-center">Mes</th>
-                                  <th className="py-3 px-2 sm:px-4 text-center">Fijo ($)</th>
-                                  <th className={`py-3 px-2 sm:px-4 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
-                                  <th className={`py-3 px-2 sm:px-4 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>c/Desc ($)</th>
-                                  <th className="py-3 px-2 sm:px-4 text-center text-white">Real (Bs)</th>
-                                  <th className="py-3 px-2 sm:px-4 text-center">TC</th>
+                            <table className="w-full text-left text-xs whitespace-nowrap min-w-[700px]">
+                              <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-800">
+                                <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                  <th className="p-3 text-center">Mes</th>
+                                  <th className="p-3 text-center">Pago Fijo ($)</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
+                                  <th className="p-3 text-center text-white">Monto Real (Bs)</th>
+                                  <th className="p-3 text-center">TC Efe.</th>
                                 </tr>
                               </thead>
                               <tbody className="font-semibold relative z-10">
                                 {resultado.transicionData?.map((row, i) => (
                                   <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-emerald-950/10' : 'text-slate-500'}`}>
-                                    <td className={`py-3 px-2 sm:px-4 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                    <td className="py-3 px-2 sm:px-4 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
-                                    <td className={`py-3 px-2 sm:px-4 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                    <td className={`py-3 px-2 sm:px-4 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
-                                    <td className={`py-3 px-2 sm:px-4 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
-                                    <td className="py-3 px-2 sm:px-4 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
+                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
+                                    <td className="p-3 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
+                                    <td className={`p-3 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
+                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
+                                    <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
+                                    <td className="p-3 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
-                            <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800">
-                              *Simulación referencial. El descuento comercial se ajusta gradualmente hasta alcanzar el TC de Mercado actual.
-                            </div>
                           </div>
-                      </details>
+                          <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800">
+                            *Simulación referencial. El descuento comercial se ajusta gradualmente hasta alcanzar el TC de Mercado actual.
+                          </div>
+                      </div>
 
                       <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50 w-full">
                         <div className="bg-[#040810] p-4 border-b border-emerald-500/10 flex justify-between items-center">
