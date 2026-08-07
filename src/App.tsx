@@ -37,6 +37,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef(null);
 
+  // LÍNEA CORREGIDA: Ruta dinámica del GeoJSON
+  const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
+
   // Doble forzado de redibujado (Resize) para aniquilar la pantalla negra
   useEffect(() => {
     const handleResize = () => { if (mapRef.current) mapRef.current.resize(); };
@@ -1027,7 +1030,7 @@ export default function App() {
                       <button 
                         type="button" 
                         onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-800/50 hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50 hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
                       >
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
@@ -1290,7 +1293,7 @@ export default function App() {
                         required 
                         value={años} 
                         onChange={e => setAños(e.target.value)} 
-                        className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                        className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
                       >
                         <option value="" disabled hidden>Selec.</option>
                         {[...Array(14)]?.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
