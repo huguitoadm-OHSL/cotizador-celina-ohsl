@@ -30,16 +30,16 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO BLINDADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO Y BLINDADO)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMapReady, setIsMapReady] = useState(false); // Controlador estricto del Loader
+  const [isMapReady, setIsMapReady] = useState(false); 
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Seguro de vida para el Radar de carga: Se quita a los 2.5s máximo sí o sí
+  // SEGURO DE VIDA DEL LOADER: Se desvanece máximo a los 2.5s para nunca bloquear el mapa
   useEffect(() => {
     setIsMapReady(false);
     const safetyTimer = setTimeout(() => {
@@ -48,45 +48,14 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // Forzar redibujado preciso al entrar/salir de Fullscreen para evitar cortes
+  // LA CURA DE LA PANTALLA NEGRA: Método correcto getMap().resize()
   useEffect(() => {
-    if (mapRef.current) {
-      setTimeout(() => mapRef.current.resize(), 50);
-      setTimeout(() => mapRef.current.resize(), 300);
+    const map = mapRef.current?.getMap();
+    if (map) {
+      setTimeout(() => map.resize(), 50);
+      setTimeout(() => map.resize(), 300);
     }
   }, [isFullscreen]);
-
-  // EL CORAZÓN DEL SISTEMA: Estilo JSON Unificado (Sin URLs externas frágiles)
-  const satelliteMapStyle = useMemo(() => ({
-    version: 8,
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-    sources: {
-      'esri-satellite': {
-        type: 'raster',
-        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-        tileSize: 256,
-        maxzoom: 17, // Fuerza overzoom fotográfico sin perder imagen ni dar pantalla blanca
-        attribution: 'Celina Quantum v3.0'
-      }
-    },
-    layers: [
-      {
-        id: 'background',
-        type: 'background',
-        paint: { 'background-color': '#020617' } // Fondo oscuro para evitar destellos blancos
-      },
-      {
-        id: 'satellite-layer',
-        type: 'raster',
-        source: 'esri-satellite',
-        paint: {
-          'raster-opacity': 0.95,
-          'raster-contrast': 1.05,
-          'raster-saturation': 0.1
-        }
-      }
-    ]
-  }), []);
 
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
@@ -153,7 +122,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
-  // 100dvh asegura que el navegador móvil no corte el mapa por la barra de direcciones
+  // CONTENEDORES RESPONSIVE ABSOLUTOS
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
     : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
@@ -161,7 +130,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   return (
     <div className={containerClasses}>
       
-      {/* HEADER DE MAPA */}
+      {/* HEADER DEL NAVEGADOR */}
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -208,10 +177,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </button>
       )}
 
-      {/* LIENZO DE MAPA PURO Y DURO */}
+      {/* LIENZO DE MAPA BLINDADO */}
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
         
-        {/* PANTALLA DE CARGA (Se destruye cuando el mapa está listo o a los 2.5s) */}
+        {/* PANTALLA DE CARGA (Con auto-desvanecimiento) */}
         {!isMapReady && (
           <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
             <div className="relative flex items-center justify-center">
@@ -228,13 +197,22 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             ref={mapRef}
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-            mapStyle={satelliteMapStyle}
-            maxZoom={19} 
-            interactiveLayerIds={[]} // Tracking Visual Puro
-            onLoad={() => setIsMapReady(true)} // Notifica que WebGL renderizó exitosamente
+            
+            // EL MOTOR BASE SEGURO: Previene excepciones de estilo en WebGL
+            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            
+            maxZoom={20} 
+            onLoad={() => setIsMapReady(true)} // Notifica que renderizó con éxito
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
+            
+            {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
+            <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
+              <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
+            </Source>
+
+            {/* INYECCIÓN DE PLANIMETRÍA NEÓN */}
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer} />
               <Layer {...lineLayer} />
@@ -874,10 +852,10 @@ export default function App() {
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      {/* CONTENEDOR PRINCIPAL */}
+      {/* CONTENEDOR PRINCIPAL - LIBRE DE CLASES "TRANSFORM" QUE ROMPAN EL FULLSCREEN */}
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
-        {/* CABECERA */}
+        {/* CABECERA (FLEX-WRAP PARA EVITAR COLAPSO EN MÓVILES) */}
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
              <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
