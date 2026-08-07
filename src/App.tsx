@@ -4,7 +4,7 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair
+  Maximize, Minimize, Eye, Crosshair, Radar
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -55,36 +55,73 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MODO VISUAL PRÍSTINO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MÓDULO VISUAL DESACOPLADO)
 // ============================================================================
 const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [loteVisual, setLoteVisual] = useState("");
 
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Propiedad de texto para iluminar en caso de que el archivo tenga algún dato
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+  // Propiedad de extracción universal de textos AutoCAD
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
 
-  // CAPA ÚNICA 1: Esqueleto de AutoCAD (Líneas Celestes Limpias)
+  // CAPA 1: Esqueleto de Líneas Celestes (Elegante y Limpio)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['!=', ['geometry-type'], 'Point'] // Filtra toda la basura de vértices
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
-  // CAPA ÚNICA 2: Borde iluminado DORADO (Responde al formulario si los datos coinciden)
+  // CAPA 2: Borde Dorado Brillante (Responde al Clic en Mapa O al Formulario)
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fcd34d', 'line-width': 4, 'line-opacity': 1 },
     filter: [
       'any',
-      ['==', ['to-string', textProperty], loteActivoFormulario || ''],
-      ['==', ['to-string', textProperty], ` ${loteActivoFormulario}` || ''],
-      ['==', ['to-string', textProperty], `${loteActivoFormulario} ` || '']
+      ['==', ['to-string', textProperty], loteVisual],
+      ['==', ['to-string', textProperty], ` ${loteVisual}`],
+      ['==', ['to-string', textProperty], `${loteVisual} `],
+      ['==', ['to-string', textProperty], loteActivoFormulario],
+      ['==', ['to-string', textProperty], ` ${loteActivoFormulario}`],
+      ['==', ['to-string', textProperty], `${loteActivoFormulario} `]
     ]
-  }), [loteActivoFormulario]);
+  }), [loteVisual, loteActivoFormulario]);
+
+  // CAPA 3: NÚMEROS BLANCOS (El código que funcionaba perfecto ayer)
+  const labelLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    layout: {
+      'text-field': textProperty,
+      'text-size': 12,
+      'text-anchor': 'center',
+      'text-allow-overlap': true,
+      'symbol-placement': 'point'
+    },
+    paint: { 
+      'text-color': '#ffffff',
+      'text-halo-color': '#020617',
+      'text-halo-width': 1.5
+    },
+    filter: ['!=', textProperty, ''] // Única regla: si hay texto, dibújalo. Cero complicaciones.
+  }), []);
+
+  // EVENTO DE CLIC: Puramente visual, no toca la base de datos.
+  const handleMapClick = (event) => {
+    const feature = event.features?.[0];
+    if (!feature || !feature.properties) return;
+    
+    const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.TextString || feature.properties.Text || feature.properties.text || feature.properties.LOTE || feature.properties.Lote || "";
+    const loteLimpio = String(nombreRaw).trim();
+    
+    // Solo ilumina el lote en la pantalla
+    if (loteLimpio) {
+      setLoteVisual(loteLimpio);
+    }
+  };
 
   const containerClasses = isFullscreen 
     ? "fixed inset-0 z-[150] bg-[#020617] w-screen h-screen flex flex-col" 
@@ -99,8 +136,9 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
            </div>
            <div>
              <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
-             <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1 font-bold">
-               <Crosshair className="w-3 h-3 text-cyan-500" /> Módulo de Referencia Visual Activo
+             {/* NUEVO MENSAJE TÉCNICO ELEGANTE */}
+             <p className="text-emerald-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5 font-bold">
+               <Radar className="w-3 h-3 text-emerald-500" /> Módulo Visual Desacoplado | En Línea
              </p>
            </div>
          </div>
@@ -118,29 +156,30 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo }) => {
          </div>
       </div>
 
-      <div className="flex-1 relative bg-[#060b13] w-full h-full overflow-hidden">
-        <div className="absolute inset-0 pointer-events-auto">
-          <Map
-            mapLib={maplibregl}
-            initialViewState={{
-              longitude: -63.2435,
-              latitude: -17.3635,
-              zoom: 14.3, 
-              pitch: 0 
-            }}
-            maxZoom={20} 
-            mapStyle={MAP_STYLE_SATELLITE as any} 
-            style={{ width: '100%', height: '100%' }}
-            interactiveLayerIds={[]} // Quitamos la interacción para evitar errores de clics
-            cursor="grab"
-          >
-            <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...lineLayer as any} />
-              <Layer {...highlightLayer as any} />
-            </Source>
-          </Map>
-        </div>
+      {/* SOLUCIÓN PANTALLA NEGRA: position: absolute asegura que llene todo el contenedor */}
+      <div className="flex-1 relative bg-[#060b13] w-full h-full min-h-[400px]">
+        <Map
+          mapLib={maplibregl}
+          initialViewState={{
+            longitude: -63.2435,
+            latitude: -17.3635,
+            zoom: 14.3, 
+            pitch: 0 
+          }}
+          maxZoom={20} 
+          mapStyle={MAP_STYLE_SATELLITE as any} 
+          style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+          interactiveLayerIds={['lotes-line', 'lotes-labels']} 
+          onClick={handleMapClick}
+          cursor="crosshair"
+        >
+          <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
+          <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+            <Layer {...lineLayer as any} />
+            <Layer {...highlightLayer as any} />
+            <Layer {...labelLayer as any} />
+          </Source>
+        </Map>
       </div>
     </div>
   );
@@ -185,7 +224,6 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
-  // Regla comercial estricta: 1$ por M2 a crédito y 2$ por M2 al contado
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
   const [descuentoInicial, setDescuentoInicial] = useState(0);
@@ -822,7 +860,6 @@ export default function App() {
            <MapaEspacial 
              loteActivoFormulario={lote}
              proyectoActivo={proyecto}
-             baseDeDatosLotes={baseDeDatosLotes}
            />
         </div>
 
@@ -900,9 +937,13 @@ export default function App() {
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
-                      <span className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30') : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}>
+                      <button 
+                        type="button" 
+                        onClick={() => setUsarBD(!usarBD)} 
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                      >
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
-                      </span>
+                      </button>
                     ) : null}
                   </div>
                   <div className="relative">
@@ -936,6 +977,11 @@ export default function App() {
                         <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
+                      {!usarBD && tieneBD && (
+                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
+                          <Edit2 className="w-3 h-3"/> Ingreso Manual
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
