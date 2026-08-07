@@ -34,20 +34,27 @@ const proyectosPorRegional = {
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const [showLoader, setShowLoader] = useState(true);
   const mapRef = useRef(null);
 
-  // LÍNEA CORREGIDA: Ruta dinámica del GeoJSON
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Doble forzado de redibujado (Resize) para aniquilar la pantalla negra
+  // FIX: Temporizador estético de seguridad. Desaparece el loader obligatoriamente a los 1.5s
+  useEffect(() => {
+    setShowLoader(true);
+    const splashTimer = setTimeout(() => {
+      setShowLoader(false);
+    }, 1500);
+    return () => clearTimeout(splashTimer);
+  }, [proyectoActivo, isFullscreen]);
+
+  // Doble forzado de redibujado (Resize) para aniquilar la pantalla negra de MapLibre
   useEffect(() => {
     const handleResize = () => { if (mapRef.current) mapRef.current.resize(); };
     window.addEventListener('resize', handleResize);
     
-    // Forzar re-cálculo al cambiar de pantalla completa
     const timeout1 = setTimeout(handleResize, 50);
-    const timeout2 = setTimeout(handleResize, 300);
+    const timeout2 = setTimeout(handleResize, 350);
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -64,7 +71,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         type: 'raster',
         tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
         tileSize: 256,
-        maxzoom: 16, // <-- FIX: Evita los cuadros blancos/grises obligando a MapLibre a estirar el nivel 16
+        maxzoom: 16, // <-- FIX ESTÉTICO: Bloquea las baldosas grises en zoom extremo
         attribution: 'Tiles &copy; Esri'
       }
     },
@@ -127,7 +134,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
   }), []);
 
-  // Borde iluminado reacciona SÓLO al input del formulario
+  // Borde iluminado reacciona SÓLO al input del formulario (Visual Tracker)
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
@@ -196,7 +203,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN (Plano Inmersivo) */}
+      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN */}
       {isFullscreen && (
         <button 
           onClick={() => setIsFullscreen(false)}
@@ -207,9 +214,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       )}
 
       <div className="flex-1 relative w-full h-full bg-[#020617]">
-        {/* PANTALLA DE CARGA (Oculta la pantalla negra inicial) */}
-        {!mapLoaded && (
-          <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center">
+        {/* PANTALLA DE CARGA CON DESVANECIMIENTO SEGURO */}
+        {showLoader && (
+          <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center animate-out fade-out duration-500 fill-mode-forwards" style={{ animationDelay: '1s' }}>
             <div className="relative flex items-center justify-center">
                <div className="absolute w-24 h-24 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
                <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
@@ -232,8 +239,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             }}
             mapStyle={satelliteMapStyle}
             maxZoom={19} 
-            interactiveLayerIds={[]} // FIX: Al vaciar esto, se deshabilita la mano y el click en los lotes. 100% Tracking Visual.
-            onLoad={() => setMapLoaded(true)}
+            interactiveLayerIds={[]} // FIX: Al vaciar esto, se deshabilita la mano y el click. 100% Tracking Visual.
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -1030,7 +1036,7 @@ export default function App() {
                       <button 
                         type="button" 
                         onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50 hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-800/50 hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
                       >
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
