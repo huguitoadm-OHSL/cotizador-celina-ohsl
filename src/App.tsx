@@ -30,52 +30,20 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (VISUAL TRACKER PURO & ESTABLE)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CAPAS SUPERPUESTAS DE CLASE MUNDIAL)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mapRef = useRef(null);
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // Forzar redibujado preciso para aniquilar la pantalla negra en móviles
+  // Forzar redibujado absoluto del WebGL al maximizar/minimizar (Aniquila la pantalla a medias)
   useEffect(() => {
     if (mapRef.current) {
-      setTimeout(() => mapRef.current.resize(), 50);
-      setTimeout(() => mapRef.current.resize(), 300);
+      setTimeout(() => mapRef.current.resize(), 100);
+      setTimeout(() => mapRef.current.resize(), 400);
     }
   }, [isFullscreen]);
-
-  // Objeto de Estilo Satelital Blindado
-  const satelliteMapStyle = useMemo(() => ({
-    version: 8,
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-    sources: {
-      'esri-satellite': {
-        type: 'raster',
-        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-        tileSize: 256,
-        maxzoom: 17, // Fuerza overzoom fotográfico sin perder imagen
-        attribution: 'Celina Quantum v3.0'
-      }
-    },
-    layers: [
-      {
-        id: 'background',
-        type: 'background',
-        paint: { 'background-color': '#020617' }
-      },
-      {
-        id: 'satellite-layer',
-        type: 'raster',
-        source: 'esri-satellite',
-        paint: {
-          'raster-opacity': 0.95,
-          'raster-contrast': 1.05,
-          'raster-saturation': 0.1
-        }
-      }
-    ]
-  }), []);
 
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
@@ -142,15 +110,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
-  // 100dvh asegura que el navegador móvil no corte el mapa por la barra de direcciones
+  // Clase de contenedor: 100dvh dinámico para cubrir toda la pantalla del móvil sin que nada lo corte.
   const containerClasses = isFullscreen 
-    ? "fixed inset-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
+    ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none" 
     : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
 
   return (
     <div className={containerClasses}>
       
-      {/* HEADER DE MAPA */}
+      {/* HEADER DE MAPA (Se oculta al expandir para maximizar visibilidad del plano) */}
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -187,7 +155,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN EN MÓVILES */}
+      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN */}
       {isFullscreen && (
         <button 
           onClick={() => setIsFullscreen(false)}
@@ -199,22 +167,39 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
       {/* LIENZO DE MAPA PURO Y DURO */}
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
+        
+        {/* Loader ultra-seguro: Se desvanece y desactiva clicks (pointer-events-none) automáticamente a los 2 segundos para no bloquear jamás el mapa */}
+        <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center animate-out fade-out duration-1000 delay-[1500ms] fill-mode-forwards pointer-events-none">
+          <div className="relative flex items-center justify-center">
+             <div className="absolute w-24 h-24 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
+             <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
+             <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
+          </div>
+          <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Enlazando Satélite...</div>
+        </div>
+
         <div className="absolute inset-0 z-10 w-full h-full">
           <Map
             ref={mapRef}
             mapLib={maplibregl}
-            initialViewState={{
-              longitude: -63.2435,
-              latitude: -17.3635,
-              zoom: 14.3, 
-              pitch: 0 
-            }}
-            mapStyle={satelliteMapStyle}
-            maxZoom={19} 
-            interactiveLayerIds={[]} // Bloquea clicks accidentales, tracker manual 100%
+            initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
+            
+            // EL MOTOR MAESTRO REGRESA: Garantiza que carguen las geometrías y los textos
+            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            
+            maxZoom={20} 
+            interactiveLayerIds={[]} // Bloquea clicks en los polígonos. 100% Tracking Visual.
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
+            
+            {/* INYECCIÓN SATELITAL: Capa fotográfica sobre el mapa oscuro. 
+                El maxzoom=17 evita que salgan las baldosas grises y fuerza el overzoom HD */}
+            <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
+              <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85, 'raster-contrast': 1.10 }} />
+            </Source>
+
+            {/* PLANIMETRÍA NEÓN (AutoCAD) */}
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer} />
               <Layer {...lineLayer} />
