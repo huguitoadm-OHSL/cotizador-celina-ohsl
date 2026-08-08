@@ -6,7 +6,6 @@ import {
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair
 } from "lucide-react";
-// Aquí inyecté NavigationControl
 import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -31,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO Y BLINDADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CON PILOTO AUTOMÁTICO)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -40,7 +39,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // SEGURO DE VIDA DEL LOADER: Se desvanece máximo a los 2.5s para nunca bloquear el mapa
+  // 1. SEGURO DEL LOADER
   useEffect(() => {
     setIsMapReady(false);
     const safetyTimer = setTimeout(() => {
@@ -49,7 +48,46 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // LA CURA DE LA PANTALLA NEGRA: Método correcto getMap().resize()
+  // 2. PILOTO AUTOMÁTICO (DRON): Vuela al proyecto seleccionado al instante
+  useEffect(() => {
+    const volarAlProyecto = async () => {
+      try {
+        const response = await fetch(geojsonPath);
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        // Si el archivo GeoJSON existe y tiene datos, buscamos sus coordenadas
+        if (data && data.features && data.features.length > 0) {
+          let coordenadas = data.features[0].geometry.coordinates;
+          
+          // Profundizar en los arrays matemáticos por si es MultiPolygon o Polygon
+          while (Array.isArray(coordenadas[0])) {
+            coordenadas = coordenadas[0];
+          }
+          
+          const [lng, lat] = coordenadas;
+          
+          // Ordenamos a la cámara hacer un vuelo cinematográfico
+          if (mapRef.current && lng && lat) {
+            mapRef.current.getMap().flyTo({
+              center: [lng, lat],
+              zoom: 14.5,
+              speed: 1.5, // Velocidad del vuelo
+              curve: 1.2, // Curvatura cinematográfica
+              essential: true
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Piloto automático en espera de datos espaciales...");
+      }
+    };
+
+    // Ejecutar vuelo cada vez que cambie el proyecto en el menú
+    volarAlProyecto();
+  }, [geojsonPath]);
+
+  // 3. CURA DE LA PANTALLA NEGRA AL CAMBIAR TAMAÑO
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -57,6 +95,24 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       setTimeout(() => map.resize(), 300);
     }
   }, [isFullscreen]);
+
+  const satelliteMapStyle = useMemo(() => ({
+    version: 8,
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    sources: {
+      'esri-satellite': {
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        maxzoom: 17, 
+        attribution: 'Celina Quantum v3.0'
+      }
+    },
+    layers: [
+      { id: 'background', type: 'background', paint: { 'background-color': '#020617' } },
+      { id: 'satellite-layer', type: 'raster', source: 'esri-satellite', paint: { 'raster-opacity': 0.95, 'raster-contrast': 1.05, 'raster-saturation': 0.1 } }
+    ]
+  }), []);
 
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
@@ -68,63 +124,38 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
       else if (est === 'VENDIDO') a.push(numLote);
     });
-    return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
-    };
+    return { verdes: v.length > 0 ? v : ['__NONE__'], rojos: r.length > 0 ? r : ['__NONE__'], azules: a.length > 0 ? a : ['__NONE__'] };
   }, [baseDeDatosLotes, proyectoActivo]);
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
   const fillLayer = useMemo(() => ({
-    id: 'lotes-fill',
-    type: 'fill',
+    id: 'lotes-fill', type: 'fill',
     paint: {
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'rgba(14, 165, 233, 0.05)'         
-      ],
+      'fill-color': ['match', ['to-string', textProperty], verdes, 'rgba(34, 197, 94, 0.45)', rojos, 'rgba(239, 68, 68, 0.45)', azules, 'rgba(59, 130, 246, 0.45)', 'rgba(14, 165, 233, 0.05)'],
       'fill-opacity': 1
     },
     filter: ['<=', ['length', ['to-string', textProperty]], 4] 
   }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
-    id: 'lotes-line',
-    type: 'line',
+    id: 'lotes-line', type: 'line',
     paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
   }), []);
 
   const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
-    type: 'line',
+    id: 'lotes-highlight', type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
   const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 16.5, // <-- AQUÍ ESTÁ LA MAGIA: Limpia la vista desde lejos
-    layout: {
-      'text-field': textProperty,
-      'text-size': 12.5,
-      'text-anchor': 'center',
-      'text-allow-overlap': false 
-    },
-    paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.5 
-    },
+    id: 'lotes-labels', type: 'symbol', minzoom: 16.5,
+    layout: { 'text-field': textProperty, 'text-size': 12.5, 'text-anchor': 'center', 'text-allow-overlap': false },
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.5 },
     filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
-  // CONTENEDORES RESPONSIVE ABSOLUTOS
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
     : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
@@ -132,7 +163,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   return (
     <div className={containerClasses}>
       
-      {/* HEADER DEL NAVEGADOR */}
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -169,7 +199,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN */}
       {isFullscreen && (
         <button 
           onClick={() => setIsFullscreen(false)}
@@ -179,10 +208,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </button>
       )}
 
-      {/* LIENZO DE MAPA BLINDADO */}
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
-        
-        {/* PANTALLA DE CARGA (Con auto-desvanecimiento) */}
         {!isMapReady && (
           <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
             <div className="relative flex items-center justify-center">
@@ -199,25 +225,19 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             ref={mapRef}
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-            
-            // EL MOTOR BASE SEGURO: Previene excepciones de estilo en WebGL
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            
             maxZoom={20} 
-            interactiveLayerIds={[]} // Tracking Visual Puro
-            onLoad={() => setIsMapReady(true)} // Notifica que renderizó con éxito
+            interactiveLayerIds={[]} 
+            onLoad={() => setIsMapReady(true)} 
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
-            {/* AQUÍ INYECTÉ LA BRÚJULA 3D PARA CONTROL TÁCTIL */}
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            {/* INYECCIÓN DE PLANIMETRÍA NEÓN */}
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer} />
               <Layer {...lineLayer} />
@@ -232,9 +252,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 };
 
 export default function App() {
-  // ==========================================================================
-  // ESTADO DE AUTENTICACIÓN Y VARIABLES
-  // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
@@ -243,16 +260,11 @@ export default function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     if (passwordInput === "DIOSESMIGUIA") { 
-      setIsAuthenticated(true); 
-      setIsAdmin(false); 
-      setLoginError(false);
+      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
     } else if (passwordInput === "DIRECTOR2026") { 
-      setIsAuthenticated(true); 
-      setIsAdmin(true); 
-      setLoginError(false);
+      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
     } else {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 2000);
+      setLoginError(true); setTimeout(() => setLoginError(false), 2000);
     }
   };
 
