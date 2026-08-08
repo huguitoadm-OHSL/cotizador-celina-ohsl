@@ -6,7 +6,8 @@ import {
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair
 } from "lucide-react";
-import Map, { Source, Layer, GeolocateControl } from 'react-map-gl';
+// Aquí inyecté NavigationControl
+import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -108,6 +109,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
+    minzoom: 16.5, // <-- AQUÍ ESTÁ LA MAGIA: Limpia la vista desde lejos
     layout: {
       'text-field': textProperty,
       'text-size': 12.5,
@@ -202,10 +204,13 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             
             maxZoom={20} 
+            interactiveLayerIds={[]} // Tracking Visual Puro
             onLoad={() => setIsMapReady(true)} // Notifica que renderizó con éxito
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
+            {/* AQUÍ INYECTÉ LA BRÚJULA 3D PARA CONTROL TÁCTIL */}
+            <NavigationControl position="bottom-right" visualizePitch={true} />
             
             {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
