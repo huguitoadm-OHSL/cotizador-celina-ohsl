@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CON PILOTO AUTOMÁTICO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO Y BLINDADO)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -39,7 +39,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // 1. SEGURO DEL LOADER
+  // SEGURO DE VIDA DEL LOADER
   useEffect(() => {
     setIsMapReady(false);
     const safetyTimer = setTimeout(() => {
@@ -48,46 +48,29 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // 2. PILOTO AUTOMÁTICO (DRON): Vuela al proyecto seleccionado al instante
+  // PILOTO AUTOMÁTICO (DRON)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
         const response = await fetch(geojsonPath);
         if (!response.ok) return;
         const data = await response.json();
-        
-        // Si el archivo GeoJSON existe y tiene datos, buscamos sus coordenadas
         if (data && data.features && data.features.length > 0) {
           let coordenadas = data.features[0].geometry.coordinates;
-          
-          // Profundizar en los arrays matemáticos por si es MultiPolygon o Polygon
-          while (Array.isArray(coordenadas[0])) {
-            coordenadas = coordenadas[0];
-          }
-          
+          while (Array.isArray(coordenadas[0])) { coordenadas = coordenadas[0]; }
           const [lng, lat] = coordenadas;
-          
-          // Ordenamos a la cámara hacer un vuelo cinematográfico
           if (mapRef.current && lng && lat) {
             mapRef.current.getMap().flyTo({
-              center: [lng, lat],
-              zoom: 14.5,
-              speed: 1.5, // Velocidad del vuelo
-              curve: 1.2, // Curvatura cinematográfica
-              essential: true
+              center: [lng, lat], zoom: 14.5, speed: 1.5, curve: 1.2, essential: true
             });
           }
         }
-      } catch (error) {
-        console.warn("Piloto automático en espera de datos espaciales...");
-      }
+      } catch (error) {}
     };
-
-    // Ejecutar vuelo cada vez que cambie el proyecto en el menú
     volarAlProyecto();
   }, [geojsonPath]);
 
-  // 3. CURA DE LA PANTALLA NEGRA AL CAMBIAR TAMAÑO
+  // REDIBUJADO WEBGL AL CAMBIAR TAMAÑO
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -103,9 +86,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       'esri-satellite': {
         type: 'raster',
         tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-        tileSize: 256,
-        maxzoom: 17, 
-        attribution: 'Celina Quantum v3.0'
+        tileSize: 256, maxzoom: 17, attribution: 'Celina Quantum v3.0'
       }
     },
     layers: [
@@ -130,9 +111,16 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
   const fillLayer = useMemo(() => ({
-    id: 'lotes-fill', type: 'fill',
+    id: 'lotes-fill',
+    type: 'fill',
     paint: {
-      'fill-color': ['match', ['to-string', textProperty], verdes, 'rgba(34, 197, 94, 0.45)', rojos, 'rgba(239, 68, 68, 0.45)', azules, 'rgba(59, 130, 246, 0.45)', 'rgba(14, 165, 233, 0.05)'],
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.45)', 
+        rojos, 'rgba(239, 68, 68, 0.45)',  
+        azules, 'rgba(59, 130, 246, 0.45)', 
+        'transparent' // <-- EL ESCUDO: Todo lo que no sea lote del Excel (como contornos gigantes) será invisible
+      ],
       'fill-opacity': 1
     },
     filter: ['<=', ['length', ['to-string', textProperty]], 4] 
@@ -209,6 +197,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       )}
 
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
+        
         {!isMapReady && (
           <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
             <div className="relative flex items-center justify-center">
