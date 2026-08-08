@@ -119,11 +119,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         verdes, 'rgba(34, 197, 94, 0.45)', 
         rojos, 'rgba(239, 68, 68, 0.45)',  
         azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent' // <-- EL ESCUDO: Todo lo que no sea lote del Excel (como contornos gigantes) será invisible
+        'rgba(14, 165, 233, 0.08)' // <-- MODO RAYOS X: Dibuja un neón tenue para lotes sin datos
       ],
       'fill-opacity': 1
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+    // Quitamos temporalmente el filtro estricto para dejar pasar la geometría aunque no tenga texto
+    // filter: ['<=', ['length', ['to-string', textProperty]], 4] 
   }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
@@ -141,7 +142,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     id: 'lotes-labels', type: 'symbol', minzoom: 16.5,
     layout: { 'text-field': textProperty, 'text-size': 12.5, 'text-anchor': 'center', 'text-allow-overlap': false },
     paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.5 },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    // filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
   const containerClasses = isFullscreen 
