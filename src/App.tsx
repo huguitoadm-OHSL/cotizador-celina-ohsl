@@ -49,6 +49,45 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
+  // PILOTO AUTOMÁTICO (DRON): Vuela al proyecto seleccionado al instante
+  useEffect(() => {
+    const volarAlProyecto = async () => {
+      try {
+        const response = await fetch(geojsonPath);
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        // Si el archivo GeoJSON existe y tiene datos, buscamos sus coordenadas
+        if (data && data.features && data.features.length > 0) {
+          let coordenadas = data.features[0].geometry.coordinates;
+          
+          // Profundizar en los arrays matemáticos por si es MultiPolygon o Polygon
+          while (Array.isArray(coordenadas[0])) {
+            coordenadas = coordenadas[0];
+          }
+          
+          const [lng, lat] = coordenadas;
+          
+          // Ordenamos a la cámara hacer un vuelo cinematográfico
+          if (mapRef.current && lng && lat) {
+            mapRef.current.getMap().flyTo({
+              center: [lng, lat],
+              zoom: 14.5,
+              speed: 1.5, // Velocidad del vuelo
+              curve: 1.2, // Curvatura cinematográfica
+              essential: true
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Piloto automático en espera de datos espaciales...");
+      }
+    };
+
+    // Ejecutar vuelo cada vez que cambie el proyecto en el menú
+    volarAlProyecto();
+  }, [geojsonPath]);
+
   // LA CURA DE LA PANTALLA NEGRA: Método correcto getMap().resize()
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -86,7 +125,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         verdes, 'rgba(34, 197, 94, 0.45)', 
         rojos, 'rgba(239, 68, 68, 0.45)',  
         azules, 'rgba(59, 130, 246, 0.45)', 
-        'rgba(14, 165, 233, 0.05)'         
+        'transparent' // <-- EL ESCUDO INVISIBLE: Ignora la basura de AutoCAD        
       ],
       'fill-opacity': 1
     },
@@ -109,7 +148,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, // <-- AQUÍ ESTÁ LA MAGIA: Limpia la vista desde lejos
+    minzoom: 16.5, // <-- Limpia la vista desde lejos
     layout: {
       'text-field': textProperty,
       'text-size': 12.5,
@@ -209,7 +248,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
-            {/* AQUÍ INYECTÉ LA BRÚJULA 3D PARA CONTROL TÁCTIL */}
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
             {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
