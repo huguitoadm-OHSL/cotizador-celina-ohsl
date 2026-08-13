@@ -280,7 +280,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSESMIGUIA") { 
+    if (passwordInput === "YOSOYELQUESOY") { 
       setIsAuthenticated(true); 
       setIsAdmin(false); 
       setLoginError(false);
