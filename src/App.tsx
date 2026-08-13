@@ -6,7 +6,8 @@ import {
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Info, Ruler
 } from "lucide-react";
-import Map, { Source, Layer, GeolocateControl, Popup } from 'react-map-gl';
+// CORRECCIÓN CRÍTICA: Renombramos 'Map' a 'MapGL' para evitar colisiones en Vercel
+import MapGL, { Source, Layer, GeolocateControl, Popup } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -56,7 +57,6 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
           let uvExtraida = feature.properties.UV || feature.properties.uv || "";
           let mznExtraido = feature.properties.MZN || feature.properties.mzn || "";
 
-          // Conexión real a la Base de Datos JSON
           const loteDB = baseDeDatosLotes.find(l => 
             l.proyecto.includes(proyectoActivo) && 
             parseInt(l.lote, 10) === numLote &&
@@ -64,7 +64,6 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
             (mznExtraido ? String(l.mzn) === String(mznExtraido) : true)
           );
 
-          // Si la celda en el JSON está vacía, asume LIBRE por defecto
           let estadoFinal = loteDB ? (loteDB.estado === "" ? "LIBRE" : loteDB.estado) : 'DESCONOCIDO';
           const supFinal = loteDB ? loteDB.superficie : 300;
           const medidasPerimetrales = supFinal === 300 ? "10 x 30m" : "Irregular";
@@ -87,7 +86,6 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       }).catch(() => setGeoData(null));
   }, [geojsonPath, baseDeDatosLotes, proyectoActivo]);
 
-  // ALGORITMO RBAC: Asesores no ven lotes bloqueados/vendidos en el mapa
   const dataVisible = useMemo(() => {
     if (!geoData) return null;
     if (isAdmin) return geoData; 
@@ -102,7 +100,8 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
 
   const uvLabelsData = useMemo(() => {
     if (!dataVisible) return null;
-    const uvMap = new Map();
+    // AQUÍ ESTABA EL ERROR. AHORA USA EL MAP NATIVO CORRECTAMENTE.
+    const uvMap = new globalThis.Map();
 
     dataVisible.features.forEach(f => {
       const uv = f.properties.uv;
@@ -128,7 +127,6 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
     return { type: 'FeatureCollection', features: labelFeatures };
   }, [dataVisible]);
 
-  // CAPAS WEBGL
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
@@ -271,7 +269,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
 
       <div className="flex-1 relative bg-[#060b13] w-full h-full overflow-hidden">
         <div className="absolute inset-0 pointer-events-auto">
-          <Map
+          <MapGL
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
             maxZoom={20} 
@@ -337,7 +335,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
                 </div>
               </Popup>
             )}
-          </Map>
+          </MapGL>
         </div>
       </div>
     </div>
@@ -371,7 +369,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); 
+  const [tcFlexible, setTcFlexible] = useState(11.66); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -501,8 +499,7 @@ export default function App() {
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
     
-    // Anclaje de valores predeterminados
-    setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
@@ -571,7 +568,7 @@ export default function App() {
     setDescuentoContado(limites.maxContadoPct);
   }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
 
-  // Validaciones estrictas de descuentos
+  // Bloqueo total de ingresos manuales para asegurar la lógica de negocio
   const handleDescContadoChange = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxContadoPct; setDescuentoContado(val > max ? max : val); };
   const handleDescCreditoChange = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxCreditoPct; setDescuentoCredito(val > max ? max : val); };
   const handleDescM2Change = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxDescM2; setDescuentoM2(val > max ? max : val); };
@@ -599,7 +596,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.86;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.66;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -1330,14 +1327,12 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
                           <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
                         </label>
+                        {/* INPUT BLOQUEADO: Solo visualiza el valor máximo configurado */}
                         <input 
                           type="number" 
-                          step="0.01" 
-                          min="0" 
-                          disabled={!aplicarDescContadoM2} 
+                          disabled
                           value={descuentoContadoM2} 
-                          onChange={handleDescContadoM2Change} 
-                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input border-cyan-500/50' : 'bg-slate-900/50 border border-slate-800 text-slate-600'}`} 
                         />
                       </div>
                     )}
@@ -1346,14 +1341,12 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
                           <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500 shrink-0" /> Crédito x m² ($us)
                         </label>
+                        {/* INPUT BLOQUEADO: Solo visualiza el valor máximo configurado */}
                         <input 
                           type="number" 
-                          step="0.01" 
-                          min="0" 
-                          disabled={!aplicarDescM2} 
+                          disabled
                           value={descuentoM2} 
-                          onChange={handleDescM2Change} 
-                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input border-emerald-500/50' : 'bg-slate-900/50 border border-slate-800 text-slate-600'}`} 
                         />
                       </div>
                     )}
