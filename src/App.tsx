@@ -6,7 +6,6 @@ import {
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Info, Ruler
 } from "lucide-react";
-// CORRECCIÓN CRÍTICA: Renombramos 'Map' a 'MapGL' para evitar colisiones en Vercel
 import MapGL, { Source, Layer, GeolocateControl, Popup } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -35,7 +34,7 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// NÚCLEO WEBGIS (CONEXIÓN DIRECTA A BASE DE DATOS)
+// NÚCLEO WEBGIS (CONEXIÓN ROBUSTA A BASE DE DATOS)
 // ============================================================================
 const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -51,33 +50,47 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
         if (!data) return setGeoData(null);
         
         const featuresEnriquecidos = data.features.map(feature => {
-          const nombreRaw = feature.properties.name || feature.properties.Name || feature.properties.LOTE || feature.properties.Lote || "";
+          const p = feature.properties;
+          
+          // ESCÁNER UNIVERSAL RESTAURADO (Aquí estaba el error, se reintegró Text y TextString)
+          const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || p.RefName || "";
           const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
           
-          let uvExtraida = feature.properties.UV || feature.properties.uv || "";
-          let mznExtraido = feature.properties.MZN || feature.properties.mzn || "";
+          let uvExtraida = p.UV || p.uv || p.Layer || p.layer || "";
+          let mznExtraido = p.MZN || p.mzn || p.Layer || p.layer || "";
 
-          const loteDB = baseDeDatosLotes.find(l => 
-            l.proyecto.includes(proyectoActivo) && 
-            parseInt(l.lote, 10) === numLote &&
-            (uvExtraida ? String(l.uv) === String(uvExtraida) : true) &&
-            (mznExtraido ? String(l.mzn) === String(mznExtraido) : true)
-          );
+          const uvLimpia = String(uvExtraida).replace(/[^0-9]/g, '');
+          const mznLimpia = String(mznExtraido).replace(/[^0-9]/g, '');
 
-          let estadoFinal = loteDB ? (loteDB.estado === "" ? "LIBRE" : loteDB.estado) : 'DESCONOCIDO';
+          // Conexión a Base de Datos (Tolerante a fallos)
+          const loteDB = baseDeDatosLotes.find(l => {
+            if (!l.proyecto.includes(proyectoActivo)) return false;
+            if (parseInt(l.lote, 10) !== numLote) return false;
+            
+            const dbUv = String(l.uv).replace(/[^0-9]/g, '');
+            const dbMzn = String(l.mzn).replace(/[^0-9]/g, '');
+
+            if (uvLimpia && dbUv && uvLimpia !== dbUv) return false;
+            if (mznLimpia && dbMzn && mznLimpia !== dbMzn) return false;
+
+            return true;
+          });
+
+          // BLINDAJE ANTIFALLOS: Si no está en BD o falta actualizar, asume LIBRE por defecto
+          let estadoFinal = loteDB && loteDB.estado ? loteDB.estado.toUpperCase() : 'LIBRE';
           const supFinal = loteDB ? loteDB.superficie : 300;
           const medidasPerimetrales = supFinal === 300 ? "10 x 30m" : "Irregular";
 
           return {
             ...feature,
             properties: {
-              ...feature.properties,
-              loteLimpio: numLote,
+              ...p,
+              loteLimpio: isNaN(numLote) ? "" : numLote,
               estado: estadoFinal,
               superficie: supFinal,
               medidas: medidasPerimetrales,
-              uv: loteDB ? loteDB.uv : uvExtraida,
-              mzn: loteDB ? loteDB.mzn : mznExtraido
+              uv: loteDB ? loteDB.uv : (uvLimpia || "-"),
+              mzn: loteDB ? loteDB.mzn : (mznLimpia || "-")
             }
           };
         });
@@ -86,6 +99,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       }).catch(() => setGeoData(null));
   }, [geojsonPath, baseDeDatosLotes, proyectoActivo]);
 
+  // ALGORITMO RBAC: Asesores solo ven lotes LIBRES/DISPONIBLES
   const dataVisible = useMemo(() => {
     if (!geoData) return null;
     if (isAdmin) return geoData; 
@@ -100,12 +114,11 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
 
   const uvLabelsData = useMemo(() => {
     if (!dataVisible) return null;
-    // AQUÍ ESTABA EL ERROR. AHORA USA EL MAP NATIVO CORRECTAMENTE.
     const uvMap = new globalThis.Map();
 
     dataVisible.features.forEach(f => {
       const uv = f.properties.uv;
-      if (!uv || uv === "SN") return;
+      if (!uv || uv === "-" || uv === "SN") return;
       
       let coords = [];
       if (f.geometry.type === 'Polygon') coords = f.geometry.coordinates[0];
@@ -127,22 +140,23 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
     return { type: 'FeatureCollection', features: labelFeatures };
   }, [dataVisible]);
 
+  // CAPAS WEBGL
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
         'match', ['get', 'estado'],
-        'LIBRE', 'rgba(34, 197, 94, 0.35)', 
-        'DISPONIBLE', 'rgba(34, 197, 94, 0.35)',
-        'VENDIDO', 'rgba(59, 130, 246, 0.35)', 
-        'BLOQUEADO', 'rgba(239, 68, 68, 0.35)', 
-        'RESERVADO', 'rgba(239, 68, 68, 0.35)',
-        'transparent'
+        'LIBRE', 'rgba(34, 197, 94, 0.40)', 
+        'DISPONIBLE', 'rgba(34, 197, 94, 0.40)',
+        'VENDIDO', 'rgba(59, 130, 246, 0.40)', 
+        'BLOQUEADO', 'rgba(239, 68, 68, 0.40)', 
+        'RESERVADO', 'rgba(239, 68, 68, 0.40)',
+        'rgba(34, 197, 94, 0.40)' // Pinta de Verde por defecto para evitar espacios vacíos
       ],
       'fill-opacity': 1
     },
-    filter: ['!=', ['get', 'estado'], 'DESCONOCIDO']
+    filter: ['!=', ['geometry-type'], 'Point']
   }), []);
 
   const lineLayer = useMemo(() => ({
@@ -176,12 +190,12 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
     }
   }), []);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  // MOTOR DE NÚMEROS (Totalmente aislado y seguro)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
-      'text-field': textProperty,
+      'text-field': ['to-string', ['get', 'loteLimpio']],
       'text-size': 11,
       'text-anchor': 'center',
       'text-allow-overlap': false
@@ -189,9 +203,9 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
     paint: { 
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
-      'text-halo-width': 1
+      'text-halo-width': 1.5
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    filter: ['!=', ['get', 'loteLimpio'], ''] // Solo pinta si hay número
   }), []);
 
   const handleMouseMove = (e) => {
@@ -214,7 +228,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       const loteDB = baseDeDatosLotes.find(l => 
         l.proyecto.includes(proyectoActivo) && 
         parseInt(l.lote, 10) === p.loteLimpio &&
-        (p.uv ? String(l.uv) === String(p.uv) : true)
+        (p.uv !== "-" ? String(l.uv).replace(/[^0-9]/g, '') === String(p.uv) : true)
       );
 
       if (loteDB) {
@@ -223,7 +237,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       } else {
         onLoteSeleccionado({ 
           isError: false, 
-          data: { lote: p.loteLimpio, mzn: p.mzn, uv: p.uv, superficie: p.superficie, precio: 100, categoria: 'ESTÁNDAR', estado: p.estado } 
+          data: { lote: p.loteLimpio, mzn: p.mzn, uv: p.uv, superficie: p.superficie, precio: 0, categoria: 'ESTÁNDAR', estado: p.estado } 
         });
       }
     }
@@ -298,7 +312,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
               </Source>
             )}
 
-            {hoverInfo && (
+            {hoverInfo && hoverInfo.properties.loteLimpio && (
               <Popup
                 longitude={hoverInfo.lngLat.lng}
                 latitude={hoverInfo.lngLat.lat}
@@ -316,10 +330,10 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
                     Lote {hoverInfo.properties.loteLimpio}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="text-slate-500">MZN:</span> <span className="font-bold">{hoverInfo.properties.mzn || '-'}</span></div>
-                    <div><span className="text-slate-500">UV:</span> <span className="font-bold">{hoverInfo.properties.uv || '-'}</span></div>
+                    <div><span className="text-slate-500">MZN:</span> <span className="font-bold">{hoverInfo.properties.mzn}</span></div>
+                    <div><span className="text-slate-500">UV:</span> <span className="font-bold">{hoverInfo.properties.uv}</span></div>
                     <div className="col-span-2 border-t border-slate-700 pt-1 mt-1 flex justify-between items-center">
-                      <span><span className="text-slate-500">Área:</span> <span className="text-amber-400 font-bold">{hoverInfo.properties.superficie || '-'} m²</span></span>
+                      <span><span className="text-slate-500">Área:</span> <span className="text-amber-400 font-bold">{hoverInfo.properties.superficie} m²</span></span>
                       <span className="flex items-center gap-1 text-[9px] text-slate-400"><Ruler className="w-3 h-3 text-cyan-500"/> {hoverInfo.properties.medidas}</span>
                     </div>
                     <div className="col-span-2">
@@ -369,7 +383,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.66); 
+  const [tcFlexible, setTcFlexible] = useState(11.86); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -379,7 +393,8 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoCredito, setDescuentoCredito] = useState(1);
+  // Regla comercial estricta: 1$ por M2 a crédito y 2$ por M2 al contado
+  const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
@@ -460,7 +475,7 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, [isAuthenticated, isAdmin]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -559,7 +574,7 @@ export default function App() {
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => { 
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 1, maxContadoM2: 2, maxBonoInicial: 500 }; 
+    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; 
   };
 
   useEffect(() => {
@@ -596,7 +611,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.66;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.86;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -1327,7 +1342,7 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
                           <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
                         </label>
-                        {/* INPUT BLOQUEADO: Solo visualiza el valor máximo configurado */}
+                        {/* INPUT BLOQUEADO */}
                         <input 
                           type="number" 
                           disabled
@@ -1341,7 +1356,7 @@ export default function App() {
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
                           <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500 shrink-0" /> Crédito x m² ($us)
                         </label>
-                        {/* INPUT BLOQUEADO: Solo visualiza el valor máximo configurado */}
+                        {/* INPUT BLOQUEADO */}
                         <input 
                           type="number" 
                           disabled
