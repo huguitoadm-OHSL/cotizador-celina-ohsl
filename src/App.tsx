@@ -4,7 +4,7 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair, Filter
+  Maximize, Minimize, Eye, Crosshair, Filter, Info, Ruler
 } from "lucide-react";
 import MapGL, { Source, Layer, GeolocateControl, NavigationControl, Popup } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -34,29 +34,27 @@ const MAP_STYLE_SATELLITE = {
 };
 
 // ============================================================================
-// COMPONENTE WEBGIS (ARQUITECTURA DE ALTO RENDIMIENTO WEBGL)
+// COMPONENTE WEBGIS (NÚCLEO ORIGINAL DE ALTO RENDIMIENTO)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) => {
+const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
-  const [mapFilter, setMapFilter] = useState('TODOS'); // TODOS, DISPONIBLE, VENDIDO, BLOQUEADO
-  
-  const [rawGeojson, setRawGeojson] = useState(null);
+  const [mapFilter, setMapFilter] = useState('TODOS'); 
+  const [hoverInfo, setHoverInfo] = useState(null);
   const [uvLabels, setUvLabels] = useState(null);
   const mapRef = useRef(null);
   
+  // Vía directa al GPU (Rendimiento extremo)
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // 1. INGESTA SÚPER RÁPIDA Y CÁLCULO DE UVs (Una sola vez)
+  // 1. ESCÁNER DE UVs (Súper ligero, no bloquea el renderizado principal)
   useEffect(() => {
     setIsMapReady(false);
     fetch(geojsonPath)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (!data) return;
-        setRawGeojson(data);
         
-        // Algoritmo veloz para extraer UVs y calcular centroides
         const uvMap = new globalThis.Map();
         data.features.forEach(f => {
           let uvRaw = f.properties.UV || f.properties.uv || f.properties.Layer || "";
@@ -67,14 +65,13 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
           if (f.geometry.type === 'Polygon') coords = f.geometry.coordinates[0];
           else if (f.geometry.type === 'MultiPolygon') coords = f.geometry.coordinates[0][0];
           
-          if (coords.length > 0) {
+          if (coords && coords.length > 0) {
             if (!uvMap.has(uvLimpia)) uvMap.set(uvLimpia, { sumLng: 0, sumLat: 0, count: 0 });
             const d = uvMap.get(uvLimpia);
             coords.forEach(c => { d.sumLng += c[0]; d.sumLat += c[1]; d.count++; });
           }
         });
 
-        // Solo crear etiquetas si hay más de 1 UV
         if (uvMap.size > 1) {
           const labelFeatures = Array.from(uvMap.entries()).map(([uv, d]) => ({
             type: 'Feature',
@@ -86,13 +83,11 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
           setUvLabels(null);
         }
         
-        // Vuelo automático
-        if (data.features[0]) {
+        if (data.features[0] && mapRef.current) {
            let coords = data.features[0].geometry.coordinates;
            while (Array.isArray(coords[0])) coords = coords[0];
-           if (mapRef.current) mapRef.current.flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5 });
+           mapRef.current.getMap().flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5 });
         }
-        
         setTimeout(() => setIsMapReady(true), 500);
       }).catch(() => setIsMapReady(true));
   }, [geojsonPath]);
@@ -106,8 +101,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
     }
   }, [isFullscreen]);
 
-  // 2. GENERACIÓN DE MATRICES DE COLOR Y RBAC (Ejecución Instantánea)
-  const { verdes, rojos, azules, visibles } = useMemo(() => {
+  // 2. MATRIZ DE COLORES Y FILTRADO RBAC (Cálculo matemático puro)
+  const { verdes, rojos, azules, ocultos } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
     
@@ -119,34 +114,27 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
       else if (est === 'VENDIDO') a.push(numLote);
     });
 
-    let showV = true, showR = true, showA = true;
-    
-    // Si no es admin, solo ve los verdes obligatoriamente
+    let h = []; // Arreglo de lotes que el motor WebGL debe destruir visualmente
     if (!isAdmin) {
-       showR = false; 
-       showA = false;
+       h = [...r, ...a]; // Si es asesor, ocultar rojos y azules
     } else {
-       // El Director puede filtrar usando el menú
-       if (mapFilter === 'DISPONIBLE') { showR = false; showA = false; }
-       if (mapFilter === 'VENDIDO') { showV = false; showR = false; }
-       if (mapFilter === 'BLOQUEADO') { showV = false; showA = false; }
+       if (mapFilter === 'DISPONIBLE') h = [...r, ...a];
+       if (mapFilter === 'VENDIDO') h = [...v, ...r];
+       if (mapFilter === 'BLOQUEADO') h = [...v, ...a];
     }
 
-    const finalV = showV && v.length > 0 ? v : ['__NONE__'];
-    const finalR = showR && r.length > 0 ? r : ['__NONE__'];
-    const finalA = showA && a.length > 0 ? a : ['__NONE__'];
-    
-    // Lotes autorizados para renderizarse en pantalla
-    const allVisible = [...(showV ? v : []), ...(showR ? r : []), ...(showA ? a : [])];
-    const finalVisibles = allVisible.length > 0 ? allVisible : ['__NONE__'];
-
-    return { verdes: finalV, rojos: finalR, azules: finalA, visibles: finalVisibles };
+    return { 
+      verdes: v.length > 0 ? v : ['__NONE__'], 
+      rojos: r.length > 0 ? r : ['__NONE__'], 
+      azules: a.length > 0 ? a : ['__NONE__'],
+      ocultos: h.length > 0 ? h : ['__NONE__']
+    };
   }, [baseDeDatosLotes, proyectoActivo, isAdmin, mapFilter]);
 
-  // 3. CAPAS WEBGL ALTO RENDIMIENTO
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ''];
-  const isTextShort = ['<=', ['length', ['to-string', textProperty]], 4]; // Filtra basura de AutoCAD
-  const isLoteVisible = ['match', ['to-string', textProperty], visibles, true, false]; // Filtra por Rol y Estado
+  // 3. RENDERIZADO WEBGL (Conexión directa a la tarjeta gráfica)
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
+  const isTextShort = ['<=', ['length', ['to-string', textProperty]], 4]; 
+  const isLoteVisible = ['!', ['in', ['to-string', textProperty], ['literal', ocultos]]];
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
@@ -154,36 +142,36 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
     paint: {
       'fill-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.65)', 
-        rojos, 'rgba(239, 68, 68, 0.65)',  
-        azules, 'rgba(59, 130, 246, 0.65)', 
-        'transparent'
+        verdes, 'rgba(34, 197, 94, 0.45)', // Verde
+        rojos, 'rgba(239, 68, 68, 0.45)',  // Rojo
+        azules, 'rgba(59, 130, 246, 0.45)', // Azul
+        'rgba(34, 197, 94, 0.45)' // Fallback Verde si no está en BD
       ],
       'fill-opacity': 1
     },
     filter: ['all', ['!=', ['geometry-type'], 'Point'], isTextShort, isLoteVisible]
-  }), [verdes, rojos, azules, visibles]);
+  }), [verdes, rojos, azules, isLoteVisible]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-opacity': 0.7 },
+    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
     filter: ['all', ['!=', ['geometry-type'], 'Point'], isTextShort, isLoteVisible]
-  }), [visibles]);
+  }), [isLoteVisible]);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo]);
+    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivoFormulario, 10) || '')] 
+  }), [loteActivoFormulario]);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 13,
+      'text-size': 11.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
     },
@@ -193,57 +181,86 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
       'text-halo-width': 1.5 
     },
     filter: ['all', isTextShort, isLoteVisible]
-  }), [visibles]);
+  }), [isLoteVisible]);
 
   const macroUvLayer = useMemo(() => ({
     id: 'uv-macro-labels',
     type: 'symbol',
     layout: {
       'text-field': ['get', 'label'],
-      'text-size': 42,
+      'text-size': 38,
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
       'text-anchor': 'center'
     },
     paint: {
       'text-color': '#ffffff',
-      'text-halo-color': '#000000',
+      'text-halo-color': '#020617',
       'text-halo-width': 3,
       'text-opacity': ['interpolate', ['linear'], ['zoom'], 14, 1, 16.5, 0] 
     }
   }), []);
 
-  const handleMapClick = (event) => {
-    const feature = event.features?.[0];
-    if (!feature || !feature.properties) return;
-    
-    const p = feature.properties;
-    const nombreLote = p.name || p.Name || p.TextString || p.Text || p.text || "";
-    const numLoteClickeado = parseInt(String(nombreLote).trim(), 10);
-    
-    if (isNaN(numLoteClickeado)) return;
+  // 4. TOOLTIP CYBERTECH (Hover en tiempo real)
+  const handleMouseMove = (e) => {
+    const feature = e.features?.[0];
+    if (feature) {
+      const p = feature.properties;
+      const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
+      const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
+      
+      let uvExtraida = p.UV || p.uv || p.Layer || p.layer || "";
+      let mznExtraido = p.MZN || p.mzn || p.Layer || p.layer || "";
+      const uvLimpia = String(uvExtraida).replace(/[^0-9]/g, '');
+      const mznLimpia = String(mznExtraido).replace(/[^0-9]/g, '');
 
-    let mznExtraido = null;
-    let uvExtraida = null;
-    const nombreLayer = p.layer || p.Layer || "";
-    
-    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
-    if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
-    
-    const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
-    if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
+      const loteDB = baseDeDatosLotes.find(l => 
+        l.proyecto.includes(proyectoActivo) && 
+        parseInt(l.lote, 10) === numLote &&
+        (uvLimpia ? String(l.uv).replace(/[^0-9]/g, '') === uvLimpia : true) &&
+        (mznLimpia ? String(l.mzn).replace(/[^0-9]/g, '') === mznLimpia : true)
+      );
 
-    let loteFinal = baseDeDatosLotes.find(l => 
-      l.proyecto.includes(proyectoActivo) && 
-      parseInt(l.lote, 10) === numLoteClickeado &&
-      (uvExtraida ? String(l.uv).replace(/[^0-9]/g, '') === uvExtraida : true) &&
-      (mznExtraido ? String(l.mzn).replace(/[^0-9]/g, '') === mznExtraido : true)
-    );
+      let estadoReal = "LIBRE";
+      if (loteDB && loteDB.estado) {
+         const est = loteDB.estado.toUpperCase();
+         if (est === "VENDIDO") estadoReal = "VENDIDO";
+         else if (est === "BLOQUEADO" || est === "RESERVADO") estadoReal = "BLOQUEADO";
+      }
+      
+      const supFinal = loteDB && loteDB.superficie > 0 ? loteDB.superficie : 300;
+      const medidasPerimetrales = supFinal === 300 ? "10 x 30m" : "Irregular";
 
-    if (loteFinal) {
-      onLoteSeleccionado({ isError: false, data: loteFinal });
-      setIsFullscreen(false);
+      setHoverInfo({
+        lngLat: e.lngLat,
+        lote: isNaN(numLote) ? "-" : numLote,
+        mzn: mznLimpia || "-",
+        uv: uvLimpia || "-",
+        estado: estadoReal,
+        superficie: supFinal,
+        medidas: medidasPerimetrales
+      });
     } else {
-      onLoteSeleccionado({ isError: true, lote: numLoteClickeado });
+      setHoverInfo(null);
+    }
+  };
+
+  const handleMapClick = (e) => {
+    if (hoverInfo && hoverInfo.lote !== "-") {
+      const loteDB = baseDeDatosLotes.find(l => 
+        l.proyecto.includes(proyectoActivo) && 
+        parseInt(l.lote, 10) === hoverInfo.lote &&
+        (hoverInfo.uv !== "-" ? String(l.uv).replace(/[^0-9]/g, '') === hoverInfo.uv : true)
+      );
+
+      if (loteDB) {
+        setIsFullscreen(false);
+        onLoteSeleccionado({ isError: false, data: loteDB });
+      } else {
+        onLoteSeleccionado({ 
+          isError: false, 
+          data: { lote: hoverInfo.lote, mzn: hoverInfo.mzn, uv: hoverInfo.uv, superficie: hoverInfo.superficie, precio: 100, categoria: 'ESTÁNDAR', estado: hoverInfo.estado } 
+        });
+      }
     }
   };
 
@@ -264,8 +281,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span> Disponible</span>
                {isAdmin && (
                  <>
-                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span> Vendido</span>
                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span> Bloqueado</span>
+                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span> Vendido</span>
                  </>
                )}
              </p>
@@ -273,16 +290,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
          </div>
          
          <div className="flex items-center gap-3">
-           {/* PESTAÑA DESPLEGABLE EXCLUSIVA PARA DIRECTOR */}
            {isAdmin && (
-             <div className="relative">
+             <div className="relative hidden sm:block">
                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                  <Filter className="w-4 h-4 text-cyan-400" />
                </div>
                <select 
                  value={mapFilter}
                  onChange={(e) => setMapFilter(e.target.value)}
-                 className="bg-[#020617] border border-cyan-500/50 text-cyan-400 text-[10px] font-black uppercase tracking-widest rounded-xl py-2 pl-9 pr-8 outline-none focus:shadow-[0_0_15px_rgba(34,211,238,0.3)] appearance-none cursor-pointer transition-all"
+                 className="bg-[#020617] border border-cyan-500/50 text-cyan-400 text-[10px] font-black uppercase tracking-widest rounded-xl py-2.5 pl-9 pr-8 outline-none focus:shadow-[0_0_15px_rgba(34,211,238,0.3)] appearance-none cursor-pointer transition-all"
                >
                  <option value="TODOS">TODOS LOS ESTADOS</option>
                  <option value="DISPONIBLE">SOLO DISPONIBLES (Verde)</option>
@@ -295,8 +311,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
              </div>
            )}
 
-           <span className="hidden sm:flex text-[10px] font-black bg-cyan-950 text-cyan-400 px-4 py-2 rounded-full border border-cyan-500/50 animate-pulse items-center gap-2 shadow-[0_0_10px_rgba(34,211,238,0.2)]">
-             <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]"></div> GPS ACTIVO
+           <span className="hidden sm:flex text-[10px] font-black bg-cyan-950 text-cyan-400 px-4 py-2.5 rounded-full border border-cyan-500/50 animate-pulse items-center gap-2 shadow-[0_0_10px_rgba(34,211,238,0.2)]">
+             <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]"></div> {isAdmin ? 'MODO DIRECTOR' : 'MODO ASESOR'}
            </span>
            <button 
              type="button"
@@ -317,7 +333,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
                <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
                <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
             </div>
-            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Renderizando Vectores...</div>
+            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Optimizando Vectores WebGL...</div>
           </div>
         )}
 
@@ -330,25 +346,70 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
             mapStyle={MAP_STYLE_SATELLITE as any} 
             style={{ width: '100%', height: '100%' }}
             interactiveLayerIds={['lotes-fill']}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoverInfo(null)}
             onClick={handleMapClick}
-            cursor="crosshair"
+            cursor={hoverInfo ? "pointer" : "crosshair"}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} positionOptions={{ enableHighAccuracy: true }} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            {rawGeojson && (
-              <Source id="dynamic-data" type="geojson" data={rawGeojson}>
-                <Layer {...fillLayer as any} />
-                <Layer {...lineLayer as any} />
-                <Layer {...highlightLayer as any} />
-                <Layer {...labelLayer as any} />
-              </Source>
-            )}
+            {/* EL NÚCLEO ORIGINAL DE VELOCIDAD: Carga el JSON directo al GPU */}
+            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+              <Layer {...fillLayer as any} />
+              <Layer {...lineLayer as any} />
+              <Layer {...highlightLayer as any} />
+              <Layer {...labelLayer as any} />
+            </Source>
 
             {uvLabels && (
               <Source id="macro-uv-labels" type="geojson" data={uvLabels}>
                 <Layer {...macroUvLayer as any} />
               </Source>
+            )}
+
+            {/* TOOLTIP CYBERTECH (ESTILO INMOBILIARIO PREMIUM) */}
+            {hoverInfo && (
+              <Popup
+                longitude={hoverInfo.lngLat.lng}
+                latitude={hoverInfo.lngLat.lat}
+                closeButton={false}
+                closeOnClick={false}
+                anchor="bottom"
+                className="custom-tooltip"
+                maxWidth="300px"
+                offset={15}
+              >
+                <div className="bg-[#0f172a] border border-cyan-500/50 p-4 rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.3)] text-white font-['Plus_Jakarta_Sans'] w-48">
+                  <div className="text-[9px] uppercase tracking-widest text-cyan-400 font-bold mb-1 flex items-center gap-1.5">
+                    <Info className="w-3 h-3" /> Datos del Terreno
+                  </div>
+                  <div className="text-2xl font-black tracking-tight leading-none mb-3 text-white">
+                    LOTE {hoverInfo.lote}
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-3">
+                    <span>MZN: <span className="text-slate-200">{hoverInfo.mzn}</span></span>
+                    <span>UV: <span className="text-slate-200">{hoverInfo.uv}</span></span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-[11px] mb-3 border-t border-slate-700/50 pt-2">
+                    <span className="font-bold">Área: <span className="text-amber-400">{hoverInfo.superficie} {hoverInfo.superficie !== 'Sin datos' && 'm²'}</span></span>
+                    <span className="flex items-center gap-1 text-slate-400"><Ruler className="w-3 h-3 text-cyan-500"/> {hoverInfo.medidas}</span>
+                  </div>
+                  
+                  <div>
+                    <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                      hoverInfo.estado === 'LIBRE' || hoverInfo.estado === 'DISPONIBLE' ? 'bg-green-500 text-[#020617]' :
+                      hoverInfo.estado === 'VENDIDO' ? 'bg-blue-500 text-white' :
+                      hoverInfo.estado === 'BLOQUEADO' ? 'bg-red-500 text-white' :
+                      'bg-slate-700 text-slate-300'
+                    }`}>
+                      {hoverInfo.estado}
+                    </span>
+                  </div>
+                </div>
+              </Popup>
             )}
           </MapGL>
         </div>
@@ -482,7 +543,18 @@ export default function App() {
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
-    return () => document.head.removeChild(link);
+    
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .mapboxgl-popup-content { background: transparent !important; padding: 0 !important; box-shadow: none !important; pointer-events: none; }
+      .mapboxgl-popup-tip { border-top-color: #0f172a !important; border-bottom-color: #0f172a !important; }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(link);
+      document.head.removeChild(style);
+    };
   }, []);
 
   useEffect(() => {
@@ -502,6 +574,7 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
+    
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto, tipoCotizacion]);
 
@@ -532,13 +605,16 @@ export default function App() {
   };
 
   const currentAliases = getAlias(proyecto);
+
   const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
     currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
   ) || [];
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
+  
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  
   const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
@@ -670,38 +746,32 @@ export default function App() {
             let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
+            const isAbril2027 = (currentY === 27 && currentMIndex === 3);
+
             if (aplicarBonificacion) {
                 if (currentY === 26 && currentMIndex === 8) { 
-                  tc_efectivo = TC_PROMOCIONAL; 
-                  descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
+                  tc_efectivo = TC_PROMOCIONAL; descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
                 else if (currentY === 26 && currentMIndex === 9) { 
-                  descPctExacto = 28; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 28; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 10) { 
-                  descPctExacto = 23; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 23; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 11) { 
-                  descPctExacto = 18; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 18; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 0) { 
-                  descPctExacto = 13; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 13; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 1) { 
-                  descPctExacto = 8; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 8; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 2) { 
-                  descPctExacto = 3; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 3; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else { 
-                  descPctExacto = 0; 
-                  tc_efectivo = TC_FLEX_NUMBER; 
+                  descPctExacto = 0; tc_efectivo = TC_FLEX_NUMBER; 
                 }
             }
 
@@ -711,17 +781,19 @@ export default function App() {
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
-            transicionData.push({
-                mesNum: m, 
-                mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
-                pagoUsdNormal: cuota_final || 0, 
-                descPct: ahorroBs > 0 ? descPctExacto : 0,
-                conDescUsd: pagoUsdDesc || 0, 
-                montoBs: montoBs || 0, 
-                tcEfectivo: tc_efectivo || 0,
-                ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
-                isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
-            });
+            if (descPctExacto > 0 || isAbril2027) {
+              transicionData.push({
+                  mesNum: m, 
+                  mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
+                  pagoUsdNormal: cuota_final || 0, 
+                  descPct: ahorroBs > 0 ? descPctExacto : 0,
+                  conDescUsd: pagoUsdDesc || 0, 
+                  montoBs: montoBs || 0, 
+                  tcEfectivo: tc_efectivo || 0,
+                  ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
+                  isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
+              });
+            }
         }
     }
 
@@ -900,34 +972,33 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
+      {/* OVERLAY DE LOGIN CON BLUR CINEMATOGRÁFICO Y MAPA DE FONDO */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] bg-[#020617]/70 backdrop-blur-xl flex flex-col items-center justify-center p-4 overflow-hidden">
-          <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-emerald-500"></div>
-            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(6,182,212,0.5)] relative">
-               <div className="absolute inset-0 bg-cyan-400/30 rounded-full blur-xl animate-pulse"></div>
-               <Lock className="w-10 h-10 text-[#020617] relative z-10" />
+        <div className="fixed inset-0 z-[200] backdrop-blur-xl bg-[#020617]/70 flex flex-col items-center justify-center p-4">
+          <div className="bg-[#0f172a]/80 border border-slate-800 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative z-10 shadow-2xl flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+               <Lock className="w-10 h-10 text-[#020617]" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]">Quantum</span></h1>
-            <p className="text-cyan-500/80 text-xs uppercase tracking-[0.2em] font-black mb-8 border border-cyan-500/20 px-4 py-1 rounded-full">Motor Financiero V3.0</p>
-            <form onSubmit={handleLogin} className="w-full space-y-6 relative z-10">
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Quantum</span></h1>
+            <p className="text-slate-400 text-sm mb-8">Ingresa la clave de acceso autorizada.</p>
+            <form onSubmit={handleLogin} className="w-full space-y-6">
               <div className="relative">
                 <input 
                   type="password" 
                   value={passwordInput} 
                   onChange={(e) => setPasswordInput(e.target.value)} 
-                  placeholder="Credencial de Acceso" 
-                  className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-slate-700 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(6,182,212,0.2)]'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none transition-all shadow-inner`} 
+                  placeholder="Contraseña" 
+                  className={`w-full bg-[#060b13] border ${loginError ? 'border-rose-500/50' : 'border-slate-700'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none focus:border-cyan-500 transition-colors shadow-inner`} 
                 />
                 {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
               </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm hover:-translate-y-1">
+              <button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-[#020617] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
                 <Unlock className="w-5 h-5"/> Desbloquear Sistema
               </button>
             </form>
-            <div className="mt-12 pt-6 border-t border-slate-800/50 w-full relative z-10">
-              <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Desarrollado y Creado por</div>
-              <div className="text-slate-300 font-bold tracking-widest mt-1">OSCAR SARAVIA ®</div>
+            <div className="mt-12 pt-6 border-t border-slate-800/50 w-full">
+              <div className="text-slate-500 text-[9px] uppercase tracking-widest font-black">Powered by</div>
+              <div className="text-slate-300 font-bold tracking-widest">OSCAR SARAVIA</div>
             </div>
           </div>
         </div>
@@ -958,55 +1029,58 @@ export default function App() {
         </div>
       )}
 
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.15] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
-            {[...Array(15)]?.map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(34, 211, 238, 0.5)" strokeWidth="1" strokeDasharray="4 4" />)}
-            {[...Array(15)]?.map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(34, 211, 238, 0.5)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)]?.map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            {[...Array(15)]?.map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="4 4" />)}
+            <polygon points="0,0 60,30 0,60 -60,30" fill="rgba(6, 182, 212, 0.1)" stroke="#0891b2" strokeWidth="1" />
+            <polygon points="60,30 120,60 60,90 0,60" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" strokeWidth="1.5" />
+            <polygon points="-60,30 0,60 -60,90 -120,60" fill="rgba(2, 132, 199, 0.1)" stroke="#0369a1" strokeWidth="1" />
           </g>
         </svg>
       </div>
 
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none no-print">
-        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-cyan-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-cyan-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
         <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-emerald-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0 no-print">
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
+      <div className="max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0">
         
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
-          <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6 no-print w-full min-w-0">
+          <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+             <button onClick={() => setIsAuthenticated(false)} className="flex-1 sm:flex-none bg-slate-900/50 hover:bg-rose-900/40 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-3 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="flex-1 sm:flex-none bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
           </div>
           
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] w-full sm:w-auto hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-3 sm:p-3 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-in slide-in-from-top-4 w-full sm:w-auto">
              <div className="flex items-center gap-2">
-               <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
+               <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/20 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC Mercado</div>
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none">
+             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-9 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner" 
                 />
              </div>
           </div>
@@ -1014,34 +1088,35 @@ export default function App() {
 
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative no-print min-w-0">
           <div className="hidden md:block w-32"></div>
-          <div className="text-center flex-1 flex flex-col items-center max-w-full relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32 bg-cyan-500/20 blur-[80px] pointer-events-none z-0"></div>
-            
-            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] mb-4 sm:mb-5 backdrop-blur-md relative z-10">
+          <div className="text-center flex-1 flex flex-col items-center max-w-full">
+            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] mb-4 sm:mb-5 backdrop-blur-md">
               <Sparkles className="w-4 h-4 text-cyan-400" />
               <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Plataforma Fintech de Alta Precisión</span>
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full relative z-10">
-              Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.2)]">Quantum</span>
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full">
+              Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400">Quantum</span>
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase relative z-10">Motor Financiero V 3.0</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase">Motor Financiero V 3.0</p>
           </div>
           <div className="hidden md:block w-32"></div>
         </div>
 
-        <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
+        {/* MAPA INTERACTIVO */}
+        <div className="w-full mb-8 sm:mb-12 no-print relative z-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
            <MapaEspacial 
-             loteActivo={lote}
+             loteActivoFormulario={lote}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en el Manzano activo. Selecciona MZN primero.`);
+                  showNotification(`⚠️ Lote no encontrado en la Base de Datos o no disponible.`);
                   return;
                }
+
                const loteEnBD = respuesta.data;
                
+               // Autocompletado del formulario
                setRegional("MONTERO");
                setProyecto("MUYURINA");
                setUv(loteEnBD.uv);
@@ -1052,27 +1127,34 @@ export default function App() {
                setCategoria(loteEnBD.categoria || "ESTÁNDAR");
                  
                setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
+               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado`);
+               
+               // AUTOSCROLL MÁGICO AL FORMULARIO
+               setTimeout(() => {
+                 if (formRef.current) {
+                   formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                 }
+               }, 300);
              }}
            />
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
+        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0 scroll-mt-24">
           
-          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
-            <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
+          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0">
+            <div className="bg-[#0d1420]/80 p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
               <div className="flex items-center gap-3 relative z-10">
-                <div className="bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/30 shadow-[inset_0_0_15px_rgba(34,211,238,0.15)]">
+                <div className="bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/20 shadow-inner">
                   <FileText className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white drop-shadow-md">Datos de Inversión</h2>
+                <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white">Datos de Inversión</h2>
               </div>
               
               <div className="relative z-10">
                 {!cargandoBD && baseDeDatosLotes.length > 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/40 border border-emerald-500/40 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)] backdrop-blur-md">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_8px_rgba(52,211,153,1)]"></div> BD Online
+                   <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/30 border border-emerald-500/30 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider shadow-sm">
+                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> BD Online
                    </span>
                 )}
                 {!cargandoBD && baseDeDatosLotes.length === 0 && (
@@ -1083,21 +1165,21 @@ export default function App() {
               </div>
             </div>
             
-            <div className="p-5 sm:p-8 flex-1 bg-[#090e17]/60 backdrop-blur-md">
+            <div className="p-5 sm:p-8 flex-1 bg-[#090e17]/50">
               <form onSubmit={handleProcesar} className="space-y-5 sm:space-y-6">
 
-                <div className="flex bg-[#04070b] p-1.5 rounded-2xl border border-slate-800 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] mb-6 relative overflow-hidden">
+                <div className="flex bg-[#060b13] p-1.5 rounded-2xl border border-slate-800 shadow-inner mb-6">
                   <button 
                     type="button" 
                     onClick={() => { setTipoCotizacion('credito'); }} 
-                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'credito' ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-900 shadow-[0_0_20px_rgba(16,185,129,0.5)]' : 'text-slate-500 hover:text-emerald-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tipoCotizacion === 'credito' ? 'bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'text-slate-500 hover:text-emerald-400'}`}
                   >
                     <CreditCard className="w-4 h-4"/> A Crédito
                   </button>
                   <button 
                     type="button" 
                     onClick={() => { setTipoCotizacion('contado'); }} 
-                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-900 shadow-[0_0_20px_rgba(6,182,212,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${tipoCotizacion === 'contado' ? 'bg-cyan-500 text-slate-900 shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-slate-500 hover:text-cyan-400'}`}
                   >
                     <Wallet className="w-4 h-4"/> Al Contado
                   </button>
@@ -1111,7 +1193,7 @@ export default function App() {
                     <select 
                       value={regional} 
                       onChange={e => setRegional(e.target.value)} 
-                      className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]'}`}
+                      className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}
                     >
                       {Object.keys(proyectosPorRegional)?.map(reg => <option key={reg} value={reg}>{reg}</option>)}
                     </select>
@@ -1134,7 +1216,7 @@ export default function App() {
                       <button 
                         type="button" 
                         onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]' : 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-800/50 hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-800/50') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
                       >
                         {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
@@ -1144,7 +1226,7 @@ export default function App() {
                     <select 
                       value={proyecto} 
                       onChange={e => setProyecto(e.target.value)} 
-                      className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]'}`}
+                      className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500' : 'focus:border-emerald-500'}`}
                     >
                       {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
                       <option value="OTRO">OTRO...</option>
@@ -1158,17 +1240,17 @@ export default function App() {
                       type="text" 
                       value={proyectoPersonalizado} 
                       onChange={e => setProyectoPersonalizado(e.target.value)} 
-                      className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(34,211,238,0.15)] focus:border-cyan-500" 
+                      className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop" 
                       placeholder="Escribe el nombre del proyecto..." 
                     />
                   )}
                 </div>
 
                 <div className="pt-2 sm:pt-3">
-                  <div className="bg-[#0b111a] border border-slate-700 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
+                  <div className="bg-[#0d1420]/80 border border-slate-800/80 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-inner">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]' : 'text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]'}`} />
+                        <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
                       {!usarBD && tieneBD && (
@@ -1181,11 +1263,11 @@ export default function App() {
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}>UV</label>
                         {modoBD ? (
-                           <div className="relative group">
+                           <div className="relative">
                              <select 
                                value={uv} 
                                onChange={handleUvChange} 
-                               className={`w-full bg-[#060b13] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.15)]'}`}
+                               className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer"
                              >
                                <option value="" disabled hidden>Selec.</option>
                                {uvsDisponibles?.map(u => <option key={u} value={u}>{u}</option>)}
@@ -1200,18 +1282,18 @@ export default function App() {
                             value={uv} 
                             onChange={handleUvChange} 
                             placeholder="Ej. 49" 
-                            className={`w-full bg-[#060b13] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.15)]'}`} 
+                            className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0" 
                           />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}>MZN</label>
                         {modoBD ? (
-                           <div className="relative group">
+                           <div className="relative">
                              <select 
                                value={mzn} 
                                onChange={handleMznChange} 
-                               className={`w-full bg-[#060b13] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.15)]'}`}
+                               className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer"
                              >
                                <option value="" disabled hidden>Selec.</option>
                                {mznsDisponibles?.map(m => <option key={m} value={m}>{m}</option>)}
@@ -1226,18 +1308,18 @@ export default function App() {
                             value={mzn} 
                             onChange={handleMznChange} 
                             placeholder="Ej. 6" 
-                            className={`w-full bg-[#060b13] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.15)]'}`} 
+                            className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0" 
                           />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}>LOTE</label>
                         {modoBD ? (
-                           <div className="relative group">
+                           <div className="relative">
                              <select 
                                value={lote} 
                                onChange={handleLoteChange} 
-                               className={`w-full bg-[#060b13] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.15)]'}`}
+                               className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer"
                              >
                                <option value="" disabled hidden>Selec.</option>
                                {lotesDisponibles?.map(l => <option key={l} value={l}>{l}</option>)}
@@ -1252,7 +1334,7 @@ export default function App() {
                             value={lote} 
                             onChange={handleLoteChange} 
                             placeholder="Ej. 9" 
-                            className={`w-full bg-[#060b13] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.15)]'}`} 
+                            className="w-full bg-[#060b13] border border-slate-800 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0" 
                           />
                         )}
                       </div>
@@ -1270,7 +1352,7 @@ export default function App() {
                       value={categoria} 
                       onChange={e => setCategoria(e.target.value)} 
                       placeholder="Ej. LOTE S/CALLE ESQ. A" 
-                      className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 shadow-[inset_0_0_15px_rgba(34,211,238,0.1)] focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]' : 'bg-emerald-950/30 border border-emerald-500/40 text-emerald-100 shadow-[inset_0_0_15px_rgba(52,211,153,0.1)] focus:border-emerald-400 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)]') : 'glass-input'}`} 
+                      className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 ${modoBD ? (tipoCotizacion==='contado' ? 'bg-cyan-950/20 border border-cyan-500/30 text-cyan-100' : 'bg-emerald-950/20 border border-emerald-500/30 text-emerald-100') : 'glass-input'}`} 
                     />
                 </div>
 
@@ -1288,7 +1370,7 @@ export default function App() {
                       value={superficie} 
                       onChange={e => setSuperficie(e.target.value)} 
                       placeholder="Ej. 240" 
-                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none ${modoBD ? `bg-[#060b13] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'text-emerald-400 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(52,211,153,0.15)]'}` : 'glass-input'}`} 
+                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? `bg-[#060b13] border border-slate-800 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}` : 'glass-input'}`} 
                     />
                   </div>
                   <div className="space-y-2.5 relative">
@@ -1304,15 +1386,15 @@ export default function App() {
                       value={precio} 
                       onChange={e => setPrecio(e.target.value)} 
                       placeholder="Ej. 145" 
-                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none ${modoBD ? `bg-[#060b13] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'text-emerald-400 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(52,211,153,0.15)]'}` : 'glass-input'}`} 
+                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 ${modoBD ? `bg-[#060b13] border border-slate-800 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}` : 'glass-input'}`} 
                     />
                   </div>
                 </div>
 
-                <div className={`bg-[#060b13]/50 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 ${tipoCotizacion === 'contado' ? 'border-cyan-500/40 hover:border-cyan-500/60' : 'border-emerald-500/40 hover:border-emerald-500/60'} transition-colors`}>
+                <div className={`bg-slate-800/40 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 ${tipoCotizacion === 'contado' ? 'border-cyan-500/20' : 'border-emerald-500/20'}`}>
                   <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl transition-colors ${tipoCotizacion === 'contado' ? 'bg-cyan-500/10 group-hover:bg-cyan-400/20' : 'bg-emerald-500/10 group-hover:bg-emerald-400/20'}`}></div>
                   <div className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 ${tipoCotizacion === 'contado' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}>
-                    <div className={`p-1.5 rounded-lg border shadow-sm shrink-0 ${tipoCotizacion === 'contado' ? 'bg-cyan-900/50 border-cyan-500/50' : 'bg-emerald-900/50 border-emerald-500/50'}`}>
+                    <div className={`p-1.5 rounded-lg border shadow-sm shrink-0 ${tipoCotizacion === 'contado' ? 'bg-cyan-500/20 border-cyan-500/30' : 'bg-emerald-500/20 border-emerald-500/30'}`}>
                       <Gift className={`w-4 h-4 ${tipoCotizacion === 'contado' ? 'text-cyan-300' : 'text-emerald-300'}`} />
                     </div>
                     Descuentos Exclusivos
@@ -1356,7 +1438,7 @@ export default function App() {
 
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
-                  <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
+                  <div className="col-span-12 md:col-span-8 bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative">
                     <div className="space-y-2">
                       <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
@@ -1369,7 +1451,7 @@ export default function App() {
                         value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'} 
-                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600 shadow-inner" 
+                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600" 
                       />
                     </div>
                     <div className="space-y-2">
@@ -1384,7 +1466,7 @@ export default function App() {
                         value={modoInicial === 'monto' ? inicialMonto : ''} 
                         onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
-                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-black text-amber-400 text-sm sm:text-base placeholder-slate-600 shadow-inner" 
+                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 transition-all font-black text-amber-400 text-sm sm:text-base placeholder-slate-600" 
                       />
                     </div>
                   </div>
@@ -1397,7 +1479,7 @@ export default function App() {
                         required 
                         value={años} 
                         onChange={e => setAños(e.target.value)} 
-                        className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                        className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500"
                       >
                         <option value="" disabled hidden>Selec.</option>
                         {[...Array(14)]?.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
@@ -1413,14 +1495,14 @@ export default function App() {
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
-                  className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-cyan-500 via-blue-500 to-cyan-400 hover:from-cyan-400 hover:via-blue-400 hover:to-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:shadow-[0_0_45px_rgba(34,211,238,0.6)]' : 'from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:via-teal-400 hover:to-emerald-300 shadow-[0_0_30px_rgba(52,211,153,0.4)] hover:shadow-[0_0_45px_rgba(52,211,153,0.6)]'} text-[#020617] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
+                  className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-cyan-600 via-blue-500 to-cyan-500 hover:from-cyan-500 hover:via-blue-400 hover:to-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)]' : 'from-emerald-600 via-teal-500 to-emerald-500 hover:from-emerald-500 hover:via-teal-400 hover:to-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)]'} text-slate-900 font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
                 >
-                  <div className="absolute inset-0 bg-white/40 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
-                  <span className="relative z-10 flex items-center gap-2 sm:gap-3 drop-shadow-sm">
+                  <div className="absolute inset-0 bg-white/30 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
+                  <span className="relative z-10 flex items-center gap-2 sm:gap-3">
                     {isCalculating ? (
-                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin shrink-0 text-[#020617]" /> Renderizando...</>
+                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin shrink-0" /> Procesando Núcleo...</>
                     ) : (
-                      <>Procesar Inversión <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /></>
+                      <>Procesar Cotización <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /></>
                     )}
                   </span>
                 </button>
@@ -1430,62 +1512,62 @@ export default function App() {
 
           <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6 min-w-0 w-full">
             {!resultado || isCalculating ? (
-              <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500 border border-slate-700/50 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-[#0d1420]/60 backdrop-blur-xl">
+              <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500">
                 <div className="relative">
-                  <div className={`absolute inset-0 rounded-full blur-2xl animate-pulse ${tipoCotizacion === 'contado' ? 'bg-cyan-500/30' : 'bg-emerald-500/30'}`}></div>
-                  <div className={`bg-[#060b13] p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-[0_0_40px_rgba(6,182,212,0.3)] border relative z-10 ${tipoCotizacion === 'contado' ? 'border-cyan-500/50' : 'border-emerald-500/50'}`}>
+                  <div className={`absolute inset-0 rounded-full blur-2xl animate-pulse ${tipoCotizacion === 'contado' ? 'bg-cyan-500/20' : 'bg-emerald-500/20'}`}></div>
+                  <div className={`bg-[#060b13] p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-[0_0_30px_rgba(6,182,212,0.2)] border relative z-10 ${tipoCotizacion === 'contado' ? 'border-cyan-500/30' : 'border-emerald-500/30'}`}>
                     {isCalculating ? <Loader2 className={`w-12 h-12 sm:w-16 sm:h-16 animate-spin ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} /> : <Calculator className={`w-12 h-12 sm:w-16 sm:h-16 ${tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />}
                   </div>
                 </div>
-                <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2 sm:mb-3 drop-shadow-md">
-                  {isCalculating ? "Analizando Variables..." : "Motor Financiero"}
+                <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2 sm:mb-3">
+                  {isCalculating ? "Analizando Inversión..." : "Plataforma Fintech"}
                 </h3>
                 <p className="text-sm sm:text-base max-w-md text-slate-400 font-medium leading-relaxed px-2">
-                  {isCalculating ? "Calculando algoritmos y proyecciones en tiempo real." : "Completa los parámetros a la izquierda para generar una propuesta financiera de máxima precisión."}
+                  {isCalculating ? "Calculando algoritmos financieros en tiempo real." : "Completa los parámetros de inversión a la izquierda para generar una propuesta financiera de alta precisión."}
                 </p>
               </div>
             ) : (
-              <div className="glass-panel rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-600/50 bg-[#0d1420]/95 backdrop-blur-2xl">
-                <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[120px] pointer-events-none ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-500/15' : 'bg-emerald-500/15'}`}></div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-5 border-b border-slate-700 gap-4 relative z-10">
-                  <h2 className="text-2xl font-extrabold text-white flex items-center gap-3 tracking-tight drop-shadow-sm">
-                    <div className={`p-2 rounded-xl text-[#060b13] shadow-[0_0_15px_rgba(255,255,255,0.2)] shrink-0 bg-gradient-to-br ${resultado.tipoCotizacion === 'contado' ? 'from-cyan-400 to-blue-500' : 'from-emerald-400 to-teal-500'}`}>
+              <div className="glass-panel rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-2xl border border-slate-700/50">
+                <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[100px] pointer-events-none ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-500/5' : 'bg-emerald-500/5'}`}></div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-5 border-b border-slate-800 gap-4 relative z-10">
+                  <h2 className="text-2xl font-extrabold text-white flex items-center gap-3 tracking-tight">
+                    <div className={`p-2 rounded-xl text-[#060b13] shadow-sm shrink-0 bg-gradient-to-br ${resultado.tipoCotizacion === 'contado' ? 'from-cyan-400 to-blue-500' : 'from-emerald-400 to-teal-500'}`}>
                       <ShieldCheck className="w-5 h-5" />
                     </div> 
                     Resumen de Inversión
                   </h2>
-                  <span className={`border text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 w-full sm:w-auto ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-950/60 text-cyan-400 border-cyan-500/50' : 'bg-emerald-950/60 text-emerald-400 border-emerald-500/50'}`}>
-                    <span className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]' : 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,1)]'}`}></span> 
+                  <span className={`border text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-900/30 text-cyan-400 border-cyan-500/30' : 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30'}`}>
+                    <span className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]' : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,1)]'}`}></span> 
                     {resultado.tipoCotizacion === 'contado' ? 'Al Contado' : 'A Crédito'}
                   </span>
                 </div>
                 
                 <div className="relative z-10 space-y-6">
                   
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-[#04070b]/80 p-4 rounded-2xl border border-slate-700 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-[#060b13]/80 p-4 rounded-2xl border border-slate-800 shadow-inner">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-600 shrink-0 shadow-sm">
-                          <MapPin className={`w-5 h-5 ${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]' : 'text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]'}`} />
+                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 shrink-0">
+                          <MapPin className={`w-5 h-5 ${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`} />
                         </div>
                         <div className="min-w-0">
                           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Proyecto</div>
-                          <div className="text-white font-black text-lg uppercase leading-none truncate drop-shadow-sm">{resultado.proyecto}</div>
+                          <div className="text-white font-black text-lg uppercase leading-none truncate">{resultado.proyecto}</div>
                           {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && (
-                            <div className="text-[8px] text-amber-400 font-bold mt-1 tracking-wider truncate bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/20 w-max">{resultado.categoria}</div>
+                            <div className="text-[8px] text-amber-400 font-bold mt-1 tracking-wider truncate">{resultado.categoria}</div>
                           )}
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
-                        <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
+                        <div className="text-center px-4 py-2 bg-slate-900 rounded-xl border border-slate-800 flex-1 sm:flex-none">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div>
                           <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
                         </div>
-                        <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
+                        <div className="text-center px-4 py-2 bg-slate-900 rounded-xl border border-slate-800 flex-1 sm:flex-none">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div>
                           <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.mzn || '-'}</div>
                         </div>
-                        <div className={`text-center px-4 py-2 rounded-xl border flex-1 sm:flex-none shadow-[0_0_15px_rgba(0,0,0,0.5)] ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-950/60 border-cyan-500/50' : 'bg-emerald-950/60 border-emerald-500/50'}`}>
-                          <div className={`text-[8px] font-extrabold uppercase mb-1 ${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}>LOTE</div>
+                        <div className={`text-center px-4 py-2 rounded-xl border flex-1 sm:flex-none ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-900/30 border-cyan-500/30' : 'bg-emerald-900/30 border-emerald-500/30'}`}>
+                          <div className={`text-[8px] font-extrabold uppercase mb-1 ${resultado.tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`}>LOTE</div>
                           <div className="text-white font-black text-base leading-none truncate">{resultado.lote || '-'}</div>
                         </div>
                       </div>
@@ -1493,24 +1575,24 @@ export default function App() {
 
                   {resultado.tipoCotizacion === 'contado' && (
                     <div className="animate-in zoom-in-95 duration-500 mt-8 space-y-6">
-                       <div className="relative overflow-hidden bg-gradient-to-br from-cyan-950 via-[#04070b] to-[#04070b] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(6,182,212,0.15)] border border-cyan-500/50 group text-center">
+                       <div className="relative overflow-hidden bg-gradient-to-br from-cyan-900 via-blue-900 to-[#060b13] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(6,182,212,0.2)] border border-cyan-500/40 group text-center">
                           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
-                          <div className="absolute -bottom-20 -right-20 opacity-10"><Wallet className="w-64 h-64 text-cyan-400" /></div>
+                          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+                          <div className="absolute -bottom-20 -right-20 opacity-10"><Wallet className="w-64 h-64 text-cyan-300" /></div>
                           <div className="relative z-10 flex flex-col items-center justify-center">
-                             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 text-[10px] sm:text-xs font-black uppercase tracking-widest mb-6 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+                             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-[10px] sm:text-xs font-black uppercase tracking-widest mb-6 shadow-sm">
                                <Tag className="w-3.5 h-3.5"/> Precio Final al Contado
                              </div>
-                             <div className="text-[3.5rem] sm:text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] leading-none mb-3">
+                             <div className="text-[3.5rem] sm:text-7xl font-black text-white tracking-tighter drop-shadow-lg leading-none mb-3">
                                $ {resultado.valorFinal}
                              </div>
                              <div className="text-xl sm:text-2xl font-bold text-cyan-200">
-                               Bs. {resultado.valorFinalBs} <span className="text-[10px] text-cyan-400 uppercase tracking-widest ml-2 bg-cyan-950/80 px-2 py-1 rounded-md border border-cyan-500/50 shadow-sm">TC 6.97 HASTA SEP</span>
+                               Bs. {resultado.valorFinalBs} <span className="text-[10px] text-cyan-400 uppercase tracking-widest ml-2 bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-500/30">TC 6.97 HASTA SEP</span>
                              </div>
                              {resultado.ahorroTotalRaw > 0 && (
-                               <div className="mt-8 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-center gap-4 shadow-[0_0_20px_rgba(52,211,153,0.15)] max-w-xl mx-auto w-full">
-                                 <div className="bg-emerald-500/20 p-3 rounded-full shrink-0 border border-emerald-500/40">
-                                   <Gift className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/>
+                               <div className="mt-8 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-center gap-4 shadow-inner max-w-xl mx-auto w-full">
+                                 <div className="bg-emerald-500/20 p-3 rounded-full shrink-0">
+                                   <Gift className="w-6 h-6 text-emerald-400"/>
                                  </div>
                                  <div className="text-center sm:text-left">
                                    <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">Ahorro Promocional Aplicado</div>
@@ -1518,7 +1600,7 @@ export default function App() {
                                  </div>
                                </div>
                              )}
-                             <div className="mt-8 flex justify-between w-full max-w-xl mx-auto border-t border-cyan-500/30 pt-6">
+                             <div className="mt-8 flex justify-between w-full max-w-xl mx-auto border-t border-cyan-500/20 pt-6">
                                <div className="text-center">
                                  <div className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mb-1">Precio de Lista</div>
                                  <div className="text-slate-300 font-bold text-lg line-through decoration-rose-500/50 decoration-2">$ {resultado.valorOriginal}</div>
@@ -1531,21 +1613,21 @@ export default function App() {
                           </div>
                        </div>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div className="bg-gradient-to-br from-amber-950/50 to-[#04070b] border border-amber-500/50 rounded-2xl p-5 sm:p-6 shadow-[0_0_25px_rgba(245,158,11,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-amber-500/70 transition-colors">
+                         <div className="bg-gradient-to-br from-amber-500/20 to-amber-900/20 border border-amber-500/40 rounded-2xl p-5 sm:p-6 shadow-[0_0_20px_rgba(245,158,11,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-amber-500/60 transition-colors">
                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
                            <div className="text-[10px] sm:text-xs font-black text-amber-400 uppercase tracking-widest mb-1 z-10 flex items-center gap-1.5">
                              <Wallet className="w-3.5 h-3.5" /> Ahorro Total vs T.C. Mercado ({tcFlexible})
                            </div>
-                           <div className="text-2xl sm:text-3xl font-black text-white z-10 drop-shadow-md">
+                           <div className="text-2xl sm:text-3xl font-black text-white z-10">
                              Bs. {resultado.ahorroContraMercado}
                            </div>
                          </div>
-                         <div className="bg-gradient-to-br from-rose-950/50 to-[#04070b] border border-rose-500/50 rounded-2xl p-5 sm:p-6 shadow-[0_0_25px_rgba(244,63,94,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-rose-500/70 transition-colors">
+                         <div className="bg-gradient-to-br from-rose-500/20 to-rose-900/20 border border-rose-500/40 rounded-2xl p-5 sm:p-6 shadow-[0_0_20px_rgba(244,63,94,0.1)] flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-rose-500/60 transition-colors">
                            <div className="absolute top-0 left-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all"></div>
                            <div className="text-[10px] sm:text-xs font-black text-rose-400 uppercase tracking-widest mb-1 z-10 flex items-center gap-1.5">
                              <AlertCircle className="w-3.5 h-3.5" /> Costo por esperar a Octubre (Baja al {resultado.descOctubre}%)
                            </div>
-                           <div className="text-2xl sm:text-3xl font-black text-white z-10 drop-shadow-md">
+                           <div className="text-2xl sm:text-3xl font-black text-white z-10">
                              Pierde Bs. {resultado.costoEsperarOctubre}
                            </div>
                          </div>
@@ -1555,7 +1637,7 @@ export default function App() {
 
                   {resultado.tipoCotizacion === 'credito' && (
                     <div className="animate-in fade-in duration-500 space-y-6">
-                      <div className="bg-gradient-to-br from-[#0b111a] to-[#04070b] p-5 sm:p-6 rounded-2xl border border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 relative overflow-hidden shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
+                      <div className="bg-gradient-to-br from-[#0d1420] to-[#060b13] p-5 sm:p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4 relative overflow-hidden">
                         <div className="text-center sm:text-left">
                           <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1 block">Valor Original del Lote</span>
                           <div className="text-2xl sm:text-3xl font-black text-white">$ {resultado.valorOriginal}</div>
@@ -1563,100 +1645,105 @@ export default function App() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                        <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative overflow-hidden shadow-[0_0_25px_rgba(0,0,0,0.4)]">
+                        <div className="bg-[#0d1420]/60 p-5 rounded-2xl border border-slate-800 text-center sm:text-left relative overflow-hidden">
                           <div className="text-emerald-500 text-[10px] font-extrabold uppercase tracking-widest">Total a Financiar</div>
-                          <div className="text-2xl font-black text-white mt-1 truncate drop-shadow-sm">$ {resultado.valorFinal}</div>
+                          <div className="text-2xl font-black text-white mt-1 truncate">$ {resultado.valorFinal}</div>
                           {resultado.ahorroTotalRaw > 0 && (
-                            <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase truncate max-w-full shadow-sm">
+                            <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-900/20 px-2 py-1 rounded border border-amber-500/20 inline-block uppercase truncate max-w-full">
                               Ahorro Incluido: $ {resultado.ahorroTotal}
                             </div>
                           )}
                         </div>
-                        <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-[0_0_25px_rgba(0,0,0,0.4)]">
-                          <div className="absolute right-0 top-0 text-[8px] bg-emerald-500 text-slate-900 font-black px-2 py-1 rounded-bl-lg shadow-sm">TC 6.97 HASTA SEP</div>
+                        <div className="bg-[#0d1420]/60 p-5 rounded-2xl border border-slate-800 text-center sm:text-left relative">
+                          <div className="absolute right-0 top-0 text-[8px] bg-emerald-500 text-slate-900 font-black px-2 py-1 rounded-bl-lg">TC 6.97 HASTA SEP</div>
                           <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest truncate">Cuota Inicial ({resultado.inicialPct}%)</div>
-                          <div className="text-2xl font-black text-white mt-1 truncate drop-shadow-sm">$ {resultado.inicial}</div>
+                          <div className="text-2xl font-black text-white mt-1 truncate">$ {resultado.inicial}</div>
                           <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.inicialBs}</div>
                         </div>
                       </div>
 
-                      <div className="bg-[#04070b] border border-emerald-500/40 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(16,185,129,0.15)] mt-8 relative w-full">
-                          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/40 to-transparent">
-                              <div>
-                                <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2 drop-shadow-sm">
-                                  <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400 drop-shadow-[0_0_5px_rgba(245,158,11,0.6)]' : 'text-slate-500'}`}/> 
-                                  Descuento Escalonado
-                                </h3>
-                                <p className="text-slate-400 text-[9px] sm:text-[10px] mt-1 font-medium">Pago regular: ${resultado.mensual} · TC Mercado: {tcFlexible}</p>
+                      <details className="group bg-[#04070b] border border-emerald-500/20 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(16,185,129,0.1)] mt-8 cursor-pointer">
+                          <summary className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-emerald-950/20 to-transparent outline-none list-none [&::-webkit-details-marker]:hidden">
+                              <div className="flex items-center gap-3">
+                                <div className="bg-emerald-500/20 p-2 rounded-xl transition-transform group-open:rotate-90">
+                                  <ChevronRight className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                <div>
+                                  <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2">
+                                    <Sparkles className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}/> 
+                                    Descuento Escalonado
+                                  </h3>
+                                  <p className="text-slate-400 text-[9px] sm:text-[10px] mt-1">Clic para expandir • Pago regular: ${resultado.mensual}</p>
+                                </div>
                               </div>
                               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
-                                <div className={`flex items-center justify-between sm:justify-start gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner w-full sm:w-auto ${aplicarBonificacion ? 'bg-slate-900/80 border-emerald-500/50' : 'bg-slate-900/50 border-slate-700'}`}>
+                                <div className={`flex items-center justify-between sm:justify-start gap-3 p-2.5 rounded-2xl border transition-all duration-300 shadow-inner w-full sm:w-auto ${aplicarBonificacion ? 'bg-slate-900/80 border-emerald-500/30' : 'bg-slate-900/50 border-slate-800'}`}>
                                   <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-500'}`}>
                                     Aplicar Descuento
                                   </span>
                                   <button 
                                     type="button" 
-                                    onClick={() => setAplicarBonificacion(!aplicarBonificacion)} 
-                                    className={`relative inline-flex h-6 w-12 shrink-0 items-center rounded-full transition-all duration-300 focus:outline-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] ${aplicarBonificacion ? 'bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)]' : 'bg-slate-800 border border-slate-600'}`}
+                                    onClick={(e) => { e.preventDefault(); setAplicarBonificacion(!aplicarBonificacion); }} 
+                                    className={`relative inline-flex h-6 w-12 shrink-0 items-center rounded-full transition-all duration-300 focus:outline-none shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] ${aplicarBonificacion ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'bg-slate-800 border border-slate-700'}`}
                                   >
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${aplicarBonificacion ? 'translate-x-7 shadow-[0_0_10px_rgba(255,255,255,0.9)]' : 'translate-x-1'}`} />
                                   </button>
                                 </div>
-                                <div className={`border px-4 py-2.5 rounded-xl text-center transition-all duration-300 w-full sm:w-auto ${aplicarBonificacion ? 'bg-amber-950/60 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.25)]' : 'bg-slate-800/50 border-slate-700'}`}>
+                                <div className={`border px-4 py-2.5 rounded-xl text-center transition-all duration-300 w-full sm:w-auto ${aplicarBonificacion ? 'bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-800/50 border-slate-700'}`}>
                                   <div className={`text-[9px] uppercase font-black tracking-widest ${aplicarBonificacion ? 'text-amber-400' : 'text-slate-500'}`}>Ahorro Total Cliente</div>
-                                  <div className={`text-lg sm:text-xl font-black truncate drop-shadow-sm ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
+                                  <div className={`text-lg sm:text-xl font-black truncate ${aplicarBonificacion ? 'text-amber-500' : 'text-slate-600'}`}>Bs. {resultado.totalAhorroTransicion}</div>
                                 </div>
                               </div>
-                          </div>
-                          <div className="overflow-x-auto overflow-y-auto max-h-[400px] custom-scrollbar relative w-full">
-                            {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-[2px] z-20 pointer-events-none transition-all duration-300"></div>}
-                            <table className="w-full text-left text-xs whitespace-nowrap min-w-[700px]">
-                              <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-700">
-                                <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                  <th className="p-3 text-center">Mes</th>
-                                  <th className="p-3 text-center">Pago Fijo ($)</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/50' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
-                                  <th className="p-3 text-center text-white">Monto Real (Bs)</th>
-                                  <th className="p-3 text-center">TC Efe.</th>
+                          </summary>
+                          <div className="w-full relative bg-[#060b13]/50">
+                            {!aplicarBonificacion && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px] z-20 pointer-events-none"></div>}
+                            <table className="w-full text-left text-[10px] sm:text-xs">
+                              <thead className="bg-[#090e17] border-b border-slate-800">
+                                <tr className="font-black text-slate-500 uppercase tracking-widest">
+                                  <th className="py-3 px-2 sm:px-4 text-center">Mes</th>
+                                  <th className="py-3 px-2 sm:px-4 text-center">Fijo ($)</th>
+                                  <th className={`py-3 px-2 sm:px-4 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
+                                  <th className={`py-3 px-2 sm:px-4 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>c/Desc ($)</th>
+                                  <th className="py-3 px-2 sm:px-4 text-center text-white">Real (Bs)</th>
+                                  <th className="py-3 px-2 sm:px-4 text-center">TC</th>
                                 </tr>
                               </thead>
                               <tbody className="font-semibold relative z-10">
                                 {resultado.transicionData?.map((row, i) => (
-                                  <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/60 transition-colors ${row.isDiscounted ? 'bg-emerald-950/20' : 'text-slate-500'}`}>
-                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
-                                    <td className="p-3 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
-                                    <td className={`p-3 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
-                                    <td className={`p-3 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/40 shadow-inner' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
-                                    <td className={`p-3 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
-                                    <td className="p-3 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
+                                  <tr key={i} className={`border-b border-slate-800/50 text-center hover:bg-slate-800/30 transition-colors ${row.isDiscounted ? 'bg-emerald-950/10' : 'text-slate-500'}`}>
+                                    <td className={`py-3 px-2 sm:px-4 font-bold ${row.isDiscounted ? 'text-emerald-400' : 'text-slate-600'}`}>{row.mesLabel}</td>
+                                    <td className="py-3 px-2 sm:px-4 text-slate-300">{Number(row.pagoUsdNormal).toFixed(2)}</td>
+                                    <td className={`py-3 px-2 sm:px-4 ${row.isDiscounted ? 'text-emerald-500' : 'text-slate-600'}`}>{row.descPct > 0 ? `${row.descPct.toFixed(1)}%` : '-'}</td>
+                                    <td className={`py-3 px-2 sm:px-4 font-bold ${row.isDiscounted ? 'text-emerald-300 bg-emerald-950/20' : 'text-slate-500'}`}>{Number(row.conDescUsd).toFixed(2)}</td>
+                                    <td className={`py-3 px-2 sm:px-4 font-black ${row.isDiscounted ? 'text-white' : 'text-slate-400'}`}>{Number(row.montoBs).toFixed(2)}</td>
+                                    <td className="py-3 px-2 sm:px-4 text-slate-400">{Number(row.tcEfectivo).toFixed(2)}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
+                            <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800">
+                              *Simulación referencial. El descuento comercial se ajusta gradualmente hasta alcanzar el TC de Mercado actual.
+                            </div>
                           </div>
-                          <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800 font-bold">
-                            *Simulación referencial. El descuento comercial se ajusta gradualmente hasta alcanzar el TC de Mercado actual.
-                          </div>
-                      </div>
+                      </details>
 
-                      <div className="mt-8 border border-emerald-500/40 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-[#0b111a] w-full">
-                        <div className="bg-[#060b13] p-4 border-b border-emerald-500/30 flex justify-between items-center">
-                          <h3 className="text-slate-200 font-bold text-sm tracking-wide flex items-center gap-2 drop-shadow-sm">
-                            <Calendar className="w-4 h-4 text-emerald-500 shrink-0 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/> Resumen de Plazos Alternativos
+                      <div className="mt-8 border border-emerald-500/20 rounded-2xl overflow-hidden shadow-sm bg-[#0d1420]/50 w-full">
+                        <div className="bg-[#040810] p-4 border-b border-emerald-500/10 flex justify-between items-center">
+                          <h3 className="text-slate-300 font-bold text-sm tracking-wide flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-emerald-500 shrink-0"/> Resumen de Plazos Alternativos
                           </h3>
                         </div>
                         <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0b111a] z-10">
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0d1420] z-10">
                               <div>Plazo</div>
                               <div className="text-emerald-400">Cuota ($us)</div>
                               <div className="text-emerald-400">Cuota (Bs.)</div>
                             </div>
                             <div className="pt-2">
                               {resultado.planPagos?.map((plan, i) => (
-                                <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-950/80 border border-emerald-500/60 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
+                                <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-900/30 border border-emerald-500/40 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/50 border border-transparent'}`}>
                                   <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-                                    {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block shrink-0 shadow-[0_0_8px_rgba(52,211,153,1)]"></span>} 
+                                    {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block shrink-0"></span>} 
                                     <span className="truncate">{plan.año} {plan.año === 1 ? 'Año' : 'Años'}</span>
                                   </div>
                                   <div className={`font-black truncate ${plan.isCurrent ? 'text-white' : 'text-emerald-50'}`}>$ {plan.cuotaUsd}</div>
@@ -1672,7 +1759,7 @@ export default function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 no-print">
                     <button 
                       onClick={() => setEscenarioGuardado(resultado)} 
-                      className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md"
+                      className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm"
                     >
                        <Scale className="w-4 h-4"/>
                        {escenarioGuardado ? "Actualizar Escenario A" : "Guardar como Escenario A"}
@@ -1680,7 +1767,7 @@ export default function App() {
                     {escenarioGuardado && (
                       <button 
                         onClick={() => setMostrarComparativa(true)} 
-                        className={`w-full hover:bg-opacity-90 border text-white font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-lg ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-600 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-emerald-600 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'}`}
+                        className={`w-full hover:bg-opacity-80 border text-white font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-md ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-600 border-cyan-500 shadow-cyan-500/20' : 'bg-emerald-600 border-emerald-500 shadow-emerald-500/20'}`}
                       >
                          <Scale className="w-4 h-4"/> Comparar Escenarios
                       </button>
@@ -1691,20 +1778,20 @@ export default function App() {
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button 
                           onClick={() => window.print()} 
-                          className="w-full sm:w-1/4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold py-3 sm:py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md"
+                          className="w-full sm:w-1/4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 sm:py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md"
                         >
                           <Printer className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                         </button>
                         <button 
                           onClick={copiarTexto} 
-                          className={`w-full sm:w-1/3 bg-[#060b13] border font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden ${resultado.tipoCotizacion === 'contado' ? 'hover:bg-cyan-950/60 border-cyan-500/60 text-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'hover:bg-emerald-950/60 border-emerald-500/60 text-emerald-400 hover:shadow-[0_0_20px_rgba(52,211,153,0.3)]'}`}
+                          className={`w-full sm:w-1/3 bg-transparent border font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden ${resultado.tipoCotizacion === 'contado' ? 'hover:bg-cyan-900/30 border-cyan-500/50 text-cyan-400' : 'hover:bg-emerald-900/30 border-emerald-500/50 text-emerald-400'}`}
                         >
                           {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />}
                           <span className="truncate">{copiado ? 'COPIADO' : 'COPIAR TEXTO'}</span>
                         </button>
                         <button 
                           onClick={enviarWhatsApp} 
-                          className="w-full sm:w-2/3 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#020617] font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:shadow-[0_0_40px_rgba(37,211,102,0.6)] hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider"
+                          className="w-full sm:w-2/3 bg-[#25D366] hover:bg-[#1DA851] text-slate-900 font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-md hover:shadow-lg hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider"
                         >
                           <Send className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /> <span className="truncate">Enviar por WhatsApp</span>
                         </button>
@@ -1716,18 +1803,18 @@ export default function App() {
           </div>
         </div>
 
-        <div className="mt-20 sm:mt-32 pt-12 sm:pt-16 border-t border-slate-800/60 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 no-print relative w-full">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+        <div className="mt-20 sm:mt-32 pt-12 sm:pt-16 border-t border-slate-800/40 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 no-print relative w-full">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
           
-          <div className="text-slate-500 text-[8px] sm:text-[10px] md:text-xs font-black tracking-[0.3em] sm:tracking-[0.5em] uppercase mb-6 sm:mb-8 px-4 drop-shadow-sm">
+          <div className="text-slate-500 text-[8px] sm:text-[10px] md:text-xs font-black tracking-[0.3em] sm:tracking-[0.5em] uppercase mb-6 sm:mb-8 px-4">
             Concepto, Arquitectura y Desarrollo Web
           </div>
           
-          <div className="text-4xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-300 to-cyan-400 tracking-tighter mb-6 sm:mb-8 drop-shadow-[0_0_50px_rgba(34,211,238,0.4)] select-none w-full break-words px-4">
+          <div className="text-4xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-cyan-400 tracking-tighter mb-6 sm:mb-8 drop-shadow-[0_0_30px_rgba(34,211,238,0.2)] select-none w-full break-words px-4">
             OSCAR SARAVIA
           </div>
           
-          <p className="text-slate-400 text-[8px] sm:text-[10px] md:text-xs max-w-3xl font-bold tracking-[0.1em] sm:tracking-[0.2em] leading-relaxed uppercase px-4">
+          <p className="text-slate-600 text-[8px] sm:text-[10px] md:text-xs max-w-3xl font-semibold tracking-[0.1em] sm:tracking-[0.2em] leading-relaxed uppercase px-4">
             Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
           </p>
         </div>
