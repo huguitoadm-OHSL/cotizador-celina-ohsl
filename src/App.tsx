@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
-  MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown,
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock
+  MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, ListOrdered,
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Flame, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
+  Eye
 } from "lucide-react";
-import MapaEspacial from './components/MapaEspacial'; // IMPORTACIÓN DEL NUEVO MÓDULO
+import MapaEspacial from './components/MapaEspacial';
 
 const proyectosPorRegional = {
   "SANTA CRUZ": ["URUBÓ NORTE", "ROSA RODALI", "CELINA PAILÓN", "EL ENCANTO", "EL ENCANTO FASE 2", "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "TAMARINDO", "JARDINES DEL BOSQUE", "EL PORVENIR", "EL PORVENIR FASE 2"],
@@ -75,11 +76,10 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) return; 
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -98,10 +98,10 @@ export default function App() {
         if (!Array.isArray(rawData)) rawData = [];
 
         const parseNum = (val) => {
-            if (val === undefined || val === null || val === '') return null;
+            if (val === undefined || val === null) return 0;
             if (typeof val === 'number') return val;
             const strVal = String(val).replace(',', '.').replace(/[^0-9.-]/g, '');
-            return Number(strVal) || null;
+            return Number(strVal) || 0;
         };
 
         const normalizedData = rawData.map(item => ({
@@ -203,12 +203,25 @@ export default function App() {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
-        setSuperficie(loteEncontrado.superficie?.toString() || "");
-        setPrecio(loteEncontrado.precio?.toString() || ""); 
+        setSuperficie(loteEncontrado.superficie.toString());
+        setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
       }
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
+
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
+
+  useEffect(() => {
+    const limites = calcularLimitesMaximos();
+    setDescuentoCredito(limites.maxCreditoPct);
+    setDescuentoContado(limites.maxContadoPct);
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
+
+  const handleDescContadoChange = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxContadoPct; setDescuentoContado(val > max ? max : val); };
+  const handleDescCreditoChange = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxCreditoPct; setDescuentoCredito(val > max ? max : val); };
+  const handleDescM2Change = (e) => { setDescuentoM2(Number(e.target.value)); };
+  const handleDescContadoM2Change = (e) => { setDescuentoContadoM2(Number(e.target.value)); };
 
   const formatMoney = (amount) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
@@ -246,7 +259,6 @@ export default function App() {
         descPctOct = 28; 
         let tc_octubre = TC_FLEX_NUMBER * (1 - (descPctOct / 100));
         costo_esperar_octubre = (valor_final * tc_octubre) - (valor_final * TC_PROMOCIONAL);
-
     } else {
         const descCreditoPct = aplicarDescCreditoPct ? ((Number(descuentoCredito) || 0) / 100) : 0;
         const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 0) : 0;
@@ -306,32 +318,38 @@ export default function App() {
             let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
-            const isAbril2027 = (currentY === 27 && currentMIndex === 3);
-
             if (aplicarBonificacion) {
                 if (currentY === 26 && currentMIndex === 8) { 
-                  tc_efectivo = TC_PROMOCIONAL; descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
+                  tc_efectivo = TC_PROMOCIONAL; 
+                  descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
                 else if (currentY === 26 && currentMIndex === 9) { 
-                  descPctExacto = 28; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 28; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 10) { 
-                  descPctExacto = 23; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 23; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 11) { 
-                  descPctExacto = 18; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 18; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 0) { 
-                  descPctExacto = 13; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 13; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 1) { 
-                  descPctExacto = 8; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 8; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 2) { 
-                  descPctExacto = 3; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 3; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else { 
-                  descPctExacto = 0; tc_efectivo = TC_FLEX_NUMBER; 
+                  descPctExacto = 0; 
+                  tc_efectivo = TC_FLEX_NUMBER; 
                 }
             }
 
@@ -341,19 +359,17 @@ export default function App() {
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
-            if (descPctExacto > 0 || isAbril2027) {
-              transicionData.push({
-                  mesNum: m, 
-                  mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
-                  pagoUsdNormal: cuota_final || 0, 
-                  descPct: ahorroBs > 0 ? descPctExacto : 0,
-                  conDescUsd: pagoUsdDesc || 0, 
-                  montoBs: montoBs || 0, 
-                  tcEfectivo: tc_efectivo || 0,
-                  ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
-                  isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
-              });
-            }
+            transicionData.push({
+                mesNum: m, 
+                mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
+                pagoUsdNormal: cuota_final || 0, 
+                descPct: ahorroBs > 0 ? descPctExacto : 0,
+                conDescUsd: pagoUsdDesc || 0, 
+                montoBs: montoBs || 0, 
+                tcEfectivo: tc_efectivo || 0,
+                ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
+                isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
+            });
         }
     }
 
@@ -590,6 +606,7 @@ export default function App() {
         </div>
       )}
 
+      {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
@@ -597,6 +614,12 @@ export default function App() {
             {[...Array(15)]?.map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(34, 211, 238, 0.5)" strokeWidth="1" strokeDasharray="4 4" />)}
           </g>
         </svg>
+      </div>
+
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none no-print">
+        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-cyan-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-emerald-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0 no-print">
@@ -607,11 +630,11 @@ export default function App() {
         
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
@@ -625,14 +648,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none">
+             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -655,7 +678,7 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* NÚCLEO WEBGL IMPORTADO (Rendimiento Absoluto) */}
+        {/* MAPA INTERACTIVO DESDE EL ARCHIVO MODULAR */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivoFormulario={lote}
@@ -664,9 +687,10 @@ export default function App() {
              isAdmin={isAdmin}
              onLoteSeleccionado={(respuesta) => {
                if (respuesta.isError) {
-                  showNotification(`⚠️ Lote no encontrado en la Base de Datos o no disponible.`);
+                  showNotification(`⚠️ El Lote ${respuesta.lote} no se encontró en la BD. Revisa si pertenece a este proyecto.`);
                   return;
                }
+
                const loteEnBD = respuesta.data;
                
                setRegional("MONTERO");
@@ -680,11 +704,17 @@ export default function App() {
                  
                setResultado(null); 
                showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
+               
+               setTimeout(() => {
+                 if (formRef.current) {
+                   formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                 }
+               }, 300);
              }}
            />
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
+        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
             <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
@@ -780,6 +810,15 @@ export default function App() {
                       <ChevronDown className="w-5 h-5" />
                     </div>
                   </div>
+                  {proyecto === "OTRO" && (
+                    <input 
+                      type="text" 
+                      value={proyectoPersonalizado} 
+                      onChange={e => setProyectoPersonalizado(e.target.value)} 
+                      className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(34,211,238,0.15)] focus:border-cyan-500" 
+                      placeholder="Escribe el nombre del proyecto..." 
+                    />
+                  )}
                 </div>
 
                 <div className="pt-2 sm:pt-3">
@@ -944,9 +983,12 @@ export default function App() {
                         </label>
                         <input 
                           type="number" 
-                          disabled
+                          step="0.01" 
+                          min="0" 
+                          disabled={!aplicarDescContadoM2} 
                           value={descuentoContadoM2} 
-                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input border-cyan-500/50' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                          onChange={handleDescContadoM2Change} 
+                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'glass-input focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
                         />
                       </div>
                     )}
@@ -957,9 +999,12 @@ export default function App() {
                         </label>
                         <input 
                           type="number" 
-                          disabled
+                          step="0.01" 
+                          min="0" 
+                          disabled={!aplicarDescM2} 
                           value={descuentoM2} 
-                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input border-emerald-500/50' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                          onChange={handleDescM2Change} 
+                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'glass-input focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
                         />
                       </div>
                     )}
@@ -1022,6 +1067,7 @@ export default function App() {
                 </div>
                 )}
 
+                {/* BOTÓN PROCESAR CYBERTECH */}
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
@@ -1227,7 +1273,7 @@ export default function App() {
                                 <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                                   <th className="p-3 text-center">Mes</th>
                                   <th className="p-3 text-center">Pago Fijo ($)</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
                                   <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/50' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
                                   <th className="p-3 text-center text-white">Monto Real (Bs)</th>
                                   <th className="p-3 text-center">TC Efe.</th>
