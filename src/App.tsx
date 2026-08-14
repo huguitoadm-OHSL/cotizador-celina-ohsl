@@ -4,9 +4,10 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair, Filter, Info
+  Maximize, Minimize, Eye, Crosshair
 } from "lucide-react";
-import MapGL, { Source, Layer, GeolocateControl, NavigationControl, Popup } from 'react-map-gl';
+// Aquí inyecté NavigationControl
+import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -29,80 +30,65 @@ const proyectosPorRegional = {
   ]
 };
 
-const MAP_STYLE_SATELLITE = {
-  version: 8,
-  sources: {
-    'esri-satellite': {
-      type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      maxzoom: 17, 
-      attribution: '&copy; Esri, Maxar'
-    }
-  },
-  layers: [{ id: 'satellite-layer', type: 'raster', source: 'esri-satellite', minzoom: 0, maxzoom: 22 }]
-};
-
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR DE ALTA VELOCIDAD RESTAURADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO Y BLINDADO)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) => {
+const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
-  const [mapFilter, setMapFilter] = useState('TODOS'); 
-  const [uvLabels, setUvLabels] = useState(null);
   const mapRef = useRef(null);
   
-  // RUTA DIRECTA AL GPU (El secreto de la velocidad)
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // CÁLCULO DE CENTROIDES PARA UV (Segundo Plano, sin bloquear la RAM)
+  // SEGURO DE VIDA DEL LOADER: Se desvanece máximo a los 2.5s para nunca bloquear el mapa
   useEffect(() => {
     setIsMapReady(false);
-    fetch(geojsonPath)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (!data) return;
-        
-        const uvMap = new globalThis.Map(); // Usamos globalThis.Map para no chocar con MapGL
-        data.features.forEach(f => {
-          let uvRaw = f.properties.UV || f.properties.uv || f.properties.Layer || "";
-          let uvLimpia = String(uvRaw).replace(/[^0-9]/g, '');
-          if (!uvLimpia || uvLimpia === "0") return;
+    const safetyTimer = setTimeout(() => {
+      setIsMapReady(true);
+    }, 2500);
+    return () => clearTimeout(safetyTimer);
+  }, [proyectoActivo]);
 
-          let coords = [];
-          if (f.geometry.type === 'Polygon') coords = f.geometry.coordinates[0];
-          else if (f.geometry.type === 'MultiPolygon') coords = f.geometry.coordinates[0][0];
+  // PILOTO AUTOMÁTICO (DRON): Vuela al proyecto seleccionado al instante
+  useEffect(() => {
+    const volarAlProyecto = async () => {
+      try {
+        const response = await fetch(geojsonPath);
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        // Si el archivo GeoJSON existe y tiene datos, buscamos sus coordenadas
+        if (data && data.features && data.features.length > 0) {
+          let coordenadas = data.features[0].geometry.coordinates;
           
-          if (coords && coords.length > 0) {
-            if (!uvMap.has(uvLimpia)) uvMap.set(uvLimpia, { sumLng: 0, sumLat: 0, count: 0 });
-            const d = uvMap.get(uvLimpia);
-            coords.forEach(c => { d.sumLng += c[0]; d.sumLat += c[1]; d.count++; });
+          // Profundizar en los arrays matemáticos por si es MultiPolygon o Polygon
+          while (Array.isArray(coordenadas[0])) {
+            coordenadas = coordenadas[0];
           }
-        });
+          
+          const [lng, lat] = coordenadas;
+          
+          // Ordenamos a la cámara hacer un vuelo cinematográfico
+          if (mapRef.current && lng && lat) {
+            mapRef.current.getMap().flyTo({
+              center: [lng, lat],
+              zoom: 14.5,
+              speed: 1.5, // Velocidad del vuelo
+              curve: 1.2, // Curvatura cinematográfica
+              essential: true
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Piloto automático en espera de datos espaciales...");
+      }
+    };
 
-        if (uvMap.size > 1) {
-          const labelFeatures = Array.from(uvMap.entries()).map(([uv, d]) => ({
-            type: 'Feature',
-            properties: { label: `UV ${uv}` },
-            geometry: { type: 'Point', coordinates: [d.sumLng / d.count, d.sumLat / d.count] }
-          }));
-          setUvLabels({ type: 'FeatureCollection', features: labelFeatures });
-        } else {
-          setUvLabels(null);
-        }
-        
-        // Vuelo Automático
-        if (data.features[0] && mapRef.current) {
-           let coords = data.features[0].geometry.coordinates;
-           while (Array.isArray(coords[0])) coords = coords[0];
-           mapRef.current.getMap().flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5 });
-        }
-        setTimeout(() => setIsMapReady(true), 600);
-      }).catch(() => setIsMapReady(true));
+    // Ejecutar vuelo cada vez que cambie el proyecto en el menú
+    volarAlProyecto();
   }, [geojsonPath]);
 
-  // Fix Pantalla Cortada al abrir Fullscreen
+  // LA CURA DE LA PANTALLA NEGRA: Método correcto getMap().resize()
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -111,41 +97,24 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
     }
   }, [isFullscreen]);
 
-  // LECTURA NATIVA DE EXCEL Y FILTRADO POR OPACIDAD (Sin alterar el JSON en React)
-  const { verdes, rojos, azules, opacityVerde, opacityRojo, opacityAzul } = useMemo(() => {
+  const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
-    
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
-      if (est === 'VENDIDO') a.push(numLote);
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else v.push(numLote); // Libres, disponibles o sin estado
+      else if (est === 'VENDIDO') a.push(numLote);
     });
-
-    let oV = 1, oR = 1, oA = 1;
-
-    // Menú de Director
-    if (isAdmin) {
-       if (mapFilter === 'DISPONIBLE') { oR = 0; oA = 0; }
-       if (mapFilter === 'VENDIDO') { oV = 0; oR = 0; }
-       if (mapFilter === 'BLOQUEADO') { oV = 0; oA = 0; }
-    }
-
     return { 
       verdes: v.length > 0 ? v : ['__NONE__'], 
       rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__'],
-      opacityVerde: oV,
-      opacityRojo: oR,
-      opacityAzul: oA
+      azules: a.length > 0 ? a : ['__NONE__']
     };
-  }, [baseDeDatosLotes, proyectoActivo, isAdmin, mapFilter]);
+  }, [baseDeDatosLotes, proyectoActivo]);
 
-  // CAPAS DEL MAPA (DIBUJO VELOZ NATIVO)
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
-  const isShortText = ['<=', ['length', ['to-string', textProperty]], 5]; // Filtra basura
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
@@ -153,35 +122,21 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
     paint: {
       'fill-color': [
         'match', ['to-string', textProperty],
-        rojos, 'rgba(239, 68, 68, 0.40)',  // Rojo
-        azules, 'rgba(59, 130, 246, 0.40)', // Azul
-        'rgba(34, 197, 94, 0.40)'           // Verde (Disponible y Fallback por defecto)
+        verdes, 'rgba(34, 197, 94, 0.45)', 
+        rojos, 'rgba(239, 68, 68, 0.45)',  
+        azules, 'rgba(59, 130, 246, 0.45)', 
+        'transparent' // <-- EL ESCUDO INVISIBLE: Ignora la basura de AutoCAD        
       ],
-      'fill-opacity': [
-        'match', ['to-string', textProperty],
-        rojos, opacityRojo,
-        azules, opacityAzul,
-        opacityVerde
-      ]
+      'fill-opacity': 1
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText] 
-  }), [rojos, azules, opacityVerde, opacityRojo, opacityAzul]);
+    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+  }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 
-        'line-color': '#22d3ee', 
-        'line-width': 1.5, 
-        'line-opacity': [
-            'match', ['to-string', textProperty],
-            rojos, opacityRojo === 1 ? 0.8 : 0,
-            azules, opacityAzul === 1 ? 0.8 : 0,
-            opacityVerde === 1 ? 0.8 : 0
-        ]
-    },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
-  }), [rojos, azules, opacityVerde, opacityRojo, opacityAzul]);
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
+  }), []);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
@@ -193,7 +148,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, 
+    minzoom: 16.5, // <-- Limpia la vista desde lejos
     layout: {
       'text-field': textProperty,
       'text-size': 12.5,
@@ -202,97 +157,23 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
     },
     paint: {
       'text-color': '#ffffff', 
-      'text-halo-color': '#020617',
-      'text-halo-width': 1.5,
-      'text-opacity': [
-        'match', ['to-string', textProperty],
-        rojos, opacityRojo,
-        azules, opacityAzul,
-        opacityVerde
-      ]
+      'text-halo-color': '#000000',
+      'text-halo-width': 1.5 
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
-  }), [rojos, azules, opacityVerde, opacityRojo, opacityAzul]);
-
-  const macroUvLayer = useMemo(() => ({
-    id: 'uv-macro-labels',
-    type: 'symbol',
-    layout: {
-      'text-field': ['get', 'label'],
-      'text-size': 42,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'text-anchor': 'center'
-    },
-    paint: {
-      'text-color': '#fcd34d',
-      'text-halo-color': '#020617',
-      'text-halo-width': 3,
-      'text-opacity': ['interpolate', ['linear'], ['zoom'], 14, 1, 16.5, 0] 
-    }
+    filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
-  // CLIC EN EL MAPA (VALIDACIÓN Y BLOQUEO ESTRATÉGICO)
-  const handleMapClick = (event) => {
-    const feature = event.features?.[0];
-    if (!feature || !feature.properties) return;
-    
-    const p = feature.properties;
-    const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
-    const numLoteClickeado = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
-    
-    if (isNaN(numLoteClickeado)) return;
-
-    let mznExtraido = null;
-    let uvExtraida = null;
-    const nombreLayer = p.layer || p.Layer || "";
-    
-    const uvMatch = nombreLayer.match(/UV\s*(\d+)|U\.V\.\s*(\d+)/i);
-    if (uvMatch) uvExtraida = uvMatch[1] || uvMatch[2];
-    
-    const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
-    if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
-
-    // Buscamos en el Excel
-    let loteDB = baseDeDatosLotes.find(l => 
-      l.proyecto.includes(proyectoActivo) && 
-      parseInt(l.lote, 10) === numLoteClickeado &&
-      (uvExtraida ? String(l.uv).replace(/[^0-9]/g, '') === uvExtraida : true)
-    );
-
-    let estadoReal = "LIBRE";
-    if (loteDB && loteDB.estado) {
-        estadoReal = String(loteDB.estado).toUpperCase();
-    }
-
-    // EL MURO DE FUEGO PARA ASESORES
-    if (!isAdmin && (estadoReal === "VENDIDO" || estadoReal === "BLOQUEADO" || estadoReal === "RESERVADO")) {
-        onLoteSeleccionado({ isError: true, message: `⚠️ Este terreno se encuentra ${estadoReal}. Operación de venta denegada.` });
-        return;
-    }
-
-    if (loteDB) {
-      onLoteSeleccionado({ isError: false, data: loteDB });
-      setIsFullscreen(false);
-    } else {
-      // Si el lote no está en Excel, asume libre para no frenar la venta
-      onLoteSeleccionado({ 
-          isError: false, 
-          data: { lote: numLoteClickeado, mzn: mznExtraido || "-", uv: uvExtraida || "-", superficie: 300, precio: 0, categoria: 'ESTÁNDAR', estado: 'LIBRE' } 
-      });
-      setIsFullscreen(false);
-    }
-  };
-
+  // CONTENEDORES RESPONSIVE ABSOLUTOS
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
-    : "relative w-full h-[450px] sm:h-[500px] lg:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
+    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
 
   return (
     <div className={containerClasses}>
       
       {/* HEADER DEL NAVEGADOR */}
       {!isFullscreen && (
-        <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex flex-wrap justify-between items-center shadow-lg relative shrink-0 gap-4">
+        <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
            <div className="flex items-center gap-3 relative z-10">
              <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/40 shadow-[inset_0_0_10px_rgba(34,211,238,0.2)]">
@@ -307,30 +188,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
                </p>
              </div>
            </div>
-           <div className="flex items-center gap-3 relative z-10">
-             
-             {/* PESTAÑA DESPLEGABLE DEL DIRECTOR */}
-             {isAdmin && (
-               <div className="relative hidden sm:block">
-                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                   <Filter className="w-4 h-4 text-cyan-400" />
-                 </div>
-                 <select 
-                   value={mapFilter}
-                   onChange={(e) => setMapFilter(e.target.value)}
-                   className="bg-[#020617] border border-cyan-500/50 text-cyan-400 text-[10px] font-black uppercase tracking-widest rounded-xl py-2 pl-9 pr-8 outline-none focus:shadow-[0_0_15px_rgba(34,211,238,0.3)] appearance-none cursor-pointer transition-all"
-                 >
-                   <option value="TODOS">TODOS LOS ESTADOS</option>
-                   <option value="DISPONIBLE">SOLO DISPONIBLES (Verde)</option>
-                   <option value="VENDIDO">SOLO VENDIDOS (Azul)</option>
-                   <option value="BLOQUEADO">SOLO BLOQUEADOS (Rojo)</option>
-                 </select>
-                 <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                   <ChevronDown className="w-4 h-4 text-cyan-400" />
-                 </div>
-               </div>
-             )}
-
+           <div className="flex gap-3 relative z-10">
              <span className="hidden sm:flex text-[10px] font-black bg-slate-900 text-cyan-400 px-4 py-2 rounded-xl border border-cyan-500/40 items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.15)]">
                <div className="relative flex h-2.5 w-2.5">
                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
@@ -360,9 +218,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
         </button>
       )}
 
-      {/* LIENZO DE MAPA BLINDADO (DIRECTO AL GPU) */}
+      {/* LIENZO DE MAPA BLINDADO */}
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
         
+        {/* PANTALLA DE CARGA (Con auto-desvanecimiento) */}
         {!isMapReady && (
           <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
             <div className="relative flex items-center justify-center">
@@ -370,54 +229,50 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, o
                <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
                <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
             </div>
-            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Renderizando Vectores WebGL...</div>
+            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Enlazando Satélite...</div>
           </div>
         )}
 
-        <div className="absolute inset-0 w-full h-full z-10">
-          <MapGL
+        <div className="absolute inset-0 z-10 w-full h-full">
+          <Map
             ref={mapRef}
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
+            
+            // EL MOTOR BASE SEGURO: Previene excepciones de estilo en WebGL
+            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            
             maxZoom={20} 
-            interactiveLayerIds={['lotes-fill']} // Activamos clicks en los lotes
-            onClick={handleMapClick}
-            cursor="crosshair"
+            interactiveLayerIds={[]} // Tracking Visual Puro
+            onLoad={() => setIsMapReady(true)} // Notifica que renderizó con éxito
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            {/* INYECCIÓN SATELITAL HD CON CIMENTACIÓN */}
+            {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            {/* INYECCIÓN DEL GEOJSON DIRECTO A LA TARJETA GRÁFICA */}
+            {/* INYECCIÓN DE PLANIMETRÍA NEÓN */}
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer as any} />
-              <Layer {...lineLayer as any} />
-              <Layer {...highlightLayer as any} />
-              <Layer {...labelLayer as any} />
+              <Layer {...fillLayer} />
+              <Layer {...lineLayer} />
+              <Layer {...highlightLayer} />
+              <Layer {...labelLayer} />
             </Source>
-
-            {/* ETIQUETAS GIGANTES DE UV */}
-            {uvLabels && (
-              <Source id="macro-uv-labels" type="geojson" data={uvLabels}>
-                <Layer {...macroUvLayer as any} />
-              </Source>
-            )}
-          </MapGL>
+          </Map>
         </div>
       </div>
     </div>
   );
 };
 
-// ============================================================================
-// APP PRINCIPAL (EL CEREBRO FINANCIERO)
-// ============================================================================
 export default function App() {
+  // ==========================================================================
+  // ESTADO DE AUTENTICACIÓN Y VARIABLES
+  // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
@@ -425,10 +280,14 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSPADRE") { 
-      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
-    } else if (passwordInput === "DIRECTOR" || passwordInput === "DIRECTOR2026") { 
-      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
+    if (passwordInput === "DIOSESMIGUIA") { 
+      setIsAuthenticated(true); 
+      setIsAdmin(false); 
+      setLoginError(false);
+    } else if (passwordInput === "DIRECTOR2026") { 
+      setIsAuthenticated(true); 
+      setIsAdmin(true); 
+      setLoginError(false);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
@@ -443,7 +302,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.86); 
+  const [tcFlexible, setTcFlexible] = useState(11.62); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -453,7 +312,7 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoCredito, setDescuentoCredito] = useState(1);
+  const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
@@ -478,11 +337,9 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -501,10 +358,10 @@ export default function App() {
         if (!Array.isArray(rawData)) rawData = [];
 
         const parseNum = (val) => {
-            if (val === undefined || val === null || val === '') return null;
+            if (val === undefined || val === null) return 0;
             if (typeof val === 'number') return val;
             const strVal = String(val).replace(',', '.').replace(/[^0-9.-]/g, '');
-            return Number(strVal) || null;
+            return Number(strVal) || 0;
         };
 
         const normalizedData = rawData.map(item => ({
@@ -521,7 +378,8 @@ export default function App() {
 
         const lotesPermitidos = normalizedData.filter(l => {
           const esValido = !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto);
-          return esValido; 
+          if (isAdmin) return esValido;
+          return esValido && (l.estado === "LIBRE" || l.estado === "DISPONIBLE" || l.estado === "BLOQUEADO" || l.estado === "");
         });
 
         setBaseDeDatosLotes(lotesPermitidos);
@@ -534,7 +392,7 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, [isAuthenticated]);
+  }, [isAdmin]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -561,8 +419,6 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    
-    // ANCLAJE REGLAS DE NEGOCIO
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto, tipoCotizacion]);
 
@@ -593,16 +449,13 @@ export default function App() {
   };
 
   const currentAliases = getAlias(proyecto);
-
   const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
     currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
   ) || [];
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
-  
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-  
   const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
@@ -615,16 +468,14 @@ export default function App() {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
       if (loteEncontrado) {
-        setSuperficie(loteEncontrado.superficie?.toString() || "");
-        setPrecio(loteEncontrado.precio?.toString() || ""); 
+        setSuperficie(loteEncontrado.superficie.toString());
+        setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
       }
     }
   }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
-  const calcularLimitesMaximos = () => { 
-    return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 1, maxContadoM2: 2, maxBonoInicial: 500 }; 
-  };
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
@@ -636,7 +487,6 @@ export default function App() {
   const handleDescCreditoChange = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxCreditoPct; setDescuentoCredito(val > max ? max : val); };
   const handleDescM2Change = (e) => { setDescuentoM2(Number(e.target.value)); };
   const handleDescContadoM2Change = (e) => { setDescuentoContadoM2(Number(e.target.value)); };
-  const handleBonoInicialChange = (e) => { const val = Number(e.target.value); setDescuentoInicial(val > 500 ? 500 : val); };
 
   const formatMoney = (amount) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
@@ -659,7 +509,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.86;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.62;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -734,32 +584,38 @@ export default function App() {
             let currentMIndex = (baseMonthIndex + (m - 1)) % 12;
             let currentY = baseYear + Math.floor((baseMonthIndex + (m - 1)) / 12);
 
-            const isAbril2027 = (currentY === 27 && currentMIndex === 3);
-
             if (aplicarBonificacion) {
                 if (currentY === 26 && currentMIndex === 8) { 
-                  tc_efectivo = TC_PROMOCIONAL; descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
+                  tc_efectivo = TC_PROMOCIONAL; 
+                  descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
                 else if (currentY === 26 && currentMIndex === 9) { 
-                  descPctExacto = 28; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 28; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 10) { 
-                  descPctExacto = 23; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 23; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 11) { 
-                  descPctExacto = 18; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 18; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 0) { 
-                  descPctExacto = 13; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 13; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 1) { 
-                  descPctExacto = 8; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 8; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 2) { 
-                  descPctExacto = 3; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 3; 
+                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else { 
-                  descPctExacto = 0; tc_efectivo = TC_FLEX_NUMBER; 
+                  descPctExacto = 0; 
+                  tc_efectivo = TC_FLEX_NUMBER; 
                 }
             }
 
@@ -769,19 +625,17 @@ export default function App() {
 
             if (ahorroBs > 0 && aplicarBonificacion) totalAhorroTransicion += ahorroBs;
 
-            if (descPctExacto > 0 || isAbril2027) {
-              transicionData.push({
-                  mesNum: m, 
-                  mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
-                  pagoUsdNormal: cuota_final || 0, 
-                  descPct: ahorroBs > 0 ? descPctExacto : 0,
-                  conDescUsd: pagoUsdDesc || 0, 
-                  montoBs: montoBs || 0, 
-                  tcEfectivo: tc_efectivo || 0,
-                  ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
-                  isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
-              });
-            }
+            transicionData.push({
+                mesNum: m, 
+                mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
+                pagoUsdNormal: cuota_final || 0, 
+                descPct: ahorroBs > 0 ? descPctExacto : 0,
+                conDescUsd: pagoUsdDesc || 0, 
+                montoBs: montoBs || 0, 
+                tcEfectivo: tc_efectivo || 0,
+                ahorroBs: ahorroBs > 0 ? ahorroBs : 0, 
+                isDiscounted: aplicarBonificacion && tc_efectivo < TC_FLEX_NUMBER
+            });
         }
     }
 
@@ -960,8 +814,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
+      {/* ==============================================================================
+          PANTALLA DE LOGIN CON EFECTO CYBERTECH
+      ============================================================================== */}
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] bg-[#020617]/70 backdrop-blur-xl flex flex-col items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-500">
           <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-emerald-500"></div>
             <div className="w-20 h-20 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(6,182,212,0.5)] relative">
@@ -1018,6 +875,7 @@ export default function App() {
         </div>
       )}
 
+      {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
@@ -1027,19 +885,27 @@ export default function App() {
         </svg>
       </div>
 
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none no-print">
+        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-cyan-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-emerald-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
+      </div>
+
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0 no-print">
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
+      {/* CONTENEDOR PRINCIPAL - LIBRE DE CLASES "TRANSFORM" QUE ROMPAN EL FULLSCREEN */}
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
+        {/* CABECERA (FLEX-WRAP PARA EVITAR COLAPSO EN MÓVILES) */}
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
@@ -1053,14 +919,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
+             <div className="relative shrink-0 flex-1 sm:flex-none">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -1083,42 +949,16 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
+        {/* MAPA INTERACTIVO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
-             loteActivoFormulario={lote}
+             loteActivo={lote}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
-             isAdmin={isAdmin}
-             onLoteSeleccionado={(respuesta) => {
-               if (respuesta.isError) {
-                  showNotification(respuesta.message || `⚠️ Lote no encontrado en la Base de Datos o no disponible.`);
-                  return;
-               }
-
-               const loteEnBD = respuesta.data;
-               
-               setRegional("MONTERO");
-               setProyecto("MUYURINA");
-               setUv(loteEnBD.uv);
-               setMzn(loteEnBD.mzn);
-               setLote(loteEnBD.lote);
-               setSuperficie(loteEnBD.superficie.toString());
-               setPrecio(loteEnBD.precio.toString()); 
-               setCategoria(loteEnBD.categoria || "ESTÁNDAR");
-                 
-               setResultado(null); 
-               showNotification(`📍 Lote ${loteEnBD.lote} (MZN ${loteEnBD.mzn} - UV ${loteEnBD.uv}) sincronizado en tiempo real`);
-               
-               setTimeout(() => {
-                 if (formRef.current) {
-                   formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                 }
-               }, 300);
-             }}
            />
         </div>
 
-        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
             <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
@@ -1425,11 +1265,11 @@ export default function App() {
                       <input 
                         type="number" 
                         step="0.01" 
-                        min="1.5" 
+                        min="0" 
                         required={modoInicial === 'porcentaje'} 
                         value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
-                        placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'} 
+                        placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
                         className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600 shadow-inner" 
                       />
                     </div>
@@ -1677,7 +1517,7 @@ export default function App() {
                                 <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                                   <th className="p-3 text-center">Mes</th>
                                   <th className="p-3 text-center">Pago Fijo ($)</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
                                   <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/50' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
                                   <th className="p-3 text-center text-white">Monto Real (Bs)</th>
                                   <th className="p-3 text-center">TC Efe.</th>
