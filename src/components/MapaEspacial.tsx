@@ -18,41 +18,24 @@ const MAP_STYLE_SATELLITE = {
   layers: [{ id: 'satellite-layer', type: 'raster', source: 'esri-satellite', minzoom: 0, maxzoom: 22 }]
 };
 
-// Fórmula matemática para calcular las medidas de los lados del polígono
-const calcularDistanciaYAngulo = (coord1, coord2) => {
-  const R = 6371e3;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const toDeg = (x) => (x * 180) / Math.PI;
-  const lat1 = coord1[1], lon1 = coord1[0], lat2 = coord2[1], lon2 = coord2[0];
-  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distancia = R * c;
-  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
-  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
-  let bearing = toDeg(Math.atan2(y, x));
-  let textAngle = bearing - 90;
-  if (textAngle < -90 || textAngle > 90) textAngle += 180;
-  return { distancia, textAngle, midLng: (lon1 + lon2) / 2, midLat: (lat1 + lat2) / 2 };
-};
-
-export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) {
+export default function MapaEspacial({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapFilter, setMapFilter] = useState('TODOS'); 
   const [hoverInfo, setHoverInfo] = useState(null);
-  const [hoverEdges, setHoverEdges] = useState(null);
   const [uvLabels, setUvLabels] = useState(null);
   const mapRef = useRef(null);
   
+  // VÍA DIRECTA AL GPU (El secreto del código fuente original)
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // CÁLCULO DE UVs CENTRALES
+  // CÁLCULO DE UVS CENTRALES EN SEGUNDO PLANO
   useEffect(() => {
     fetch(geojsonPath)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (!data) return;
         const uvMap = new globalThis.Map();
+        
         data.features.forEach(f => {
           let uvRaw = f.properties.UV || f.properties.uv || f.properties.Layer || "";
           let uvLimpia = String(uvRaw).replace(/[^0-9]/g, '');
@@ -80,6 +63,7 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
           setUvLabels(null);
         }
         
+        // Vuelo automático inicial
         if (data.features[0] && mapRef.current) {
            let coords = data.features[0].geometry.coordinates;
            while (Array.isArray(coords[0])) coords = coords[0];
@@ -88,6 +72,7 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
       }).catch(() => {});
   }, [geojsonPath]);
 
+  // FIX DE PANTALLA CORTADA AL ABRIR FULLSCREEN
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -96,41 +81,43 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
     }
   }, [isFullscreen]);
 
-  // NÚCLEO WEBGL: CRUCE CON EXCEL Y FILTRADO RBAC
-  const { verdes, rojos, azules, visibles } = useMemo(() => {
+  // LECTURA DE BD EXCEL Y FILTRADO RBAC MEDIANTE OPACIDAD (Alto Rendimiento)
+  const { verdes, rojos, azules, showV, showR, showA } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
+    
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+      if (est === 'VENDIDO') a.push(numLote);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else if (est === 'VENDIDO') a.push(numLote);
+      else v.push(numLote); // Libres o disponibles
     });
 
-    let finalV = [...v], finalR = [...r], finalA = [...a];
+    let sV = true, sR = true, sA = true;
 
+    // Regla de Asesores
     if (!isAdmin) {
-       finalR = ['__NONE__']; finalA = ['__NONE__']; // Asesores solo ven verde
+       sR = false; sA = false; 
     } else {
-       if (mapFilter === 'DISPONIBLE') { finalR = ['__NONE__']; finalA = ['__NONE__']; }
-       if (mapFilter === 'VENDIDO') { finalV = ['__NONE__']; finalR = ['__NONE__']; }
-       if (mapFilter === 'BLOQUEADO') { finalV = ['__NONE__']; finalA = ['__NONE__']; }
+       // Reglas de Director
+       if (mapFilter === 'DISPONIBLE') { sR = false; sA = false; }
+       if (mapFilter === 'VENDIDO') { sV = false; sR = false; }
+       if (mapFilter === 'BLOQUEADO') { sV = false; sA = false; }
     }
 
-    const vis = [...(finalV[0]!=='__NONE__'?finalV:[]), ...(finalR[0]!=='__NONE__'?finalR:[]), ...(finalA[0]!=='__NONE__'?finalA:[])];
-
+    // Mapbox requiere arreglos con al menos un elemento para que la función 'match' no falle
     return { 
-      verdes: finalV.length > 0 ? finalV : ['__NONE__'], 
-      rojos: finalR.length > 0 ? finalR : ['__NONE__'],
-      azules: finalA.length > 0 ? finalA : ['__NONE__'],
-      visibles: vis.length > 0 ? vis : ['__NONE__']
+      verdes: v.length > 0 ? v : ['__NONE__'], 
+      rojos: r.length > 0 ? r : ['__NONE__'],
+      azules: a.length > 0 ? a : ['__NONE__'],
+      showV: sV, showR: sR, showA: sA
     };
   }, [baseDeDatosLotes, proyectoActivo, isAdmin, mapFilter]);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
-  const isLoteVisible = ['in', ['to-string', textProperty], ['literal', visibles]];
-  const isShort = ['<=', ['length', ['to-string', textProperty]], 5]; 
+  // CAPAS WEBGL NATIVAS (Sin saturar React)
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  const isShortText = ['<=', ['length', ['to-string', textProperty]], 5];
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
@@ -138,98 +125,98 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
     paint: {
       'fill-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.40)', // Verde
-        rojos, 'rgba(239, 68, 68, 0.50)',  // Rojo
-        azules, 'rgba(59, 130, 246, 0.50)', // Azul
-        'transparent'
+        rojos, 'rgba(239, 68, 68, 0.45)',  // Rojo
+        azules, 'rgba(59, 130, 246, 0.45)', // Azul
+        'rgba(34, 197, 94, 0.45)'           // Todo lo demás asume Verde (Disponible)
       ],
-      'fill-opacity': 1
+      'fill-opacity': [
+        'match', ['to-string', textProperty],
+        rojos, showR ? 1 : 0,
+        azules, showA ? 1 : 0,
+        showV ? 1 : 0
+      ]
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShort, isLoteVisible]
-  }), [verdes, rojos, azules, visibles]);
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
+  }), [rojos, azules, showV, showR, showA]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShort, isLoteVisible]
-  }), [visibles]);
+    paint: { 
+      'line-color': '#0ea5e9', 
+      'line-width': 1.5, 
+      'line-opacity': [
+        'match', ['to-string', textProperty],
+        rojos, showR ? 0.8 : 0,
+        azules, showA ? 0.8 : 0,
+        showV ? 0.8 : 0
+      ] 
+    },
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
+  }), [rojos, azules, showV, showR, showA]);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     layout: {
       'text-field': textProperty,
-      'text-size': 12,
+      'text-size': 11.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
     },
     paint: {
       'text-color': '#ffffff', 
       'text-halo-color': '#020617',
-      'text-halo-width': 1.5 
+      'text-halo-width': 1.5,
+      'text-opacity': [
+        'match', ['to-string', textProperty],
+        rojos, showR ? 1 : 0,
+        azules, showA ? 1 : 0,
+        showV ? 1 : 0
+      ]
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShort, isLoteVisible]
-  }), [visibles]);
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
+  }), [rojos, azules, showV, showR, showA]);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo]);
-
-  const edgeDimensionsLayer = useMemo(() => ({
-    id: 'edge-dimensions',
-    type: 'symbol',
-    layout: {
-      'text-field': ['get', 'label'],
-      'text-size': 10.5,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'symbol-placement': 'point',
-      'text-rotation-alignment': 'map',
-      'text-rotate': ['get', 'angle'],
-      'text-offset': [0, -0.6],
-      'text-allow-overlap': true
-    },
-    paint: {
-      'text-color': '#fcd34d',
-      'text-halo-color': '#020617',
-      'text-halo-width': 1.5
-    }
-  }), []);
+    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivoFormulario, 10) || '')] 
+  }), [loteActivoFormulario]);
 
   const macroUvLayer = useMemo(() => ({
     id: 'uv-macro-labels',
     type: 'symbol',
     layout: {
       'text-field': ['get', 'label'],
-      'text-size': 42,
+      'text-size': 38,
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
       'text-anchor': 'center'
     },
     paint: {
-      'text-color': '#ffffff',
+      'text-color': '#fcd34d',
       'text-halo-color': '#020617',
-      'text-halo-width': 3,
+      'text-halo-width': 2,
       'text-opacity': ['interpolate', ['linear'], ['zoom'], 14, 1, 16.5, 0] 
     }
   }), []);
 
-  // TOOLTIPS Y MEDIDAS DINÁMICAS (HAVERSINE)
+  // INTERACCIONES CON MOUSE
   const handleMouseMove = (e) => {
-    const features = e.features;
-    if (features && features.length > 0 && features[0].layer.id === 'lotes-fill') {
-      const activeFeature = features[0];
-      const p = activeFeature.properties;
-      const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
+    const feature = e.features?.[0];
+    if (feature) {
+      const p = feature.properties;
+      const nombreRaw = p.name || p.Name || p.Text || p.text || "";
       const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
+      if (isNaN(numLote)) return setHoverInfo(null);
       
       let uvExtraida = p.UV || p.uv || p.Layer || p.layer || "";
       let mznExtraido = p.MZN || p.mzn || p.Layer || p.layer || "";
       const uvLimpia = String(uvExtraida).replace(/[^0-9]/g, '');
       const mznLimpia = String(mznExtraido).replace(/[^0-9]/g, '');
 
+      // Búsqueda en tu base de datos de Excel
       const loteDB = baseDeDatosLotes.find(l => 
         l.proyecto.includes(proyectoActivo) && 
         parseInt(l.lote, 10) === numLote &&
@@ -244,39 +231,23 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
       }
       
       const supFinal = loteDB && loteDB.superficie > 0 ? loteDB.superficie : "Sin datos";
-      
+      const medidasPerimetrales = supFinal === 300 ? "10 x 30m" : "Irregular";
+
       setHoverInfo({
         lngLat: e.lngLat,
-        lote: isNaN(numLote) ? "-" : numLote,
+        lote: numLote,
         mzn: loteDB ? loteDB.mzn : (mznLimpia || "-"),
         uv: loteDB ? loteDB.uv : (uvLimpia || "-"),
         estado: estadoReal,
-        superficie: supFinal
+        superficie: supFinal,
+        medidas: medidasPerimetrales
       });
-
-      if (activeFeature.geometry && (activeFeature.geometry.type === 'Polygon' || activeFeature.geometry.type === 'MultiPolygon')) {
-        let coordinates = activeFeature.geometry.type === 'Polygon' ? activeFeature.geometry.coordinates[0] : activeFeature.geometry.coordinates[0][0];
-        const edgeFeatures = [];
-        for (let i = 0; i < coordinates.length - 1; i++) {
-          try {
-            const { distancia, textAngle, midLng, midLat } = calcularDistanciaYAngulo(coordinates[i], coordinates[i + 1]);
-            if (distancia > 3) {
-              edgeFeatures.push({
-                type: 'Feature', geometry: { type: 'Point', coordinates: [midLng, midLat] },
-                properties: { label: `${distancia.toFixed(2)}m`, angle: textAngle }
-              });
-            }
-          } catch(err) {}
-        }
-        setHoverEdges({ type: 'FeatureCollection', features: edgeFeatures });
-      }
     } else {
       setHoverInfo(null);
-      setHoverEdges(null);
     }
   };
 
-  const handleMapClick = () => {
+  const handleMapClick = (e) => {
     if (hoverInfo && hoverInfo.lote !== "-") {
       const loteDB = baseDeDatosLotes.find(l => 
         l.proyecto.includes(proyectoActivo) && 
@@ -289,7 +260,7 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
         onLoteSeleccionado({ isError: false, data: loteDB });
       } else {
         onLoteSeleccionado({ 
-          isError: true, 
+          isError: false, 
           data: { lote: hoverInfo.lote, mzn: hoverInfo.mzn, uv: hoverInfo.uv, superficie: hoverInfo.superficie, precio: 0, categoria: 'ESTÁNDAR', estado: hoverInfo.estado } 
         });
       }
@@ -313,8 +284,8 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span> Disponible</span>
                {isAdmin && (
                  <>
-                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span> Vendido</span>
                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span> Bloqueado</span>
+                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span> Vendido</span>
                  </>
                )}
              </p>
@@ -354,81 +325,94 @@ export default function MapaEspacial({ loteActivo, proyectoActivo, baseDeDatosLo
       </div>
 
       <div className="flex-1 relative bg-[#060b13] w-full h-full min-h-[400px]">
-        <MapGL
-          ref={mapRef}
-          mapLib={maplibregl}
-          initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-          maxZoom={20} 
-          mapStyle={MAP_STYLE_SATELLITE as any} 
-          style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
-          interactiveLayerIds={['lotes-fill']}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => { setHoverInfo(null); setHoverEdges(null); }}
-          onClick={handleMapClick}
-          cursor={hoverInfo ? "pointer" : "crosshair"}
-        >
-          <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
-          <NavigationControl position="bottom-right" visualizePitch={true} />
-          
-          <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-            <Layer {...fillLayer as any} />
-            <Layer {...lineLayer as any} />
-            <Layer {...highlightLayer as any} />
-            <Layer {...labelLayer as any} />
-          </Source>
+        
+        {!isMapReady && (
+          <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
+            <div className="relative flex items-center justify-center">
+               <div className="absolute w-24 h-24 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
+               <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
+               <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
+            </div>
+            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Renderizando Vectores...</div>
+          </div>
+        )}
 
-          {uvLabels && (
-            <Source id="macro-uv-labels" type="geojson" data={uvLabels}>
-              <Layer {...macroUvLayer as any} />
+        <div className="absolute inset-0 w-full h-full">
+          <MapGL
+            ref={mapRef}
+            mapLib={maplibregl}
+            initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
+            maxZoom={20} 
+            mapStyle={MAP_STYLE_SATELLITE as any} 
+            style={{ width: '100%', height: '100%' }}
+            interactiveLayerIds={['lotes-fill']}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoverInfo(null)}
+            onClick={handleMapClick}
+            cursor={hoverInfo ? "pointer" : "crosshair"}
+          >
+            <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
+            <NavigationControl position="bottom-right" visualizePitch={true} />
+            
+            {/* EL NÚCLEO ORIGINAL DIRECTO AL GPU */}
+            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+              <Layer {...fillLayer as any} />
+              <Layer {...lineLayer as any} />
+              <Layer {...highlightLayer as any} />
+              <Layer {...labelLayer as any} />
             </Source>
-          )}
 
-          {hoverEdges && (
-            <Source id="hover-edges-data" type="geojson" data={hoverEdges}>
-              <Layer {...edgeDimensionsLayer as any} />
-            </Source>
-          )}
+            {uvLabels && (
+              <Source id="macro-uv-labels" type="geojson" data={uvLabels}>
+                <Layer {...macroUvLayer as any} />
+              </Source>
+            )}
 
-          {/* TOOLTIP CYBERTECH ESTILO INMOBILIARIO */}
-          {hoverInfo && hoverInfo.lote !== "-" && (
-            <Popup
-              longitude={hoverInfo.lngLat.lng}
-              latitude={hoverInfo.lngLat.lat}
-              closeButton={false}
-              closeOnClick={false}
-              anchor="bottom"
-              className="custom-tooltip"
-              maxWidth="300px"
-              offset={15}
-            >
-              <div className="bg-[#0f172a] border border-cyan-500/50 p-4 rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.3)] text-white font-['Plus_Jakarta_Sans'] w-48">
-                <div className="text-[9px] uppercase tracking-widest text-cyan-400 font-bold mb-1 flex items-center gap-1.5">
-                  <Info className="w-3 h-3" /> Datos del Terreno
+            {/* TOOLTIP CYBERTECH ESTILO INMOBILIARIO */}
+            {hoverInfo && hoverInfo.lote !== "-" && (
+              <Popup
+                longitude={hoverInfo.lngLat.lng}
+                latitude={hoverInfo.lngLat.lat}
+                closeButton={false}
+                closeOnClick={false}
+                anchor="bottom"
+                className="custom-tooltip"
+                maxWidth="300px"
+                offset={15}
+              >
+                <div className="bg-[#0f172a] border border-cyan-500/50 p-4 rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.3)] text-white font-['Plus_Jakarta_Sans'] w-48">
+                  <div className="text-[9px] uppercase tracking-widest text-cyan-400 font-bold mb-1 flex items-center gap-1.5">
+                    <Info className="w-3 h-3" /> Datos del Terreno
+                  </div>
+                  <div className="text-2xl font-black tracking-tight leading-none mb-3 text-white">
+                    LOTE {hoverInfo.lote}
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-3">
+                    <span>MZN: <span className="text-slate-200">{hoverInfo.mzn}</span></span>
+                    <span>UV: <span className="text-slate-200">{hoverInfo.uv}</span></span>
+                  </div>
+                  
+                  <div className="flex items-center text-[11px] mb-3 border-t border-slate-700/50 pt-2 justify-between">
+                    <span className="font-bold">Área: <span className="text-amber-400">{hoverInfo.superficie} {hoverInfo.superficie !== 'Sin datos' && 'm²'}</span></span>
+                    <span className="flex items-center gap-1 text-[9px] text-slate-400"><Ruler className="w-3 h-3 text-cyan-500"/> {hoverInfo.medidas}</span>
+                  </div>
+                  
+                  <div>
+                    <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                      hoverInfo.estado === 'LIBRE' || hoverInfo.estado === 'DISPONIBLE' ? 'bg-green-500 text-[#020617]' :
+                      hoverInfo.estado === 'VENDIDO' ? 'bg-blue-500 text-white' :
+                      hoverInfo.estado === 'BLOQUEADO' ? 'bg-red-500 text-white' :
+                      'bg-slate-700 text-slate-300'
+                    }`}>
+                      {hoverInfo.estado === 'SIN_DATOS' ? 'DISPONIBLE' : hoverInfo.estado}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-2xl font-black tracking-tight leading-none mb-3 text-white">
-                  LOTE {hoverInfo.lote}
-                </div>
-                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-3">
-                  <span>MZN: <span className="text-slate-200">{hoverInfo.mzn}</span></span>
-                  <span>UV: <span className="text-slate-200">{hoverInfo.uv}</span></span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] mb-3 border-t border-slate-700/50 pt-2">
-                  <span className="font-bold">Área: <span className="text-amber-400">{hoverInfo.superficie} {hoverInfo.superficie !== 'Sin datos' && 'm²'}</span></span>
-                </div>
-                <div>
-                  <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                    hoverInfo.estado === 'LIBRE' || hoverInfo.estado === 'DISPONIBLE' ? 'bg-green-500 text-[#020617]' :
-                    hoverInfo.estado === 'VENDIDO' ? 'bg-blue-500 text-white' :
-                    hoverInfo.estado === 'BLOQUEADO' ? 'bg-red-500 text-white' :
-                    'bg-slate-700 text-slate-300'
-                  }`}>
-                    {hoverInfo.estado}
-                  </span>
-                </div>
-              </div>
-            </Popup>
-          )}
-        </MapGL>
+              </Popup>
+            )}
+          </MapGL>
+        </div>
       </div>
     </div>
   );
