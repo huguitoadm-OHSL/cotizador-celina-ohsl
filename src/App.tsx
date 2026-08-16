@@ -356,11 +356,19 @@ export default function App() {
         }
 
         if (!Array.isArray(rawData)) rawData = [];
-       // 1. NUEVO PARSER: Lee las comas y puntos de la superficie perfectamente
+      
+        // BUSCADOR INTELIGENTE: Rastrea columnas ignorando espacios ocultos o mayúsculas
+        const getSafeVal = (obj, propName) => {
+            const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
+            return key ? obj[key] : undefined;
+        };
+
+        // PARSER MATEMÁTICO: Traduce comas latinas y puntos corporativos a números puros
         const parseNum = (val) => {
-            if (val === undefined || val === null || val === '') return 0;
+            if (val === undefined || val === null || val === '') return ''; 
             if (typeof val === 'number') return val;
             let strVal = String(val).trim();
+            
             if (strVal.includes('.') && strVal.includes(',')) {
                 if (strVal.indexOf('.') < strVal.indexOf(',')) {
                     strVal = strVal.replace(/\./g, '').replace(',', '.');
@@ -371,24 +379,25 @@ export default function App() {
                 strVal = strVal.replace(',', '.');
             }
             strVal = strVal.replace(/[^0-9.-]/g, '');
-            return Number(strVal) || 0;
+            const finalNum = Number(strVal);
+            return isNaN(finalNum) ? '' : finalNum;
         };
 
         const normalizedData = rawData.map(item => ({
-            proyecto: String(item?.Proyecto || item?.proyecto || item?.PROYECTO || "").trim().toUpperCase(),
-            uv: String(item?.uv || item?.Uv || item?.UV || "").trim().toUpperCase() || "SN", 
-            mzn: String(item?.mzn || item?.Mzn || item?.MZN || "").trim().toUpperCase(),
-            lote: String(item?.lote || item?.Lote || item?.LOTE || "").trim().toUpperCase(),
-            superficie: parseNum(item?.superficie || item?.Superficie || item?.SUPERFICIE),
-            precio: parseNum(item?.precio || item?.Precio || item?.PRECIO),
-            estado: String(item?.estado || item?.Estado || item?.ESTADO || "LIBRE").trim().toUpperCase(),
-            categoria: String(item?.categoria || item?.Categoria || item?.CATEGORIA || "ESTÁNDAR").trim().toUpperCase(),
-            vendedor: String(item?.vendedor || item?.Vendedor || item?.VENDEDOR || "NO ASIGNADO") 
+            proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
+            uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
+            mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
+            lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
+            superficie: parseNum(getSafeVal(item, 'superficie')),
+            precio: parseNum(getSafeVal(item, 'precio')),
+            estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
+            categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
+            vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase()
         }));
 
-        // 2. LECTOR TOTAL: Permite que todos los lotes (Vendidos, Bloqueados) pasen al mapa
+        // LECTOR TOTAL DE INVENTARIO: Permite visibilidad absoluta
         const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
-
+        
         setBaseDeDatosLotes(lotesPermitidos);
         setCargandoBD(false);
 
