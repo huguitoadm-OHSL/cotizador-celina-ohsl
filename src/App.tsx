@@ -439,7 +439,7 @@ export default function App() {
             // 4. FUSIÓN CUÁNTICA: Sobrescribimos tu Excel EN MEMORIA con los datos vivos
             setBaseDeDatosLotes(lotesAntiguos => {
               const nuevaBase = [...lotesAntiguos];
-              dataLotes.lotes.forEach(loteFresco => {
+            dataLotes.lotes.forEach(loteFresco => {
                 const idx = nuevaBase.findIndex(l => 
                   l.proyecto.includes(proyecto) && 
                   String(l.lote) === String(loteFresco.lote) &&
@@ -447,11 +447,24 @@ export default function App() {
                 );
                 
                 if (idx !== -1) {
-                  // Si encuentra el lote de la API en tu Excel, le actualiza el precio y superficie exactos
+                  // Si ya existe en tu Excel, solo lo actualiza
                   nuevaBase[idx].superficie = Number(loteFresco.mt2 || nuevaBase[idx].superficie);
                   nuevaBase[idx].precio = Number(loteFresco.price_mt2 || nuevaBase[idx].precio);
                   nuevaBase[idx].estado = "LIBRE"; 
                   if(loteFresco.categoria) nuevaBase[idx].categoria = String(loteFresco.categoria).toUpperCase();
+                } else {
+                  // MAGIA PURA: Si NO existe en tu Excel (Ej: El Porvenir), lo crea automáticamente
+                  nuevaBase.push({
+                    proyecto: proyecto,
+                    uv: loteFresco.uv ? String(loteFresco.uv) : "SN",
+                    mzn: loteFresco.manzano ? String(loteFresco.manzano) : "SN",
+                    lote: String(loteFresco.lote),
+                    superficie: Number(loteFresco.mt2 || 0),
+                    precio: Number(loteFresco.price_mt2 || 0),
+                    estado: "LIBRE",
+                    categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
+                    vendedor: "SISTEMA API"
+                  });
                 }
               });
               return nuevaBase;
