@@ -4,7 +4,7 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair, Filter, Info, Ruler
+  Maximize, Minimize, Eye, Crosshair, Filter, Info, ShieldAlert
 } from "lucide-react";
 import MapGL, { Source, Layer, GeolocateControl, NavigationControl, Popup } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -20,65 +20,62 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// FÓRMULA MATEMÁTICA PARA MEDIDAS (Geodesia)
-// ============================================================================
-const calcularDistanciaYAngulo = (coord1, coord2) => {
-  const R = 6371e3;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const toDeg = (x) => (x * 180) / Math.PI;
-  const lat1 = coord1[1], lon1 = coord1[0], lat2 = coord2[1], lon2 = coord2[0];
-  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distancia = R * c;
-  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
-  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
-  let bearing = toDeg(Math.atan2(y, x));
-  let textAngle = bearing - 90;
-  if (textAngle < -90 || textAngle > 90) textAngle += 180;
-  return { distancia, textAngle, midLng: (lon1 + lon2) / 2, midLat: (lat1 + lat2) / 2 };
-};
-
-// ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR DE ALTA VELOCIDAD RESTAURADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR CUÁNTICO)
 // ============================================================================
 const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, isAdmin, onLoteSeleccionado }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
   const [mapFilter, setMapFilter] = useState('TODOS'); 
-  const [hoverInfo, setHoverInfo] = useState(null);
-  const [hoverEdges, setHoverEdges] = useState(null);
+  const [rawGeoData, setRawGeoData] = useState(null);
   const [uvLabels, setUvLabels] = useState(null);
+  const [hoverInfo, setHoverInfo] = useState(null);
   const mapRef = useRef(null);
   
-  // RUTA DIRECTA AL GPU
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // CÁLCULO DE CENTROIDES PARA UV
+  // 1. EL INTERCEPTOR: DESCARGA, LIMPIA TEXTOS DE AUTOCAD Y CREA CENTROIDES UV
   useEffect(() => {
     setIsMapReady(false);
     fetch(geojsonPath)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (!data) return;
-        
-        const uvMap = new globalThis.Map();
-        data.features.forEach(f => {
-          let uvRaw = f.properties.UV || f.properties.uv || f.properties.Layer || "";
-          let uvLimpia = String(uvRaw).replace(/[^0-9]/g, '');
-          if (!uvLimpia || uvLimpia === "0") return;
+        if (!data) return setIsMapReady(true);
 
-          let coords = [];
-          if (f.geometry.type === 'Polygon') coords = f.geometry.coordinates[0];
-          else if (f.geometry.type === 'MultiPolygon') coords = f.geometry.coordinates[0][0];
+        const uvMap = new globalThis.Map();
+
+        // Limpiador Cuántico: Transforma la basura de AutoCAD en números puros
+        const featuresEnriquecidas = data.features.map(f => {
+          const p = f.properties || {};
+          const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
           
-          if (coords && coords.length > 0) {
-            if (!uvMap.has(uvLimpia)) uvMap.set(uvLimpia, { sumLng: 0, sumLat: 0, count: 0 });
-            const d = uvMap.get(uvLimpia);
-            coords.forEach(c => { d.sumLng += c[0]; d.sumLat += c[1]; d.count++; });
+          // Extrae SOLO números
+          const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
+          const loteLimpio = isNaN(numLote) ? "" : String(numLote);
+
+          let uvRaw = p.UV || p.uv || p.Layer || p.layer || "";
+          let uvLimpia = String(uvRaw).replace(/[^0-9]/g, '');
+
+          // Cálculo del centro del barrio para el radar UV
+          if (uvLimpia && uvLimpia !== "0" && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+            let coords = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : f.geometry.coordinates[0][0];
+            if (coords && coords.length > 0) {
+              if (!uvMap.has(uvLimpia)) uvMap.set(uvLimpia, { sumLng: 0, sumLat: 0, count: 0 });
+              const d = uvMap.get(uvLimpia);
+              coords.forEach(c => { d.sumLng += c[0]; d.sumLat += c[1]; d.count++; });
+            }
           }
+
+          return {
+            ...f,
+            properties: { ...p, quantum_lote: loteLimpio, quantum_uv: uvLimpia }
+          };
         });
 
+        // Aplicamos el plano limpio a la memoria virtual
+        data.features = featuresEnriquecidas;
+        setRawGeoData(data);
+
+        // Si hay varias UVs, crear los hologramas centrales
         if (uvMap.size > 1) {
           const labelFeatures = Array.from(uvMap.entries()).map(([uv, d]) => ({
             type: 'Feature',
@@ -90,16 +87,16 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
           setUvLabels(null);
         }
         
+        // Vuelo Automático
         if (data.features[0] && mapRef.current) {
            let coords = data.features[0].geometry.coordinates;
            while (Array.isArray(coords[0])) coords = coords[0];
-           mapRef.current.getMap().flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5 });
+           mapRef.current.getMap().flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5, essential: true });
         }
         setTimeout(() => setIsMapReady(true), 600);
       }).catch(() => setIsMapReady(true));
   }, [geojsonPath]);
 
-  // Fix Pantalla Cortada al abrir Fullscreen
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -108,8 +105,8 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
     }
   }, [isFullscreen]);
 
-  // LECTURA DE COLORES DESDE EL EXCEL (Alta velocidad)
-  const { verdes, rojos, azules, opacityVerde, opacityRojo, opacityAzul } = useMemo(() => {
+  // 2. MATRIZ DE COLORES EXACTA (Extraída de tu Excel)
+  const { verdes, rojos, azules, colorRojo, colorAzul, colorVerde } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
     
@@ -118,50 +115,46 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       const est = String(l.estado).toUpperCase();
       if (est === 'VENDIDO') a.push(numLote);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else v.push(numLote); // Libres o disponibles
+      else v.push(numLote); 
     });
 
-    // IMPORTANTE: TODOS VEN TODOS LOS COLORES AHORA
-    let oV = 1, oR = 1, oA = 1;
+    let cR = 'rgba(239, 68, 68, 0.45)';
+    let cA = 'rgba(59, 130, 246, 0.45)';
+    let cV = 'rgba(34, 197, 94, 0.45)';
 
-    // Solo el Director puede aplicar el filtro visual para apagarlos
+    // Filtros exclusivos para el Director
     if (isAdmin) {
-       if (mapFilter === 'DISPONIBLE') { oR = 0; oA = 0; }
-       if (mapFilter === 'VENDIDO') { oV = 0; oR = 0; }
-       if (mapFilter === 'BLOQUEADO') { oV = 0; oA = 0; }
+       if (mapFilter === 'DISPONIBLE') { cR = 'transparent'; cA = 'transparent'; }
+       if (mapFilter === 'VENDIDO') { cV = 'transparent'; cR = 'transparent'; }
+       if (mapFilter === 'BLOQUEADO') { cV = 'transparent'; cA = 'transparent'; }
     }
 
     return { 
       verdes: v.length > 0 ? v : ['__NONE__'], 
       rojos: r.length > 0 ? r : ['__NONE__'],
       azules: a.length > 0 ? a : ['__NONE__'],
-      opacityVerde: oV, opacityRojo: oR, opacityAzul: oA
+      colorRojo: cR, colorAzul: cA, colorVerde: cV
     };
   }, [baseDeDatosLotes, proyectoActivo, isAdmin, mapFilter]);
 
-  // CAPAS WEBGL
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'LOTE'], ['get', 'Lote'], ''];
-  const isShortText = ['<=', ['length', ['to-string', textProperty]], 5];
+  // 3. CAPAS DEL MAPA NATIVO (Rendimiento Absoluto)
+  const propLoteLimpio = ['get', 'quantum_lote']; // Usamos el dato limpio de nuestro Interceptor
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', ['to-string', textProperty],
-        rojos, 'rgba(239, 68, 68, 0.45)',  // Rojo
-        azules, 'rgba(59, 130, 246, 0.45)', // Azul
-        'rgba(34, 197, 94, 0.45)'           // Verde (Disponible por defecto)
+        'match', propLoteLimpio,
+        rojos, colorRojo,
+        azules, colorAzul,
+        verdes, colorVerde,
+        'rgba(34, 197, 94, 0.35)' // Si el plano tiene lotes que NO están en el Excel, se pintan verde por defecto
       ],
-      'fill-opacity': [
-        'match', ['to-string', textProperty],
-        rojos, opacityRojo,
-        azules, opacityAzul,
-        opacityVerde
-      ]
+      'fill-opacity': 1
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText] 
-  }), [rojos, azules, opacityVerde, opacityRojo, opacityAzul]);
+    filter: ['!=', ['geometry-type'], 'Point'] // Pinta todo polígono, sin importar longitud de texto
+  }), [rojos, azules, verdes, colorRojo, colorAzul, colorVerde]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
@@ -170,28 +163,22 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       'line-color': '#0ea5e9', 
       'line-width': 1.5, 
       'line-opacity': [
-        'match', ['to-string', textProperty],
-        rojos, opacityRojo === 1 ? 0.8 : 0,
-        azules, opacityAzul === 1 ? 0.8 : 0,
-        opacityVerde === 1 ? 0.8 : 0
+        'match', propLoteLimpio,
+        rojos, colorRojo === 'transparent' ? 0 : 0.8,
+        azules, colorAzul === 'transparent' ? 0 : 0.8,
+        verdes, colorVerde === 'transparent' ? 0 : 0.8,
+        0.8
       ] 
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
-  }), [rojos, azules, opacityVerde, opacityRojo, opacityAzul]);
-
-  const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
-    type: 'line',
-    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivoFormulario, 10) || '')] 
-  }), [loteActivoFormulario]);
+    filter: ['!=', ['geometry-type'], 'Point']
+  }), [rojos, azules, verdes, colorRojo, colorAzul, colorVerde]);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     minzoom: 16.5, 
     layout: {
-      'text-field': textProperty,
+      'text-field': propLoteLimpio,
       'text-size': 12,
       'text-anchor': 'center',
       'text-allow-overlap': false 
@@ -201,14 +188,22 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
       'text-halo-color': '#020617',
       'text-halo-width': 1.5,
       'text-opacity': [
-        'match', ['to-string', textProperty],
-        rojos, opacityRojo,
-        azules, opacityAzul,
-        opacityVerde
+        'match', propLoteLimpio,
+        rojos, colorRojo === 'transparent' ? 0 : 1,
+        azules, colorAzul === 'transparent' ? 0 : 1,
+        verdes, colorVerde === 'transparent' ? 0 : 1,
+        1
       ]
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], isShortText]
-  }), [rojos, azules, opacityVerde, opacityRojo, opacityAzul]);
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', propLoteLimpio, '']]
+  }), [rojos, azules, verdes, colorRojo, colorAzul, colorVerde]);
+
+  const highlightLayer = useMemo(() => ({
+    id: 'lotes-highlight',
+    type: 'line',
+    paint: { 'line-color': '#fcd34d', 'line-width': 5, 'line-opacity': 1 },
+    filter: ['==', propLoteLimpio, String(parseInt(loteActivoFormulario, 10) || '')] 
+  }), [loteActivoFormulario]);
 
   const macroUvLayer = useMemo(() => ({
     id: 'uv-macro-labels',
@@ -227,47 +222,23 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
     }
   }), []);
 
-  const edgeDimensionsLayer = useMemo(() => ({
-    id: 'edge-dimensions',
-    type: 'symbol',
-    layout: {
-      'text-field': ['get', 'label'],
-      'text-size': 11,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'symbol-placement': 'point',
-      'text-rotation-alignment': 'map',
-      'text-rotate': ['get', 'angle'],
-      'text-offset': [0, -0.6],
-      'text-allow-overlap': true
-    },
-    paint: {
-      'text-color': '#fcd34d',
-      'text-halo-color': '#020617',
-      'text-halo-width': 1.5
-    }
-  }), []);
-
-  // INTERACCIONES CON HOVER TRIGONOMÉTRICO
+  // 4. INTERACCIONES TÁCTICAS (Hover y Clic)
   const handleMouseMove = (e) => {
     const features = e.features;
     if (features && features.length > 0 && features[0].layer.id === 'lotes-fill') {
-      const activeFeature = features[0];
-      const p = activeFeature.properties;
-      const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
-      const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
+      const p = features[0].properties;
+      const numLote = parseInt(p.quantum_lote, 10);
       if (isNaN(numLote)) return setHoverInfo(null);
       
-      let uvExtraida = p.UV || p.uv || p.Layer || p.layer || "";
-      let mznExtraido = p.MZN || p.mzn || p.Layer || p.layer || "";
-      const uvLimpia = String(uvExtraida).replace(/[^0-9]/g, '');
-      const mznLimpia = String(mznExtraido).replace(/[^0-9]/g, '');
+      let mznExtraido = null;
+      const nombreLayer = p.layer || p.Layer || "";
+      const mznMatch = nombreLayer.match(/MZN\s*(\d+)|M-\s*(\d+)|M(\d+)/i);
+      if (mznMatch) mznExtraido = mznMatch[1] || mznMatch[2] || mznMatch[3];
 
-      // Cruce con Excel MÁS PRECISO (Con UV y MZN)
       const loteDB = baseDeDatosLotes.find(l => 
         l.proyecto.includes(proyectoActivo) && 
         parseInt(l.lote, 10) === numLote &&
-        (uvLimpia ? String(l.uv).replace(/[^0-9]/g, '') === uvLimpia : true) &&
-        (mznLimpia ? String(l.mzn).replace(/[^0-9]/g, '') === mznLimpia : true)
+        (p.quantum_uv ? String(l.uv).replace(/[^0-9]/g, '') === p.quantum_uv : true)
       );
 
       let estadoReal = "DISPONIBLE";
@@ -276,67 +247,43 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
          if (est === "VENDIDO") estadoReal = "VENDIDO";
          else if (est === "BLOQUEADO" || est === "RESERVADO") estadoReal = "BLOQUEADO";
       }
-      
-      // EXTRACCIÓN REAL DE SUPERFICIE
-      const supFinal = loteDB && loteDB.superficie > 0 ? loteDB.superficie : "Sin datos";
 
       setHoverInfo({
         lngLat: e.lngLat,
-        lote: isNaN(numLote) ? "-" : numLote,
-        mzn: loteDB ? loteDB.mzn : (mznLimpia || "-"),
-        uv: loteDB ? loteDB.uv : (uvLimpia || "-"),
+        lote: numLote,
+        mzn: loteDB ? loteDB.mzn : (mznExtraido || "-"),
+        uv: loteDB ? loteDB.uv : (p.quantum_uv || "-"),
         estado: estadoReal,
-        superficie: supFinal
+        superficie: loteDB && loteDB.superficie > 0 ? loteDB.superficie : "Sin datos"
       });
-
-      // Cálculo de Medidas (Lados)
-      if (activeFeature.geometry && (activeFeature.geometry.type === 'Polygon' || activeFeature.geometry.type === 'MultiPolygon')) {
-        let coordinates = activeFeature.geometry.type === 'Polygon' ? activeFeature.geometry.coordinates[0] : activeFeature.geometry.coordinates[0][0];
-        const edgeFeatures = [];
-        if (coordinates && coordinates.length < 30) {
-          for (let i = 0; i < coordinates.length - 1; i++) {
-            try {
-              const { distancia, textAngle, midLng, midLat } = calcularDistanciaYAngulo(coordinates[i], coordinates[i + 1]);
-              if (distancia > 3) {
-                edgeFeatures.push({
-                  type: 'Feature', geometry: { type: 'Point', coordinates: [midLng, midLat] },
-                  properties: { label: `${distancia.toFixed(2)}m`, angle: textAngle }
-                });
-              }
-            } catch(err) {}
-          }
-          setHoverEdges({ type: 'FeatureCollection', features: edgeFeatures });
-        }
-      }
     } else {
       setHoverInfo(null);
-      setHoverEdges(null);
     }
   };
 
   const handleMapClick = (e) => {
     if (hoverInfo && hoverInfo.lote !== "-") {
       
-      // EL MURO DE SEGURIDAD PARA ASESORES (AlertCircle)
+      // EL MURO DE SEGURIDAD PARA ASESORES (Solo cotizan Verdes)
       if (!isAdmin && (hoverInfo.estado === "VENDIDO" || hoverInfo.estado === "BLOQUEADO" || hoverInfo.estado === "RESERVADO")) {
-         onLoteSeleccionado({ isError: true, message: `⚠️ Lote ${hoverInfo.estado}. Operación denegada.` });
+         onLoteSeleccionado({ isError: true, message: `⚠️ Operación denegada. Lote ${hoverInfo.estado}.` });
          return;
       }
 
       const loteDB = baseDeDatosLotes.find(l => 
         l.proyecto.includes(proyectoActivo) && 
         parseInt(l.lote, 10) === hoverInfo.lote &&
-        (hoverInfo.uv !== "-" ? String(l.uv).replace(/[^0-9]/g, '') === hoverInfo.uv : true) &&
-        (hoverInfo.mzn !== "-" ? String(l.mzn).replace(/[^0-9]/g, '') === hoverInfo.mzn : true)
+        (hoverInfo.uv !== "-" ? String(l.uv).replace(/[^0-9]/g, '') === hoverInfo.uv : true)
       );
 
       if (loteDB) {
         setIsFullscreen(false);
         onLoteSeleccionado({ isError: false, data: loteDB });
       } else {
+        // Fallback si no está en Excel (permite cotizarlo genérico)
         onLoteSeleccionado({ 
           isError: false, 
-          data: { lote: hoverInfo.lote, mzn: hoverInfo.mzn, uv: hoverInfo.uv, superficie: hoverInfo.superficie, precio: 0, categoria: 'ESTÁNDAR', estado: hoverInfo.estado } 
+          data: { lote: hoverInfo.lote, mzn: hoverInfo.mzn, uv: hoverInfo.uv, superficie: hoverInfo.superficie === 'Sin datos' ? 300 : hoverInfo.superficie, precio: 0, categoria: 'ESTÁNDAR', estado: 'LIBRE' } 
         });
         setIsFullscreen(false);
       }
@@ -345,26 +292,27 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
 
   const containerClasses = isFullscreen 
     ? "fixed inset-0 z-[150] bg-[#020617] w-screen h-screen flex flex-col m-0 p-0" 
-    : "relative w-full h-[450px] sm:h-[550px] lg:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_30px_rgba(14,165,233,0.15)] border border-cyan-500/30 bg-[#060b13] flex flex-col";
+    : "relative w-full h-[450px] sm:h-[550px] lg:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50 bg-[#060b13] flex flex-col";
 
   return (
     <div className={containerClasses}>
-      <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-5 z-10 border-b border-cyan-500/30 flex flex-wrap justify-between items-center shadow-lg shrink-0 gap-4">
+      <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-10 border-b border-slate-800 flex flex-wrap justify-between items-center shadow-lg shrink-0 gap-4">
          <div className="flex items-center gap-3">
-           <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30">
+           <div className="bg-cyan-500/10 p-2 rounded-xl border border-cyan-500/30">
              <MapPin className="w-5 h-5 text-cyan-400" />
            </div>
            <div>
-             <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-500">{proyectoActivo}</span></h3>
+             <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm drop-shadow-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
              <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-2 font-bold">
-               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span> Disponible</span>
-               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span> Bloqueado</span>
-               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span> Vendido</span>
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible</span>
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado</span>
+               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido</span>
              </p>
            </div>
          </div>
          
          <div className="flex items-center gap-3">
+           {/* PESTAÑA DIRECTOR */}
            {isAdmin && (
              <div className="relative hidden sm:block">
                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -373,7 +321,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
                <select 
                  value={mapFilter}
                  onChange={(e) => setMapFilter(e.target.value)}
-                 className="bg-[#020617] border border-cyan-500/50 text-cyan-400 text-[10px] font-black uppercase tracking-widest rounded-xl py-2.5 pl-9 pr-8 outline-none focus:shadow-[0_0_15px_rgba(34,211,238,0.3)] appearance-none cursor-pointer transition-all"
+                 className="bg-[#04070b] border border-cyan-500/30 text-cyan-400 text-[10px] font-black uppercase tracking-widest rounded-xl py-2.5 pl-9 pr-8 outline-none focus:border-cyan-500 appearance-none cursor-pointer transition-all shadow-inner"
                >
                  <option value="TODOS">TODOS LOS ESTADOS</option>
                  <option value="DISPONIBLE">SOLO DISPONIBLES (Verde)</option>
@@ -389,7 +337,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
            <button 
              type="button"
              onClick={() => setIsFullscreen(!isFullscreen)} 
-             className="bg-slate-800 hover:bg-slate-700 text-cyan-400 p-2.5 rounded-xl border border-slate-700 transition-colors cursor-pointer z-50 shadow-sm"
+             className="bg-slate-800/80 hover:bg-slate-700 text-cyan-400 p-2.5 rounded-xl border border-slate-700 transition-colors cursor-pointer z-50 shadow-sm"
            >
              {isFullscreen ? <Minimize className="w-5 h-5"/> : <Maximize className="w-5 h-5"/>}
            </button>
@@ -405,7 +353,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
                <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
                <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
             </div>
-            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Renderizando Vectores...</div>
+            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Renderizando Sistema Espacial...</div>
           </div>
         )}
 
@@ -414,28 +362,32 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
             ref={mapRef}
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             maxZoom={20} 
+            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             style={{ width: '100%', height: '100%' }}
             interactiveLayerIds={['lotes-fill']}
             onMouseMove={handleMouseMove}
-            onMouseLeave={() => { setHoverInfo(null); setHoverEdges(null); }}
+            onMouseLeave={() => setHoverInfo(null)}
             onClick={handleMapClick}
             cursor={hoverInfo ? (isAdmin || hoverInfo.estado === 'DISPONIBLE' ? "pointer" : "not-allowed") : "crosshair"}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
+            {/* SATÉLITE DIRECTO */}
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer as any} />
-              <Layer {...lineLayer as any} />
-              <Layer {...highlightLayer as any} />
-              <Layer {...labelLayer as any} />
-            </Source>
+            {/* DIBUJO DE POLÍGONOS LIMPIOS */}
+            {rawGeoData && (
+              <Source id="dynamic-data" type="geojson" data={rawGeoData}>
+                <Layer {...fillLayer as any} />
+                <Layer {...lineLayer as any} />
+                <Layer {...highlightLayer as any} />
+                <Layer {...labelLayer as any} />
+              </Source>
+            )}
 
             {uvLabels && (
               <Source id="macro-uv-labels" type="geojson" data={uvLabels}>
@@ -443,12 +395,7 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
               </Source>
             )}
 
-            {hoverEdges && (
-              <Source id="hover-edges-data" type="geojson" data={hoverEdges}>
-                <Layer {...edgeDimensionsLayer as any} />
-              </Source>
-            )}
-
+            {/* TOOLTIP CYBERTECH ESTILO INMOBILIARIO */}
             {hoverInfo && hoverInfo.lote !== "-" && (
               <Popup
                 longitude={hoverInfo.lngLat.lng}
@@ -460,25 +407,21 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
                 maxWidth="300px"
                 offset={15}
               >
-                <div className="bg-[#0f172a] border border-cyan-500/50 p-4 rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.3)] text-white font-['Plus_Jakarta_Sans'] w-48 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
-                  <div className="text-[9px] uppercase tracking-widest text-cyan-400 font-bold mb-1 flex items-center gap-1.5 relative z-10">
+                <div className="bg-[#0f172a] border border-cyan-500/50 p-4 rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.3)] text-white font-['Plus_Jakarta_Sans'] w-48">
+                  <div className="text-[9px] uppercase tracking-widest text-cyan-400 font-bold mb-1 flex items-center gap-1.5">
                     <Info className="w-3 h-3" /> Datos del Terreno
                   </div>
-                  <div className="text-2xl font-black tracking-tight leading-none mb-3 text-white relative z-10">
+                  <div className="text-2xl font-black tracking-tight leading-none mb-3 text-white">
                     LOTE {hoverInfo.lote}
                   </div>
-                  
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-3 relative z-10">
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-3">
                     <span>MZN: <span className="text-slate-200">{hoverInfo.mzn}</span></span>
                     <span>UV: <span className="text-slate-200">{hoverInfo.uv}</span></span>
                   </div>
-                  
-                  <div className="flex items-center justify-between text-[11px] mb-3 border-t border-slate-700/50 pt-2 relative z-10">
+                  <div className="flex items-center text-[11px] mb-3 border-t border-slate-700/50 pt-2 justify-between">
                     <span className="font-bold">Área: <span className="text-amber-400">{hoverInfo.superficie} {hoverInfo.superficie !== 'Sin datos' && 'm²'}</span></span>
                   </div>
-                  
-                  <div className="relative z-10">
+                  <div>
                     <span className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm ${
                       hoverInfo.estado === 'LIBRE' || hoverInfo.estado === 'DISPONIBLE' ? 'bg-green-500 text-[#020617]' :
                       hoverInfo.estado === 'VENDIDO' ? 'bg-blue-500 text-white' :
@@ -498,6 +441,9 @@ const MapaEspacial = ({ loteActivoFormulario, proyectoActivo, baseDeDatosLotes, 
   );
 };
 
+// ============================================================================
+// APP PRINCIPAL (EL CEREBRO FINANCIERO)
+// ============================================================================
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
@@ -519,6 +465,7 @@ export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
+  
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
@@ -534,7 +481,7 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoCredito, setDescuentoCredito] = useState(0);
+  const [descuentoCredito, setDescuentoCredito] = useState(1);
   const [descuentoContado, setDescuentoContado] = useState(0);
   const [descuentoM2, setDescuentoM2] = useState(1);
   const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
@@ -559,10 +506,10 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const formRef = useRef(null); // ¡EL ANCLA HA SIDO RESTAURADA!
+  const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
-  // PARSER DE EXCEL ULTRA-ROBUSTO
+  // EXCEL PARSER DE ALTA PRECISIÓN (Comas a Puntos)
   useEffect(() => {
     if (!isAuthenticated) return;
     const cargarLotes = async () => {
@@ -583,7 +530,7 @@ export default function App() {
         if (!Array.isArray(rawData)) rawData = [];
 
         const parseNum = (val) => {
-            if (val === undefined || val === null || val === '') return 0;
+            if (val === undefined || val === null || val === '') return null;
             if (typeof val === 'number') return val;
             let strVal = String(val).trim();
             if (strVal.includes('.') && strVal.includes(',')) {
@@ -596,7 +543,7 @@ export default function App() {
                 strVal = strVal.replace(',', '.');
             }
             strVal = strVal.replace(/[^0-9.-]/g, '');
-            return Number(strVal) || 0;
+            return Number(strVal) || null;
         };
 
         const getVal = (obj, keyName) => {
@@ -613,11 +560,10 @@ export default function App() {
             precio: parseNum(getVal(item, 'precio')),
             estado: String(getVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
             categoria: String(getVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
-            vendedor: String(getVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase()
+            vendedor: String(getVal(item, 'vendedor') || "NO ASIGNADO") 
         }));
 
         const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
-        
         setBaseDeDatosLotes(lotesPermitidos);
         setCargandoBD(false);
 
@@ -634,7 +580,18 @@ export default function App() {
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
-    return () => document.head.removeChild(link);
+    
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .mapboxgl-popup-content { background: transparent !important; padding: 0 !important; box-shadow: none !important; pointer-events: none; }
+      .mapboxgl-popup-tip { border-top-color: #0f172a !important; border-bottom-color: #0f172a !important; }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(link);
+      document.head.removeChild(style);
+    };
   }, []);
 
   useEffect(() => {
@@ -654,6 +611,7 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
+    
     setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto, tipoCotizacion]);
 
@@ -684,13 +642,16 @@ export default function App() {
   };
 
   const currentAliases = getAlias(proyecto);
+
   const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
     currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
   ) || [];
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
+  
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  
   const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
@@ -724,6 +685,7 @@ export default function App() {
   const handleDescCreditoChange = (e) => { const val = Number(e.target.value); const max = calcularLimitesMaximos().maxCreditoPct; setDescuentoCredito(val > max ? max : val); };
   const handleDescM2Change = (e) => { setDescuentoM2(Number(e.target.value)); };
   const handleDescContadoM2Change = (e) => { setDescuentoContadoM2(Number(e.target.value)); };
+  const handleBonoInicialChange = (e) => { const val = Number(e.target.value); setDescuentoInicial(val > 500 ? 500 : val); };
 
   const formatMoney = (amount) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
@@ -825,36 +787,28 @@ export default function App() {
 
             if (aplicarBonificacion) {
                 if (currentY === 26 && currentMIndex === 8) { 
-                  tc_efectivo = TC_PROMOCIONAL; 
-                  descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
+                  tc_efectivo = TC_PROMOCIONAL; descPctExacto = ((TC_FLEX_NUMBER - TC_PROMOCIONAL) / TC_FLEX_NUMBER) * 100; 
                 } 
                 else if (currentY === 26 && currentMIndex === 9) { 
-                  descPctExacto = 28; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 28; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 10) { 
-                  descPctExacto = 23; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 23; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 26 && currentMIndex === 11) { 
-                  descPctExacto = 18; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 18; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 0) { 
-                  descPctExacto = 13; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 13; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 1) { 
-                  descPctExacto = 8; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 8; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else if (currentY === 27 && currentMIndex === 2) { 
-                  descPctExacto = 3; 
-                  tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
+                  descPctExacto = 3; tc_efectivo = TC_FLEX_NUMBER * (1 - (descPctExacto / 100)); 
                 } 
                 else { 
-                  descPctExacto = 0; 
-                  tc_efectivo = TC_FLEX_NUMBER; 
+                  descPctExacto = 0; tc_efectivo = TC_FLEX_NUMBER; 
                 }
             }
 
@@ -1090,7 +1044,8 @@ export default function App() {
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
-           <AlertCircle className="w-5 h-5 text-rose-400" /> {toast}
+           {toast.includes('⚠️') ? <ShieldAlert className="w-5 h-5 text-rose-400" /> : <CheckCircle2 className="w-5 h-5 text-cyan-400" />}
+           {toast}
         </div>
       )}
 
@@ -1526,11 +1481,11 @@ export default function App() {
                       <input 
                         type="number" 
                         step="0.01" 
-                        min="0" 
+                        min="1.5" 
                         required={modoInicial === 'porcentaje'} 
                         value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
-                        placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
+                        placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 1.5'} 
                         className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600 shadow-inner" 
                       />
                     </div>
@@ -1641,7 +1596,7 @@ export default function App() {
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div>
-                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
+                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'textemerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
                         </div>
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div>
