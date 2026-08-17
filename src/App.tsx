@@ -30,9 +30,9 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (VERSIÓN ESTABLE Y ELEGANTE)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
+const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
   const [geoData, setGeoData] = useState(null);
@@ -49,12 +49,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         
         const cleanFeatures = data.features.map(f => {
             const p = f.properties || {};
-            // El filtro de hierro busca la etiqueta más limpia
             const nombreRaw = p.LOTE || p.lote || p.Lote || p.TextString || p.Text || p.text || p.name || p.Name || "";
             const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
             let q_lote = isNaN(numLote) ? "" : String(numLote);
             
-            // FILTRO DE HIERRO: Destruye la basura topográfica (números largos de AutoCAD)
             if (q_lote.length > 4) {
                 q_lote = "";
             }
@@ -89,38 +87,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     }
   }, [isFullscreen]);
 
-  const { verdes, rojos, azules } = useMemo(() => {
-    let v = []; let r = []; let a = [];
-    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
-    lotesFiltrados.forEach(l => {
-      const numLote = String(parseInt(l.lote, 10) || l.lote);
-      const est = String(l.estado).toUpperCase();
-      if (est === 'VENDIDO') a.push(numLote);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else v.push(numLote); 
-    });
-    return { 
-      verdes: v.length > 0 ? v : ['__NONE_VERDE__'], 
-      rojos: r.length > 0 ? r : ['__NONE_ROJO__'],
-      azules: a.length > 0 ? a : ['__NONE_AZUL__']
-    };
-  }, [baseDeDatosLotes, proyectoActivo]);
-
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
-      'fill-color': [
-        'match', ['get', 'q_lote'],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent'      
-      ],
+      'fill-color': 'rgba(6, 182, 212, 0.15)', 
       'fill-opacity': 1
     },
     filter: ['!=', ['geometry-type'], 'Point'] 
-  }), [verdes, rojos, azules]);
+  }), []);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
@@ -130,9 +105,16 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   }), []);
 
   const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
+    id: 'lotes-highlight-fill',
+    type: 'fill',
+    paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
+    filter: ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '')] 
+  }), [loteActivo]);
+
+  const highlightLineLayer = useMemo(() => ({
+    id: 'lotes-highlight-line',
     type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
+    paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
     filter: ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
@@ -170,9 +152,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <div>
                <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
                <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
-                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
-                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
+                 Plataforma renderizada establemente.
                </p>
              </div>
            </div>
@@ -238,6 +218,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
                 <Layer {...fillLayer as any} />
                 <Layer {...lineLayer as any} />
                 <Layer {...highlightLayer as any} />
+                <Layer {...highlightLineLayer as any} />
                 <Layer {...labelLayer as any} />
               </Source>
             )}
@@ -270,7 +251,6 @@ export default function App() {
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
   
-  // EL SWITCH MAESTRO DE OSCAR: false = Excel Local, true = API de la Empresa
   const [usarAPI, setUsarAPI] = useState(false); 
   
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
@@ -349,20 +329,38 @@ export default function App() {
       };
 
       if (usarAPI) {
-        // -----------------------------------------------------
-        // MODO 1: API DE LA EMPRESA (Reemplaza el Excel)
-        // -----------------------------------------------------
+        // MODO API
         try {
           const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
           if (!resProj.ok) throw new Error("API Falló");
           const dataProj = await resProj.json();
 
           const projAPI = dataProj.proyectos.find(p => {
-             const nombreAPI = String(p.proyecto).trim().toUpperCase();
-             const nombreLocal = proyecto.trim().toUpperCase();
-             if (nombreLocal === "EL PORVENIR") return nombreAPI === "EL PORVENIR" || nombreAPI === "CELINA EL PORVENIR";
-             if (nombreLocal === "EL PORVENIR FASE 2") return nombreAPI === "EL PORVENIR FASE 2" || nombreAPI === "EL PORVENIR 2" || nombreAPI === "CELINA EL PORVENIR FASE 2";
-             return nombreAPI === nombreLocal || nombreAPI === `CELINA ${nombreLocal}`;
+             const apiName = String(p.proyecto).trim().toUpperCase();
+             const local = proyecto.trim().toUpperCase();
+
+             if (local === "EL PORVENIR") return apiName === "EL PORVENIR" || apiName === "CELINA EL PORVENIR";
+             if (local === "EL PORVENIR FASE 2") return apiName === "EL PORVENIR FASE 2" || apiName === "EL PORVENIR 2" || apiName === "CELINA EL PORVENIR FASE 2";
+             if (local === "CELINA 3") return apiName === "CELINA III";
+             if (local === "CELINA 4") return apiName === "CELINA IV";
+             if (local === "CELINA 5") return apiName === "CELINA V";
+             if (local === "CELINA 8") return apiName === "CELINA 8" || apiName === "CELINA VIII";
+             if (local === "CELINA X") return apiName === "CELINA X" || apiName === "CELINA 10";
+             if (local === "CELINA 7 FASE 1") return apiName === "CELINA VII FASE 1";
+             if (local === "CELINA 7 FASE 2") return apiName === "CELINA VII FASE 2";
+             if (local === "CELINA 7 FASE 3") return apiName === "CELINA VII FASE 3";
+             if (local === "RANCHO NUEVO") return apiName === "CELINA - RANCHO NUEVO" || apiName === "RANCHO NUEVO";
+             if (local === "CLARA CHUCHIO") return apiName === "CELINA CLARA CHUCHIO" || apiName === "CLARA CHUCHIO";
+             if (local === "ROSA RODALI") return apiName === "ROSA RODALI" || apiName === "CELINA ROSA RODALI";
+             if (local === "SANTA ROSA - FASE 1") return apiName === "SANTA ROSA FASE 1" || apiName === "SANTA ROSA - FASE 1";
+             if (local === "SANTA ROSA - FASE 2") return apiName === "SANTA ROSA FASE 2" || apiName === "SANTA ROSA - FASE 2";
+             if (local === "SANTA ROSA - FASE 3") return apiName === "SANTA ROSA FASE 3" || apiName === "SANTA ROSA - FASE 3";
+             if (local === "SAN JORGE") return apiName === "SAN JORGE";
+             if (local === "CAÑAVERAL") return apiName === "CAÑAVERAL";
+             if (local === "EL ENCANTO") return apiName === "EL ENCANTO";
+             if (local === "TAMARINDO") return apiName === "TAMARINDO";
+
+             return apiName === local || apiName === `CELINA ${local}`;
           });
 
           if (projAPI && projAPI.project_id) {
@@ -376,7 +374,7 @@ export default function App() {
                 const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
                 
                 return {
-                  proyecto: proyecto, // Forzamos el nombre de tu selector
+                  proyecto: proyecto, 
                   uv: loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN",
                   mzn: loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN",
                   lote: String(loteFresco.lote).trim().toUpperCase(),
@@ -392,7 +390,6 @@ export default function App() {
                 };
               });
 
-              // Guardamos TODOS los lotes para el mapa, los menús se filtran después
               setBaseDeDatosLotes(apiMapped);
               setCargandoBD(false);
               return; 
@@ -400,13 +397,11 @@ export default function App() {
           }
           throw new Error("Proyecto no encontrado en API");
         } catch (error) {
-          showNotification("🛡️ API no disponible. Regresando a Excel Local.");
+          console.warn("⚠️ API inaccesible. Operando con Excel Local en modo sigiloso.");
           setUsarAPI(false); 
         }
       } else {
-        // -----------------------------------------------------
-        // MODO 2: EXCEL LOCAL (El cimiento blindado)
-        // -----------------------------------------------------
+        // MODO EXCEL LOCAL
         try {
           let rawData;
           try {
@@ -433,7 +428,6 @@ export default function App() {
               estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
               categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
               vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
-              // Mapeamos los datos de la inicial por si los agregas al Excel
               api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
               api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
               api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
@@ -518,7 +512,6 @@ export default function App() {
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
-  // EL FILTRO ANTI-FANTASMAS: Oculta los vendidos en los menús, pero los deja en el mapa
   const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
 
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
@@ -530,7 +523,6 @@ export default function App() {
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
-  // AL SELECCIONAR EL LOTE: LLENAR DATOS Y AUTO-CALCULAR LA CUOTA INICIAL (API O EXCEL)
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -539,7 +531,6 @@ export default function App() {
         setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
 
-        // FÓRMULA UNIVERSAL DE LA EMPRESA PARA LA CUOTA INICIAL
         const precioCalculado = loteEncontrado.superficie * loteEncontrado.precio;
         let iniCalculada = loteEncontrado.api_cuota_inicial || 0;
         
@@ -547,6 +538,10 @@ export default function App() {
             iniCalculada = Math.ceil((precioCalculado * loteEncontrado.api_initial_pct) / 100);
         } else if (loteEncontrado.api_initial_tipo === '1' && loteEncontrado.api_initial_valor > 0) {
             iniCalculada = Math.round(loteEncontrado.api_initial_valor);
+        }
+
+        if (iniCalculada === 0 && loteEncontrado.api_cuota_inicial > 0) {
+            iniCalculada = loteEncontrado.api_cuota_inicial;
         }
 
         if (iniCalculada > 0) {
@@ -1034,7 +1029,6 @@ export default function App() {
            <MapaEspacial 
              loteActivo={lote}
              proyectoActivo={proyecto}
-             baseDeDatosLotes={baseDeDatosLotes}
            />
         </div>
 
@@ -1051,15 +1045,15 @@ export default function App() {
               </div>
               
               <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
-                {/* BOTÓN KILL-SWITCH (EXCEL VS API) */}
+                {/* BOTÓN KILL-SWITCH (MODO SIGILOSO) */}
                 <button 
-                    onClick={() => { setUsarAPI(false); showNotification("🛡️ Cambiando a Modo Excel Local Blindado."); }} 
+                    onClick={() => setUsarAPI(false)} 
                     className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
                 >
                     <Database className="w-3 h-3" /> Excel Local
                 </button>
                 <button 
-                    onClick={() => { setUsarAPI(true); showNotification("📡 Conectando a los Servidores de Grupo Paz..."); }} 
+                    onClick={() => setUsarAPI(true)} 
                     className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-emerald-400'}`}
                 >
                     <Server className="w-3 h-3" /> API Server
@@ -1306,7 +1300,7 @@ export default function App() {
                     {tipoCotizacion === 'contado' && (
                       <div className="space-y-1.5">
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-50 shrink-0" /> Contado x m² ($us)
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
                         </label>
                         <input 
                           type="number" 
