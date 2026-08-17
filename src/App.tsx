@@ -421,7 +421,7 @@ export default function App() {
         if (!resProj.ok) return;
         const dataProj = await resProj.json();
 
-        // 1. BUSCADOR INTELIGENTE: Engancha "EL PORVENIR" con "Celina Porvenir" de la API
+        // BUSCADOR INTELIGENTE: Triangulación de nomenclaturas asimétricas
         const projAPI = dataProj.proyectos.find(p => {
            const nombreAPI = String(p.proyecto).toUpperCase();
            const nombreLocal = proyecto.toUpperCase();
@@ -435,6 +435,15 @@ export default function App() {
           const dataLotes = await resLotes.json();
 
           if (dataLotes.lotes && dataLotes.lotes.length > 0) {
+            
+            // PARSER MATEMÁTICO API: Transforma topología de comas a números puros
+            const parseAPI = (val) => {
+                if (val === undefined || val === null || val === '') return 0;
+                if (typeof val === 'number') return val;
+                const limpio = Number(String(val).replace(',', '.'));
+                return isNaN(limpio) ? 0 : limpio;
+            };
+
             setBaseDeDatosLotes(lotesAntiguos => {
               const nuevaBase = [...lotesAntiguos];
               
@@ -444,34 +453,39 @@ export default function App() {
                   String(l.lote) === String(loteFresco.lote)
                 );
 
+                const supLimpia = parseAPI(loteFresco.mt2);
+                const precioLimpio = parseAPI(loteFresco.price_mt2);
+                const estadoLimpio = String(loteFresco.estado || "LIBRE").toUpperCase();
+                const categoriaLimpia = loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR";
+
                 if (idx !== -1) {
-                  // Si el lote existe en tu Excel, actualiza su precio y superficie
-                  nuevaBase[idx].superficie = Number(loteFresco.mt2 || nuevaBase[idx].superficie);
-                  nuevaBase[idx].precio = Number(loteFresco.price_mt2 || nuevaBase[idx].precio);
-                  nuevaBase[idx].estado = "LIBRE";
-                  if(loteFresco.categoria) nuevaBase[idx].categoria = String(loteFresco.categoria).toUpperCase();
+                  // Actualización en tiempo real de nodos existentes
+                  nuevaBase[idx].superficie = supLimpia || nuevaBase[idx].superficie;
+                  nuevaBase[idx].precio = precioLimpio || nuevaBase[idx].precio;
+                  nuevaBase[idx].estado = estadoLimpio;
+                  nuevaBase[idx].categoria = categoriaLimpia;
                 } else {
-                  // AUTO-CREADOR: Si el lote no está en tu Excel (Ej: El Porvenir), lo crea mágicamente
+                  // AUTO-CREADOR: Ingesta de inventario fantasma (Ej: El Porvenir)
                   nuevaBase.push({
                     proyecto: proyecto,
                     uv: loteFresco.uv ? String(loteFresco.uv).replace(/[^0-9]/g, '') : "SN",
                     mzn: loteFresco.manzano ? String(loteFresco.manzano).replace(/[^0-9]/g, '') : "SN",
                     lote: String(loteFresco.lote),
-                    superficie: Number(loteFresco.mt2 || 0),
-                    precio: Number(loteFresco.price_mt2 || 0),
-                    estado: "LIBRE",
-                    categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
+                    superficie: supLimpia,
+                    precio: precioLimpio,
+                    estado: estadoLimpio,
+                    categoria: categoriaLimpia,
                     vendedor: "API VIVO"
                   });
                 }
               });
               return nuevaBase;
             });
-            console.log(`✅ API Conectada: Datos y precios de ${proyecto} cargados con éxito.`);
+            console.log(`✅ API Conectada: Datos y precios de ${proyecto} cargados con exactitud algorítmica.`);
           }
         }
       } catch (error) {
-        console.warn("⚠️ Firewall de la empresa detectado. Operando de forma segura con Excel local.");
+        console.warn("⚠️ Firewall corporativo detectado. Operando bajo red de seguridad con Excel local.");
       }
     };
 
