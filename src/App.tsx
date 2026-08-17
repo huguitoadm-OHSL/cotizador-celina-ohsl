@@ -436,56 +436,80 @@ export default function App() {
 
           if (dataLotes.lotes && dataLotes.lotes.length > 0) {
             
-            // PARSER MATEMÁTICO API: Transforma topología de comas a números puros
-            const parseAPI = (val) => {
+            // EXTRACCIÓN MILIMÉTRICA: Convierte comas latinas y cualquier formato a números matemáticos puros
+            const extractNumber = (val) => {
                 if (val === undefined || val === null || val === '') return 0;
                 if (typeof val === 'number') return val;
-                const limpio = Number(String(val).replace(',', '.'));
-                return isNaN(limpio) ? 0 : limpio;
+                let s = String(val).trim();
+                if (s.includes('.') && s.includes(',')) {
+                    if (s.indexOf('.') < s.indexOf(',')) {
+                        s = s.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        s = s.replace(/,/g, '');
+                    }
+                } else if (s.includes(',')) {
+                    s = s.replace(',', '.');
+                }
+                s = s.replace(/[^0-9.-]/g, '');
+                const n = Number(s);
+                return isNaN(n) ? 0 : n;
             };
 
             setBaseDeDatosLotes(lotesAntiguos => {
               const nuevaBase = [...lotesAntiguos];
               
               dataLotes.lotes.forEach(loteFresco => {
-                const idx = nuevaBase.findIndex(l =>
-                  l.proyecto.includes(proyecto) &&
-                  String(l.lote) === String(loteFresco.lote)
-                );
-
-                const supLimpia = parseAPI(loteFresco.mt2);
-                const precioLimpio = parseAPI(loteFresco.price_mt2);
+                
+                // 1. CAZADOR DE LLAVES: Busca agresivamente el precio sin importar cómo lo nombre la API
+                const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
+                const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
+                
+                const precioLimpio = extractNumber(rawPrecio);
+                const supLimpia = extractNumber(loteFresco.mt2 || loteFresco.superficie);
                 const estadoLimpio = String(loteFresco.estado || "LIBRE").toUpperCase();
                 const categoriaLimpia = loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR";
+                
+                // Sanitizamos los datos respetando letras como "SN"
+                const uvFresco = loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN";
+                const mznFresco = loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN";
+                const loteNumFresco = String(loteFresco.lote).trim().toUpperCase();
 
+                // 2. CRUCE DE DATOS PRECISO: Compara Manzano y Lote exactamente
+                const idx = nuevaBase.findIndex(l => {
+                  const matchProj = l.proyecto.includes(proyecto) || proyecto.includes(l.proyecto);
+                  const matchLote = String(l.lote).trim().toUpperCase() === loteNumFresco;
+                  const matchMzn = String(l.mzn).trim().toUpperCase() === mznFresco;
+                  return matchProj && matchLote && matchMzn;
+                });
+
+                // 3. INYECCIÓN O CREACIÓN
                 if (idx !== -1) {
-                  // Actualización en tiempo real de nodos existentes
-                  nuevaBase[idx].superficie = supLimpia || nuevaBase[idx].superficie;
-                  nuevaBase[idx].precio = precioLimpio || nuevaBase[idx].precio;
+                  // Si existe en tu Excel local, fuerza la actualización del precio
+                  if (supLimpia > 0) nuevaBase[idx].superficie = supLimpia;
+                  if (precioLimpio > 0) nuevaBase[idx].precio = precioLimpio;
                   nuevaBase[idx].estado = estadoLimpio;
                   nuevaBase[idx].categoria = categoriaLimpia;
                 } else {
-                  // AUTO-CREADOR: Ingesta de inventario fantasma (Ej: El Porvenir)
+                  // Si es totalmente nuevo (Ej: El Porvenir sin cargar en Excel)
                   nuevaBase.push({
                     proyecto: proyecto,
-                    uv: loteFresco.uv ? String(loteFresco.uv).replace(/[^0-9]/g, '') : "SN",
-                    mzn: loteFresco.manzano ? String(loteFresco.manzano).replace(/[^0-9]/g, '') : "SN",
-                    lote: String(loteFresco.lote),
+                    uv: uvFresco === "" ? "SN" : uvFresco,
+                    mzn: mznFresco === "" ? "SN" : mznFresco,
+                    lote: loteNumFresco,
                     superficie: supLimpia,
                     precio: precioLimpio,
                     estado: estadoLimpio,
                     categoria: categoriaLimpia,
-                    vendedor: "API VIVO"
+                    vendedor: "API VIVA"
                   });
                 }
               });
               return nuevaBase;
             });
-            console.log(`✅ API Conectada: Datos y precios de ${proyecto} cargados con exactitud algorítmica.`);
           }
         }
       } catch (error) {
-        console.warn("⚠️ Firewall corporativo detectado. Operando bajo red de seguridad con Excel local.");
+        // Fallback silencioso en caso de bloqueo
       }
     };
 
