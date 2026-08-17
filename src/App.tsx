@@ -49,13 +49,21 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         
         const cleanFeatures = data.features.map(f => {
             const p = f.properties || {};
-            const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
+            // El filtro de hierro busca la etiqueta más limpia
+            const nombreRaw = p.LOTE || p.lote || p.Lote || p.TextString || p.Text || p.text || p.name || p.Name || "";
             const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
+            let q_lote = isNaN(numLote) ? "" : String(numLote);
+            
+            // FILTRO DE HIERRO: Destruye la basura topográfica (números largos de AutoCAD)
+            if (q_lote.length > 4) {
+                q_lote = "";
+            }
+
             return {
                 ...f,
                 properties: {
                     ...p,
-                    q_lote: isNaN(numLote) ? "" : String(numLote)
+                    q_lote: q_lote
                 }
             };
         });
@@ -305,197 +313,147 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const resultadosRef = useRef(null);
   const formRef = useRef(null);
-  // 1. CARGA BASE: Siempre carga tu Excel blindado primero
+  const resultadosRef = useRef(null);
+
+  // ============================================================================
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (AISLAMIENTO TOTAL)
+  // ============================================================================
   useEffect(() => {
-    if (!isAuthenticated) return;
-    const cargarLotes = async () => {
-      try {
-        let rawData;
+    if (!isAuthenticated || !proyecto) return;
+
+    const cargarDatos = async () => {
+      setCargandoBD(true);
+
+      const getSafeVal = (obj, propName) => {
+          const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
+          return key ? obj[key] : undefined;
+      };
+
+      const extractNumber = (val) => {
+          if (val === undefined || val === null || val === '') return 0;
+          if (typeof val === 'number') return val;
+          let s = String(val).trim();
+          if (s.includes('.') && s.includes(',')) {
+              if (s.indexOf('.') < s.indexOf(',')) {
+                  s = s.replace(/\./g, '').replace(',', '.');
+              } else {
+                  s = s.replace(/,/g, '');
+              }
+          } else if (s.includes(',')) {
+              s = s.replace(',', '.');
+          }
+          s = s.replace(/[^0-9.-]/g, '');
+          const n = Number(s);
+          return isNaN(n) ? 0 : n;
+      };
+
+      if (usarAPI) {
+        // -----------------------------------------------------
+        // MODO 1: API DE LA EMPRESA (Reemplaza el Excel)
+        // -----------------------------------------------------
         try {
-          const response = await fetch('/lotes.json');
-          if (!response.ok) throw new Error('Fallo local');
-          rawData = await response.json();
-        } catch (e) {
-          const timestamp = new Date().getTime();
-          const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
-          const fallbackResponse = await fetch(githubRawUrl);
-          if (!fallbackResponse.ok) throw new Error('Fallo github');
-          rawData = await fallbackResponse.json();
-        }
+          const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
+          if (!resProj.ok) throw new Error("API Falló");
+          const dataProj = await resProj.json();
 
-        if (!Array.isArray(rawData)) rawData = [];
+          const projAPI = dataProj.proyectos.find(p => {
+             const nombreAPI = String(p.proyecto).trim().toUpperCase();
+             const nombreLocal = proyecto.trim().toUpperCase();
+             if (nombreLocal === "EL PORVENIR") return nombreAPI === "EL PORVENIR" || nombreAPI === "CELINA EL PORVENIR";
+             if (nombreLocal === "EL PORVENIR FASE 2") return nombreAPI === "EL PORVENIR FASE 2" || nombreAPI === "EL PORVENIR 2" || nombreAPI === "CELINA EL PORVENIR FASE 2";
+             return nombreAPI === nombreLocal || nombreAPI === `CELINA ${nombreLocal}`;
+          });
 
-        const getSafeVal = (obj, propName) => {
-            const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
-            return key ? obj[key] : undefined;
-        };
+          if (projAPI && projAPI.project_id) {
+            const resLotes = await fetch(`https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`);
+            if (!resLotes.ok) throw new Error("API Lotes Falló");
+            const dataLotes = await resLotes.json();
 
-        const parseNum = (val) => {
-            if (val === undefined || val === null || val === '') return ''; 
-            if (typeof val === 'number') return val;
-            let strVal = String(val).trim();
-            if (strVal.includes('.') && strVal.includes(',')) {
-                if (strVal.indexOf('.') < strVal.indexOf(',')) {
-                    strVal = strVal.replace(/\./g, '').replace(',', '.');
-                } else {
-                    strVal = strVal.replace(/,/g, '');
-                }
-            } else if (strVal.includes(',')) {
-                strVal = strVal.replace(',', '.');
-            }
-            strVal = strVal.replace(/[^0-9.-]/g, '');
-            const finalNum = Number(strVal);
-            return isNaN(finalNum) ? '' : finalNum;
-        };
-
-        const normalizedData = rawData.map(item => ({
-            proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
-            uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
-            mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
-            lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
-            superficie: parseNum(getSafeVal(item, 'superficie')),
-            precio: parseNum(getSafeVal(item, 'precio')),
-            estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
-            categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
-            vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase()
-        }));
-
-        const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
-        
-        setBaseDeDatosLotes(lotesPermitidos);
-        setCargandoBD(false);
-
-      } catch (error) {
-        console.error('Error al cargar BD:', error);
-        setCargandoBD(false);
-        setUsarBD(false); 
-      }
-    };
-    cargarLotes();
-  }, [isAuthenticated, usarAPI]); // Si apagas la API, recarga el Excel puro
-
-  // 2. MOTOR HÍBRIDO (SE ACTIVA SÓLO SI EL SWITCH 'usarAPI' ESTÁ ENCENDIDO)
-  useEffect(() => {
-    if (!isAuthenticated || !proyecto || !usarAPI) return;
-
-    const sincronizarConAPI = async () => {
-      try {
-        const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
-        if (!resProj.ok) return;
-        const dataProj = await resProj.json();
-
-        // Candado Estricto de Arquitectura: Diferencia Fase 1 de Fase 2
-        const projAPI = dataProj.proyectos.find(p => {
-           const nombreAPI = String(p.proyecto).trim().toUpperCase();
-           const nombreLocal = proyecto.trim().toUpperCase();
-           
-           if (nombreLocal === "EL PORVENIR") {
-               return nombreAPI === "EL PORVENIR" || nombreAPI === "CELINA EL PORVENIR";
-           }
-           if (nombreLocal === "EL PORVENIR FASE 2") {
-               return nombreAPI === "EL PORVENIR FASE 2" || nombreAPI === "EL PORVENIR 2" || nombreAPI === "CELINA EL PORVENIR FASE 2";
-           }
-           return nombreAPI === nombreLocal || nombreAPI === `CELINA ${nombreLocal}`;
-        });
-
-        if (projAPI && projAPI.project_id) {
-          const resLotes = await fetch(`https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`);
-          if (!resLotes.ok) return;
-          const dataLotes = await resLotes.json();
-
-          if (dataLotes.lotes && dataLotes.lotes.length > 0) {
-            
-            const extractNumber = (val) => {
-                if (val === undefined || val === null || val === '') return 0;
-                if (typeof val === 'number') return val;
-                let s = String(val).trim();
-                if (s.includes('.') && s.includes(',')) {
-                    if (s.indexOf('.') < s.indexOf(',')) {
-                        s = s.replace(/\./g, '').replace(',', '.');
-                    } else {
-                        s = s.replace(/,/g, '');
-                    }
-                } else if (s.includes(',')) {
-                    s = s.replace(',', '.');
-                }
-                s = s.replace(/[^0-9.-]/g, '');
-                const n = Number(s);
-                return isNaN(n) ? 0 : n;
-            };
-
-            setBaseDeDatosLotes(lotesAntiguos => {
-              const nuevaBase = [...lotesAntiguos];
-              
-              dataLotes.lotes.forEach(loteFresco => {
+            if (dataLotes.lotes) {
+              const apiMapped = dataLotes.lotes.map(loteFresco => {
                 const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
                 const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
                 
-                const precioLimpio = extractNumber(rawPrecio);
-                const supLimpia = extractNumber(loteFresco.mt2 || loteFresco.superficie);
-                const estadoLimpio = String(loteFresco.estado || "LIBRE").toUpperCase();
-                const categoriaLimpia = loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR";
-                
-                const uvFresco = loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN";
-                const mznFresco = loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN";
-                const loteNumFresco = String(loteFresco.lote).trim().toUpperCase();
-
-                // EXTRAEMOS LA FÓRMULA SECRETA DE LA CUOTA INICIAL DE LA EMPRESA
-                const api_cuota_inicial = extractNumber(loteFresco.cuota_inicial);
-                const api_initial_tipo = String(loteFresco.initial_tipo);
-                const api_initial_pct = extractNumber(loteFresco.initial_pct);
-                const api_initial_valor = extractNumber(loteFresco.initial_valor);
-
-                const idx = nuevaBase.findIndex(l => {
-                  const matchProj = l.proyecto.includes(proyecto) || proyecto.includes(l.proyecto);
-                  const matchLote = String(l.lote).trim().toUpperCase() === loteNumFresco;
-                  const matchMzn = String(l.mzn).trim().toUpperCase() === mznFresco;
-                  return matchProj && matchLote && matchMzn;
-                });
-
-                if (idx !== -1) {
-                  if (supLimpia > 0) nuevaBase[idx].superficie = supLimpia;
-                  if (precioLimpio > 0) nuevaBase[idx].precio = precioLimpio;
-                  nuevaBase[idx].estado = estadoLimpio;
-                  nuevaBase[idx].categoria = categoriaLimpia;
-                  // Inyectamos las variables de la inicial
-                  nuevaBase[idx].api_cuota_inicial = api_cuota_inicial;
-                  nuevaBase[idx].api_initial_tipo = api_initial_tipo;
-                  nuevaBase[idx].api_initial_pct = api_initial_pct;
-                  nuevaBase[idx].api_initial_valor = api_initial_valor;
-                } else {
-                  nuevaBase.push({
-                    proyecto: proyecto,
-                    uv: uvFresco === "" ? "SN" : uvFresco,
-                    mzn: mznFresco === "" ? "SN" : mznFresco,
-                    lote: loteNumFresco,
-                    superficie: supLimpia,
-                    precio: precioLimpio,
-                    estado: estadoLimpio,
-                    categoria: categoriaLimpia,
-                    vendedor: "API VIVA",
-                    // Inyectamos las variables de la inicial
-                    api_cuota_inicial: api_cuota_inicial,
-                    api_initial_tipo: api_initial_tipo,
-                    api_initial_pct: api_initial_pct,
-                    api_initial_valor: api_initial_valor
-                  });
-                }
+                return {
+                  proyecto: proyecto, // Forzamos el nombre de tu selector
+                  uv: loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN",
+                  mzn: loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN",
+                  lote: String(loteFresco.lote).trim().toUpperCase(),
+                  superficie: extractNumber(loteFresco.mt2 || loteFresco.superficie),
+                  precio: extractNumber(rawPrecio),
+                  estado: String(loteFresco.estado || "LIBRE").toUpperCase(),
+                  categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
+                  vendedor: "API VIVA",
+                  api_cuota_inicial: extractNumber(loteFresco.cuota_inicial),
+                  api_initial_tipo: String(loteFresco.initial_tipo || ""),
+                  api_initial_pct: extractNumber(loteFresco.initial_pct),
+                  api_initial_valor: extractNumber(loteFresco.initial_valor)
+                };
               });
-              return nuevaBase;
-            });
-            showNotification(`📡 Conexión API Exitosa: ${proyecto} sincronizado en tiempo real.`);
+
+              // Guardamos TODOS los lotes para el mapa, los menús se filtran después
+              setBaseDeDatosLotes(apiMapped);
+              setCargandoBD(false);
+              return; 
+            }
           }
+          throw new Error("Proyecto no encontrado en API");
+        } catch (error) {
+          showNotification("🛡️ API no disponible. Regresando a Excel Local.");
+          setUsarAPI(false); 
         }
-      } catch (error) {
-        showNotification("🛡️ Escudo de Seguridad: API no disponible. Usando Excel Local.");
-        setUsarAPI(false); // Si la API falla, el switch se apaga solo para protegerte
+      } else {
+        // -----------------------------------------------------
+        // MODO 2: EXCEL LOCAL (El cimiento blindado)
+        // -----------------------------------------------------
+        try {
+          let rawData;
+          try {
+            const response = await fetch('/lotes.json');
+            if (!response.ok) throw new Error('Fallo local');
+            rawData = await response.json();
+          } catch (e) {
+            const timestamp = new Date().getTime();
+            const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
+            const fallbackResponse = await fetch(githubRawUrl);
+            if (!fallbackResponse.ok) throw new Error('Fallo github');
+            rawData = await fallbackResponse.json();
+          }
+
+          if (!Array.isArray(rawData)) rawData = [];
+
+          const normalizedData = rawData.map(item => ({
+              proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
+              uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
+              mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
+              lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
+              superficie: extractNumber(getSafeVal(item, 'superficie')),
+              precio: extractNumber(getSafeVal(item, 'precio')),
+              estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
+              categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
+              vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
+              // Mapeamos los datos de la inicial por si los agregas al Excel
+              api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
+              api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
+              api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
+              api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
+          }));
+
+          const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
+          
+          setBaseDeDatosLotes(lotesPermitidos);
+          setCargandoBD(false);
+
+        } catch (error) {
+          setCargandoBD(false);
+          setUsarBD(false); 
+        }
       }
     };
 
-    sincronizarConAPI();
-  }, [proyecto, isAuthenticated, usarAPI]);
+    cargarDatos();
+  }, [proyecto, isAuthenticated, usarAPI]); 
 
 
   useEffect(() => {
@@ -559,16 +517,20 @@ export default function App() {
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
+  
+  // EL FILTRO ANTI-FANTASMAS: Oculta los vendidos en los menús, pero los deja en el mapa
+  const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
+
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-  const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
-  const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
-  const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
+  const uvsDisponibles = [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum);
+  const mznsDisponibles = [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
+  const lotesDisponibles = lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
 
   useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
-  // AL SELECCIONAR EL LOTE: LLENAR DATOS Y AUTO-CALCULAR LA CUOTA INICIAL DE LA API
+  // AL SELECCIONAR EL LOTE: LLENAR DATOS Y AUTO-CALCULAR LA CUOTA INICIAL (API O EXCEL)
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -577,26 +539,27 @@ export default function App() {
         setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
 
-        // SI ESTAMOS CON LA API, CALCULAMOS LA INICIAL EXACTA DE LA EMPRESA
-        if (usarAPI && loteEncontrado.api_initial_tipo) {
-            const precioCalculado = loteEncontrado.superficie * loteEncontrado.precio;
-            let iniCalculada = loteEncontrado.api_cuota_inicial || 0;
-            
-            // Fórmula extraída del HTML oficial
-            if (loteEncontrado.api_initial_tipo === '2' && loteEncontrado.api_initial_pct > 0) {
-                iniCalculada = Math.ceil(precioCalculado * loteEncontrado.api_initial_pct / 100);
-            } else if (loteEncontrado.api_initial_tipo === '1' && loteEncontrado.api_initial_valor > 0) {
-                iniCalculada = Math.round(loteEncontrado.api_initial_valor);
-            }
+        // FÓRMULA UNIVERSAL DE LA EMPRESA PARA LA CUOTA INICIAL
+        const precioCalculado = loteEncontrado.superficie * loteEncontrado.precio;
+        let iniCalculada = loteEncontrado.api_cuota_inicial || 0;
+        
+        if (loteEncontrado.api_initial_tipo === '2' && loteEncontrado.api_initial_pct > 0) {
+            iniCalculada = Math.ceil((precioCalculado * loteEncontrado.api_initial_pct) / 100);
+        } else if (loteEncontrado.api_initial_tipo === '1' && loteEncontrado.api_initial_valor > 0) {
+            iniCalculada = Math.round(loteEncontrado.api_initial_valor);
+        }
 
-            if (iniCalculada > 0) {
-                setModoInicial("monto");
-                setInicialMonto(iniCalculada.toString());
-            }
+        if (iniCalculada > 0) {
+            setModoInicial("monto");
+            setInicialMonto(iniCalculada.toString());
+        } else {
+            setModoInicial("porcentaje");
+            setInicialPorcentaje("");
+            setInicialMonto("");
         }
       }
     }
-  }, [modoBD, uv, mzn, lote, lotesDelProyecto, usarAPI]);
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -972,7 +935,8 @@ export default function App() {
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
-           <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
+           {toast.includes('🛡️') ? <AlertCircle className="w-5 h-5 text-amber-400" /> : <CheckCircle2 className="w-5 h-5 text-cyan-400" />}
+           {toast}
         </div>
       )}
 
@@ -1342,7 +1306,7 @@ export default function App() {
                     {tipoCotizacion === 'contado' && (
                       <div className="space-y-1.5">
                         <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-50 shrink-0" /> Contado x m² ($us)
                         </label>
                         <input 
                           type="number" 
