@@ -306,7 +306,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   const resultadosRef = useRef(null);
-
+  const formRef = useRef(null);
   // 1. CARGA BASE: Siempre carga tu Excel blindado primero
   useEffect(() => {
     if (!isAuthenticated) return;
