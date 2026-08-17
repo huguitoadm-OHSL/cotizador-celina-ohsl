@@ -410,77 +410,73 @@ export default function App() {
     cargarLotes();
   }, [isAdmin]);
 // ============================================================================
-  // MOTOR HÍBRIDO: CONEXIÓN EN TIEMPO REAL A LA API DE LA EMPRESA (FASE 4)
+  // MOTOR HÍBRIDO: CONEXIÓN EN TIEMPO REAL A LA API DE LA EMPRESA
   // ============================================================================
   useEffect(() => {
-    // Si no está logueado, no hay proyecto, o el Excel base aún no carga, esperamos.
     if (!isAuthenticated || !proyecto || baseDeDatosLotes.length === 0) return;
 
     const sincronizarConAPI = async () => {
       try {
-        // 1. Conectamos a la URL oficial que conseguiste
         const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
-        if (!resProj.ok) return; 
+        if (!resProj.ok) return;
         const dataProj = await resProj.json();
 
-        // 2. Buscamos el ID del proyecto que tienes seleccionado en el cotizador
-        const projAPI = dataProj.proyectos.find(p => 
-          String(p.proyecto).toUpperCase().includes(proyecto.toUpperCase()) || 
-          proyecto.toUpperCase().includes(String(p.proyecto).toUpperCase())
-        );
+        // 1. BUSCADOR INTELIGENTE: Engancha "EL PORVENIR" con "Celina Porvenir" de la API
+        const projAPI = dataProj.proyectos.find(p => {
+           const nombreAPI = String(p.proyecto).toUpperCase();
+           const nombreLocal = proyecto.toUpperCase();
+           return nombreAPI.includes(nombreLocal) || nombreLocal.includes(nombreAPI) ||
+                  (nombreLocal === "EL PORVENIR" && nombreAPI.includes("PORVENIR"));
+        });
 
         if (projAPI && projAPI.project_id) {
-          // 3. Jala los lotes frescos de ese proyecto en milisegundos
           const resLotes = await fetch(`https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`);
           if (!resLotes.ok) return;
           const dataLotes = await resLotes.json();
 
           if (dataLotes.lotes && dataLotes.lotes.length > 0) {
-            // 4. FUSIÓN CUÁNTICA: Sobrescribimos tu Excel EN MEMORIA con los datos vivos
             setBaseDeDatosLotes(lotesAntiguos => {
               const nuevaBase = [...lotesAntiguos];
-            dataLotes.lotes.forEach(loteFresco => {
-                const idx = nuevaBase.findIndex(l => 
-                  l.proyecto.includes(proyecto) && 
-                  String(l.lote) === String(loteFresco.lote) &&
-                  String(l.uv).replace(/[^0-9]/g, '') === String(loteFresco.uv || '').replace(/[^0-9]/g, '')
+              
+              dataLotes.lotes.forEach(loteFresco => {
+                const idx = nuevaBase.findIndex(l =>
+                  l.proyecto.includes(proyecto) &&
+                  String(l.lote) === String(loteFresco.lote)
                 );
-                
+
                 if (idx !== -1) {
-                  // Si ya existe en tu Excel, solo lo actualiza
+                  // Si el lote existe en tu Excel, actualiza su precio y superficie
                   nuevaBase[idx].superficie = Number(loteFresco.mt2 || nuevaBase[idx].superficie);
                   nuevaBase[idx].precio = Number(loteFresco.price_mt2 || nuevaBase[idx].precio);
-                  nuevaBase[idx].estado = "LIBRE"; 
+                  nuevaBase[idx].estado = "LIBRE";
                   if(loteFresco.categoria) nuevaBase[idx].categoria = String(loteFresco.categoria).toUpperCase();
                 } else {
-                  // MAGIA PURA: Si NO existe en tu Excel (Ej: El Porvenir), lo crea automáticamente
+                  // AUTO-CREADOR: Si el lote no está en tu Excel (Ej: El Porvenir), lo crea mágicamente
                   nuevaBase.push({
                     proyecto: proyecto,
-                    uv: loteFresco.uv ? String(loteFresco.uv) : "SN",
-                    mzn: loteFresco.manzano ? String(loteFresco.manzano) : "SN",
+                    uv: loteFresco.uv ? String(loteFresco.uv).replace(/[^0-9]/g, '') : "SN",
+                    mzn: loteFresco.manzano ? String(loteFresco.manzano).replace(/[^0-9]/g, '') : "SN",
                     lote: String(loteFresco.lote),
                     superficie: Number(loteFresco.mt2 || 0),
                     precio: Number(loteFresco.price_mt2 || 0),
                     estado: "LIBRE",
                     categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
-                    vendedor: "SISTEMA API"
+                    vendedor: "API VIVO"
                   });
                 }
               });
               return nuevaBase;
             });
-            console.log(`✅ Sincronización en vivo exitosa: ${proyecto}`);
+            console.log(`✅ API Conectada: Datos y precios de ${proyecto} cargados con éxito.`);
           }
         }
       } catch (error) {
-        // ESCUDO DE OSCAR: Si la API falla, o si el servidor bloquea conexiones externas (CORS), 
-        // no hacemos nada. El Excel salva la venta y la pantalla jamás se congela.
-        console.warn("⚠️ Servidor empresa no disponible. Operando con Excel blindado.");
+        console.warn("⚠️ Firewall de la empresa detectado. Operando de forma segura con Excel local.");
       }
     };
 
     sincronizarConAPI();
-  }, [proyecto, isAuthenticated]); // Solo se activa cuando cambias de proyecto o inicias sesión
+  }, [proyecto, isAuthenticated]);
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
