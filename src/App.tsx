@@ -35,6 +35,7 @@ const proyectosPorRegional = {
 const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
+  const [geoData, setGeoData] = useState(null);
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
@@ -76,6 +77,45 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     volarAlProyecto();
   }, [geojsonPath]);
 
+  // JAVASCRIPT PRE-PROCESSOR (EL FILTRO DE DIAMANTE)
+  useEffect(() => {
+    setIsMapReady(false);
+    fetch(geojsonPath)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return setIsMapReady(true);
+        
+        const cleanFeatures = data.features.map(f => {
+            const p = f.properties || {};
+            // 1. Extraemos el texto crudo priorizando la etiqueta LOTE
+            const nombreRaw = p.LOTE || p.lote || p.Lote || p.TextString || p.Text || p.text || p.name || p.Name || "";
+            
+            // 2. Limpiamos cualquier letra, dejando solo los números puros
+            const soloNumeros = String(nombreRaw).replace(/[^0-9]/g, '');
+            let q_lote = "";
+            
+            // 3. EL FILTRO: Si es de 1 a 3 dígitos, es un lote real. 
+            // Si es de 4 o más (ej. 3230), es superficie de AutoCAD (basura), la destruye.
+            if (soloNumeros.length > 0 && soloNumeros.length <= 3) {
+                q_lote = String(parseInt(soloNumeros, 10)); // parseInt quita ceros a la izquierda (05 -> 5)
+            }
+
+            return {
+                ...f,
+                properties: {
+                    ...p,
+                    q_lote: q_lote
+                }
+            };
+        });
+        
+        const dataLimpia = { type: "FeatureCollection", features: cleanFeatures };
+        setGeoData(dataLimpia);
+        setTimeout(() => setIsMapReady(true), 600);
+      })
+      .catch(() => setIsMapReady(true));
+  }, [geojsonPath]);
+
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -84,9 +124,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     }
   }, [isFullscreen]);
 
-  // EL CÓDIGO MAESTRO: Priorizamos la etiqueta LOTE y luego filtramos longitudes
-  const textProperty = ['coalesce', ['get', 'LOTE'], ['get', 'lote'], ['get', 'Lote'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'name'], ['get', 'Name'], ''];
-
+  // CAPAS DEL MAPA (100% ESTABLES)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
@@ -109,8 +147,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'fill',
     paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
     filter: ['all', 
-      ['!=', ['to-string', textProperty], ''], 
-      ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '___NONE___')] 
+      ['!=', ['get', 'q_lote'], ''], 
+      ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '___NONE___')] 
     ]
   }), [loteActivo]);
 
@@ -119,8 +157,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
     filter: ['all', 
-      ['!=', ['to-string', textProperty], ''], 
-      ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '___NONE___')] 
+      ['!=', ['get', 'q_lote'], ''], 
+      ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '___NONE___')] 
     ]
   }), [loteActivo]);
 
@@ -129,7 +167,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'symbol',
     minzoom: 16.5, 
     layout: {
-      'text-field': textProperty,
+      'text-field': ['get', 'q_lote'],
       'text-size': 12.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
@@ -139,12 +177,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
       'text-halo-color': '#000000',
       'text-halo-width': 1.5 
     },
-    // EL FILTRO DE DIAMANTE: Destruye cualquier número de 4 dígitos o más (la basura de AutoCAD)
-    filter: ['all', 
-      ['!=', ['geometry-type'], 'Point'], 
-      ['!=', ['to-string', textProperty], ''],
-      ['<=', ['length', ['to-string', textProperty]], 3] 
-    ]
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote'], '']]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -226,13 +259,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer as any} />
-              <Layer {...lineLayer as any} />
-              <Layer {...highlightLayer as any} />
-              <Layer {...highlightLineLayer as any} />
-              <Layer {...labelLayer as any} />
-            </Source>
+            {geoData && (
+              <Source id="dynamic-data" type="geojson" data={geoData}>
+                <Layer {...fillLayer as any} />
+                <Layer {...lineLayer as any} />
+                <Layer {...highlightLayer as any} />
+                <Layer {...highlightLineLayer as any} />
+                <Layer {...labelLayer as any} />
+              </Source>
+            )}
           </Map>
         </div>
       </div>
@@ -1073,7 +1108,6 @@ export default function App() {
               </div>
               
               <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
-                {/* BOTÓN KILL-SWITCH (MODO SIGILOSO) */}
                 <button 
                     onClick={() => setUsarAPI(false)} 
                     className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
