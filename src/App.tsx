@@ -4,9 +4,8 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair
+  Maximize, Minimize, Eye, Crosshair, Server
 } from "lucide-react";
-// Aquí inyecté NavigationControl
 import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -31,64 +30,49 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO Y BLINDADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
+  const [geoData, setGeoData] = useState(null);
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // SEGURO DE VIDA DEL LOADER: Se desvanece máximo a los 2.5s para nunca bloquear el mapa
   useEffect(() => {
     setIsMapReady(false);
-    const safetyTimer = setTimeout(() => {
-      setIsMapReady(true);
-    }, 2500);
-    return () => clearTimeout(safetyTimer);
-  }, [proyectoActivo]);
-
-  // PILOTO AUTOMÁTICO (DRON): Vuela al proyecto seleccionado al instante
-  useEffect(() => {
-    const volarAlProyecto = async () => {
-      try {
-        const response = await fetch(geojsonPath);
-        if (!response.ok) return;
-        const data = await response.json();
+    fetch(geojsonPath)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return setIsMapReady(true);
         
-        // Si el archivo GeoJSON existe y tiene datos, buscamos sus coordenadas
-        if (data && data.features && data.features.length > 0) {
-          let coordenadas = data.features[0].geometry.coordinates;
-          
-          // Profundizar en los arrays matemáticos por si es MultiPolygon o Polygon
-          while (Array.isArray(coordenadas[0])) {
-            coordenadas = coordenadas[0];
-          }
-          
-          const [lng, lat] = coordenadas;
-          
-          // Ordenamos a la cámara hacer un vuelo cinematográfico
-          if (mapRef.current && lng && lat) {
-            mapRef.current.getMap().flyTo({
-              center: [lng, lat],
-              zoom: 14.5,
-              speed: 1.5, // Velocidad del vuelo
-              curve: 1.2, // Curvatura cinematográfica
-              essential: true
-            });
-          }
-        }
-      } catch (error) {
-        console.warn("Piloto automático en espera de datos espaciales...");
-      }
-    };
+        const cleanFeatures = data.features.map(f => {
+            const p = f.properties || {};
+            const nombreRaw = p.name || p.Name || p.TextString || p.Text || p.text || p.LOTE || p.Lote || "";
+            const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
+            return {
+                ...f,
+                properties: {
+                    ...p,
+                    q_lote: isNaN(numLote) ? "" : String(numLote)
+                }
+            };
+        });
+        
+        const dataLimpia = { type: "FeatureCollection", features: cleanFeatures };
+        setGeoData(dataLimpia);
 
-    // Ejecutar vuelo cada vez que cambie el proyecto en el menú
-    volarAlProyecto();
+        if (dataLimpia.features[0] && mapRef.current) {
+            let coords = dataLimpia.features[0].geometry.coordinates;
+            while (Array.isArray(coords[0])) coords = coords[0];
+            mapRef.current.getMap().flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5, essential: true });
+        }
+        setTimeout(() => setIsMapReady(true), 600);
+      })
+      .catch(() => setIsMapReady(true));
   }, [geojsonPath]);
 
-  // LA CURA DE LA PANTALLA NEGRA: Método correcto getMap().resize()
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -103,54 +87,53 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+      if (est === 'VENDIDO') a.push(numLote);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else if (est === 'VENDIDO') a.push(numLote);
+      else v.push(numLote); 
     });
     return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
+      verdes: v.length > 0 ? v : ['__NONE_VERDE__'], 
+      rojos: r.length > 0 ? r : ['__NONE_ROJO__'],
+      azules: a.length > 0 ? a : ['__NONE_AZUL__']
     };
   }, [baseDeDatosLotes, proyectoActivo]);
-
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', ['to-string', textProperty],
+        'match', ['get', 'q_lote'],
         verdes, 'rgba(34, 197, 94, 0.45)', 
         rojos, 'rgba(239, 68, 68, 0.45)',  
         azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent' // <-- EL ESCUDO INVISIBLE: Ignora la basura de AutoCAD        
+        'transparent'      
       ],
       'fill-opacity': 1
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 },
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
+    filter: ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, // <-- Limpia la vista desde lejos
+    minzoom: 16.5, 
     layout: {
-      'text-field': textProperty,
+      'text-field': ['get', 'q_lote'],
       'text-size': 12.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
@@ -160,18 +143,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       'text-halo-color': '#000000',
       'text-halo-width': 1.5 
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote'], '']]
   }), []);
 
-  // CONTENEDORES RESPONSIVE ABSOLUTOS
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
     : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
 
   return (
     <div className={containerClasses}>
-      
-      {/* HEADER DEL NAVEGADOR */}
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -208,7 +188,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN */}
       {isFullscreen && (
         <button 
           onClick={() => setIsFullscreen(false)}
@@ -218,10 +197,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </button>
       )}
 
-      {/* LIENZO DE MAPA BLINDADO */}
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
-        
-        {/* PANTALLA DE CARGA (Con auto-desvanecimiento) */}
         {!isMapReady && (
           <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
             <div className="relative flex items-center justify-center">
@@ -238,30 +214,25 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             ref={mapRef}
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-            
-            // EL MOTOR BASE SEGURO: Previene excepciones de estilo en WebGL
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            
             maxZoom={20} 
-            interactiveLayerIds={[]} // Tracking Visual Puro
-            onLoad={() => setIsMapReady(true)} // Notifica que renderizó con éxito
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            {/* INYECCIÓN DE PLANIMETRÍA NEÓN */}
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer} />
-              <Layer {...lineLayer} />
-              <Layer {...highlightLayer} />
-              <Layer {...labelLayer} />
-            </Source>
+            {geoData && (
+              <Source id="dynamic-data" type="geojson" data={geoData}>
+                <Layer {...fillLayer as any} />
+                <Layer {...lineLayer as any} />
+                <Layer {...highlightLayer as any} />
+                <Layer {...labelLayer as any} />
+              </Source>
+            )}
           </Map>
         </div>
       </div>
@@ -270,9 +241,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 };
 
 export default function App() {
-  // ==========================================================================
-  // ESTADO DE AUTENTICACIÓN Y VARIABLES
-  // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
@@ -281,13 +249,9 @@ export default function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     if (passwordInput === "DIOSESMIGUIA") { 
-      setIsAuthenticated(true); 
-      setIsAdmin(false); 
-      setLoginError(false);
+      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
     } else if (passwordInput === "DIRECTOR2026") { 
-      setIsAuthenticated(true); 
-      setIsAdmin(true); 
-      setLoginError(false);
+      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
@@ -297,6 +261,10 @@ export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
+  
+  // EL SWITCH MAESTRO DE OSCAR: false = Excel Local, true = API de la Empresa
+  const [usarAPI, setUsarAPI] = useState(false); 
+  
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
@@ -339,7 +307,9 @@ export default function App() {
 
   const resultadosRef = useRef(null);
 
+  // 1. CARGA BASE: Siempre carga tu Excel blindado primero
   useEffect(() => {
+    if (!isAuthenticated) return;
     const cargarLotes = async () => {
       try {
         let rawData;
@@ -356,19 +326,16 @@ export default function App() {
         }
 
         if (!Array.isArray(rawData)) rawData = [];
-      
-        // BUSCADOR INTELIGENTE: Rastrea columnas ignorando espacios ocultos o mayúsculas
+
         const getSafeVal = (obj, propName) => {
             const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
             return key ? obj[key] : undefined;
         };
 
-        // PARSER MATEMÁTICO: Traduce comas latinas y puntos corporativos a números puros
         const parseNum = (val) => {
             if (val === undefined || val === null || val === '') return ''; 
             if (typeof val === 'number') return val;
             let strVal = String(val).trim();
-            
             if (strVal.includes('.') && strVal.includes(',')) {
                 if (strVal.indexOf('.') < strVal.indexOf(',')) {
                     strVal = strVal.replace(/\./g, '').replace(',', '.');
@@ -395,7 +362,6 @@ export default function App() {
             vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase()
         }));
 
-        // LECTOR TOTAL DE INVENTARIO: Permite visibilidad absoluta
         const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
         
         setBaseDeDatosLotes(lotesPermitidos);
@@ -408,12 +374,11 @@ export default function App() {
       }
     };
     cargarLotes();
-  }, [isAdmin]);
-// ============================================================================
-  // MOTOR HÍBRIDO: CONEXIÓN EN TIEMPO REAL A LA API DE LA EMPRESA
-  // ============================================================================
+  }, [isAuthenticated, usarAPI]); // Si apagas la API, recarga el Excel puro
+
+  // 2. MOTOR HÍBRIDO (SE ACTIVA SÓLO SI EL SWITCH 'usarAPI' ESTÁ ENCENDIDO)
   useEffect(() => {
-    if (!isAuthenticated || !proyecto || baseDeDatosLotes.length === 0) return;
+    if (!isAuthenticated || !proyecto || !usarAPI) return;
 
     const sincronizarConAPI = async () => {
       try {
@@ -421,12 +386,18 @@ export default function App() {
         if (!resProj.ok) return;
         const dataProj = await resProj.json();
 
-        // BUSCADOR INTELIGENTE: Triangulación de nomenclaturas asimétricas
+        // Candado Estricto de Arquitectura: Diferencia Fase 1 de Fase 2
         const projAPI = dataProj.proyectos.find(p => {
-           const nombreAPI = String(p.proyecto).toUpperCase();
-           const nombreLocal = proyecto.toUpperCase();
-           return nombreAPI.includes(nombreLocal) || nombreLocal.includes(nombreAPI) ||
-                  (nombreLocal === "EL PORVENIR" && nombreAPI.includes("PORVENIR"));
+           const nombreAPI = String(p.proyecto).trim().toUpperCase();
+           const nombreLocal = proyecto.trim().toUpperCase();
+           
+           if (nombreLocal === "EL PORVENIR") {
+               return nombreAPI === "EL PORVENIR" || nombreAPI === "CELINA EL PORVENIR";
+           }
+           if (nombreLocal === "EL PORVENIR FASE 2") {
+               return nombreAPI === "EL PORVENIR FASE 2" || nombreAPI === "EL PORVENIR 2" || nombreAPI === "CELINA EL PORVENIR FASE 2";
+           }
+           return nombreAPI === nombreLocal || nombreAPI === `CELINA ${nombreLocal}`;
         });
 
         if (projAPI && projAPI.project_id) {
@@ -436,7 +407,6 @@ export default function App() {
 
           if (dataLotes.lotes && dataLotes.lotes.length > 0) {
             
-            // EXTRACCIÓN MILIMÉTRICA: Convierte comas latinas y cualquier formato a números matemáticos puros
             const extractNumber = (val) => {
                 if (val === undefined || val === null || val === '') return 0;
                 if (typeof val === 'number') return val;
@@ -459,8 +429,6 @@ export default function App() {
               const nuevaBase = [...lotesAntiguos];
               
               dataLotes.lotes.forEach(loteFresco => {
-                
-                // 1. CAZADOR DE LLAVES: Busca agresivamente el precio sin importar cómo lo nombre la API
                 const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
                 const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
                 
@@ -469,12 +437,16 @@ export default function App() {
                 const estadoLimpio = String(loteFresco.estado || "LIBRE").toUpperCase();
                 const categoriaLimpia = loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR";
                 
-                // Sanitizamos los datos respetando letras como "SN"
                 const uvFresco = loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN";
                 const mznFresco = loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN";
                 const loteNumFresco = String(loteFresco.lote).trim().toUpperCase();
 
-                // 2. CRUCE DE DATOS PRECISO: Compara Manzano y Lote exactamente
+                // EXTRAEMOS LA FÓRMULA SECRETA DE LA CUOTA INICIAL DE LA EMPRESA
+                const api_cuota_inicial = extractNumber(loteFresco.cuota_inicial);
+                const api_initial_tipo = String(loteFresco.initial_tipo);
+                const api_initial_pct = extractNumber(loteFresco.initial_pct);
+                const api_initial_valor = extractNumber(loteFresco.initial_valor);
+
                 const idx = nuevaBase.findIndex(l => {
                   const matchProj = l.proyecto.includes(proyecto) || proyecto.includes(l.proyecto);
                   const matchLote = String(l.lote).trim().toUpperCase() === loteNumFresco;
@@ -482,15 +454,17 @@ export default function App() {
                   return matchProj && matchLote && matchMzn;
                 });
 
-                // 3. INYECCIÓN O CREACIÓN
                 if (idx !== -1) {
-                  // Si existe en tu Excel local, fuerza la actualización del precio
                   if (supLimpia > 0) nuevaBase[idx].superficie = supLimpia;
                   if (precioLimpio > 0) nuevaBase[idx].precio = precioLimpio;
                   nuevaBase[idx].estado = estadoLimpio;
                   nuevaBase[idx].categoria = categoriaLimpia;
+                  // Inyectamos las variables de la inicial
+                  nuevaBase[idx].api_cuota_inicial = api_cuota_inicial;
+                  nuevaBase[idx].api_initial_tipo = api_initial_tipo;
+                  nuevaBase[idx].api_initial_pct = api_initial_pct;
+                  nuevaBase[idx].api_initial_valor = api_initial_valor;
                 } else {
-                  // Si es totalmente nuevo (Ej: El Porvenir sin cargar en Excel)
                   nuevaBase.push({
                     proyecto: proyecto,
                     uv: uvFresco === "" ? "SN" : uvFresco,
@@ -500,21 +474,30 @@ export default function App() {
                     precio: precioLimpio,
                     estado: estadoLimpio,
                     categoria: categoriaLimpia,
-                    vendedor: "API VIVA"
+                    vendedor: "API VIVA",
+                    // Inyectamos las variables de la inicial
+                    api_cuota_inicial: api_cuota_inicial,
+                    api_initial_tipo: api_initial_tipo,
+                    api_initial_pct: api_initial_pct,
+                    api_initial_valor: api_initial_valor
                   });
                 }
               });
               return nuevaBase;
             });
+            showNotification(`📡 Conexión API Exitosa: ${proyecto} sincronizado en tiempo real.`);
           }
         }
       } catch (error) {
-        // Fallback silencioso en caso de bloqueo
+        showNotification("🛡️ Escudo de Seguridad: API no disponible. Usando Excel Local.");
+        setUsarAPI(false); // Si la API falla, el switch se apaga solo para protegerte
       }
     };
 
     sincronizarConAPI();
-  }, [proyecto, isAuthenticated]);
+  }, [proyecto, isAuthenticated, usarAPI]);
+
+
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
@@ -585,16 +568,35 @@ export default function App() {
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
+  // AL SELECCIONAR EL LOTE: LLENAR DATOS Y AUTO-CALCULAR LA CUOTA INICIAL DE LA API
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
-      const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
+      const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
         setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
+
+        // SI ESTAMOS CON LA API, CALCULAMOS LA INICIAL EXACTA DE LA EMPRESA
+        if (usarAPI && loteEncontrado.api_initial_tipo) {
+            const precioCalculado = loteEncontrado.superficie * loteEncontrado.precio;
+            let iniCalculada = loteEncontrado.api_cuota_inicial || 0;
+            
+            // Fórmula extraída del HTML oficial
+            if (loteEncontrado.api_initial_tipo === '2' && loteEncontrado.api_initial_pct > 0) {
+                iniCalculada = Math.ceil(precioCalculado * loteEncontrado.api_initial_pct / 100);
+            } else if (loteEncontrado.api_initial_tipo === '1' && loteEncontrado.api_initial_valor > 0) {
+                iniCalculada = Math.round(loteEncontrado.api_initial_valor);
+            }
+
+            if (iniCalculada > 0) {
+                setModoInicial("monto");
+                setInicialMonto(iniCalculada.toString());
+            }
+        }
       }
     }
-  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto, usarAPI]);
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -935,9 +937,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* ==============================================================================
-          PANTALLA DE LOGIN CON EFECTO CYBERTECH
-      ============================================================================== */}
       {!isAuthenticated && (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-500">
           <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
@@ -996,7 +995,6 @@ export default function App() {
         </div>
       )}
 
-      {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
@@ -1016,17 +1014,15 @@ export default function App() {
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      {/* CONTENEDOR PRINCIPAL - LIBRE DE CLASES "TRANSFORM" QUE ROMPAN EL FULLSCREEN */}
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
-        {/* CABECERA (FLEX-WRAP PARA EVITAR COLAPSO EN MÓVILES) */}
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
@@ -1040,14 +1036,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none">
+             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -1070,7 +1066,6 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* MAPA INTERACTIVO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivo={lote}
@@ -1079,10 +1074,10 @@ export default function App() {
            />
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
+        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
-            <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
+            <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800 flex-wrap">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
               <div className="flex items-center gap-3 relative z-10">
                 <div className="bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/30 shadow-[inset_0_0_15px_rgba(34,211,238,0.15)]">
@@ -1091,17 +1086,20 @@ export default function App() {
                 <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white drop-shadow-md">Datos de Inversión</h2>
               </div>
               
-              <div className="relative z-10">
-                {!cargandoBD && baseDeDatosLotes.length > 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/40 border border-emerald-500/40 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)] backdrop-blur-md">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_8px_rgba(52,211,153,1)]"></div> BD Online
-                   </span>
-                )}
-                {!cargandoBD && baseDeDatosLotes.length === 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-950/30 border border-rose-500/30 rounded-full text-[9px] font-bold text-rose-400 tracking-wider shadow-sm">
-                     <AlertCircle className="w-3 h-3 shrink-0" /> BD Offline
-                   </span>
-                )}
+              <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
+                {/* BOTÓN KILL-SWITCH (EXCEL VS API) */}
+                <button 
+                    onClick={() => { setUsarAPI(false); showNotification("🛡️ Cambiando a Modo Excel Local Blindado."); }} 
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <Database className="w-3 h-3" /> Excel Local
+                </button>
+                <button 
+                    onClick={() => { setUsarAPI(true); showNotification("📡 Conectando a los Servidores de Grupo Paz..."); }} 
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-emerald-400'}`}
+                >
+                    <Server className="w-3 h-3" /> API Server
+                </button>
               </div>
             </div>
             
@@ -1432,7 +1430,6 @@ export default function App() {
                 </div>
                 )}
 
-                {/* BOTÓN PROCESAR CYBERTECH */}
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
@@ -1638,7 +1635,7 @@ export default function App() {
                                 <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                                   <th className="p-3 text-center">Mes</th>
                                   <th className="p-3 text-center">Pago Fijo ($)</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
                                   <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/50' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
                                   <th className="p-3 text-center text-white">Monto Real (Bs)</th>
                                   <th className="p-3 text-center">TC Efe.</th>
