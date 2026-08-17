@@ -1641,7 +1641,16 @@ export default function App() {
             Concepto, Arquitectura y Desarrollo Web
           </div>
           
-          <div className="text-4xl sm:text-7xl md:text-[6rem] font-b
-
-
+          <div className="text-4xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-300 to-cyan-400 tracking-tighter mb-6 sm:mb-8 drop-shadow-[0_0_50px_rgba(34,211,238,0.4)] select-none w-full break-words px-4">
+            OSCAR SARAVIA
+          </div>
           
+          <p className="text-slate-400 text-[8px] sm:text-[10px] md:text-xs max-w-3xl font-bold tracking-[0.1em] sm:tracking-[0.2em] leading-relaxed uppercase px-4">
+            Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}
