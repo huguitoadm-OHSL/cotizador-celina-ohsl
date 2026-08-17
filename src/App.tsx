@@ -30,12 +30,11 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (VERSIÓN ESTABLE Y ELEGANTE)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CON FILTRO DE DIAMANTE)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
-  const [geoData, setGeoData] = useState(null);
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
@@ -78,40 +77,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
   }, [geojsonPath]);
 
   useEffect(() => {
-    setIsMapReady(false);
-    fetch(geojsonPath)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (!data) return setIsMapReady(true);
-        
-        const cleanFeatures = data.features.map(f => {
-            const p = f.properties || {};
-            const nombreRaw = p.LOTE || p.lote || p.Lote || p.TextString || p.Text || p.text || p.name || p.Name || "";
-            const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
-            let q_lote = isNaN(numLote) ? "" : String(numLote);
-            
-            // FILTRO DE HIERRO: Destruye basura topográfica de AutoCAD
-            if (q_lote.length > 4) {
-                q_lote = "";
-            }
-
-            return {
-                ...f,
-                properties: {
-                    ...p,
-                    q_lote: q_lote
-                }
-            };
-        });
-        
-        const dataLimpia = { type: "FeatureCollection", features: cleanFeatures };
-        setGeoData(dataLimpia);
-        setTimeout(() => setIsMapReady(true), 600);
-      })
-      .catch(() => setIsMapReady(true));
-  }, [geojsonPath]);
-
-  useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
       setTimeout(() => map.resize(), 50);
@@ -119,7 +84,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     }
   }, [isFullscreen]);
 
-  // CAPAS DEL MAPA PURAS Y ESTABLES
+  // EL CÓDIGO MAESTRO: Priorizamos la etiqueta LOTE y luego filtramos longitudes
+  const textProperty = ['coalesce', ['get', 'LOTE'], ['get', 'lote'], ['get', 'Lote'], ['get', 'TextString'], ['get', 'Text'], ['get', 'text'], ['get', 'name'], ['get', 'Name'], ''];
+
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
@@ -142,8 +109,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'fill',
     paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
     filter: ['all', 
-      ['!=', ['get', 'q_lote'], ''], 
-      ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '___NONE___')] 
+      ['!=', ['to-string', textProperty], ''], 
+      ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '___NONE___')] 
     ]
   }), [loteActivo]);
 
@@ -152,8 +119,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
     filter: ['all', 
-      ['!=', ['get', 'q_lote'], ''], 
-      ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '___NONE___')] 
+      ['!=', ['to-string', textProperty], ''], 
+      ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '___NONE___')] 
     ]
   }), [loteActivo]);
 
@@ -162,7 +129,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'symbol',
     minzoom: 16.5, 
     layout: {
-      'text-field': ['get', 'q_lote'],
+      'text-field': textProperty,
       'text-size': 12.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
@@ -172,7 +139,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
       'text-halo-color': '#000000',
       'text-halo-width': 1.5 
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote'], '']]
+    // EL FILTRO DE DIAMANTE: Destruye cualquier número de 4 dígitos o más (la basura de AutoCAD)
+    filter: ['all', 
+      ['!=', ['geometry-type'], 'Point'], 
+      ['!=', ['to-string', textProperty], ''],
+      ['<=', ['length', ['to-string', textProperty]], 3] 
+    ]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -254,15 +226,13 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            {geoData && (
-              <Source id="dynamic-data" type="geojson" data={geoData}>
-                <Layer {...fillLayer as any} />
-                <Layer {...lineLayer as any} />
-                <Layer {...highlightLayer as any} />
-                <Layer {...highlightLineLayer as any} />
-                <Layer {...labelLayer as any} />
-              </Source>
-            )}
+            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+              <Layer {...fillLayer as any} />
+              <Layer {...lineLayer as any} />
+              <Layer {...highlightLayer as any} />
+              <Layer {...highlightLineLayer as any} />
+              <Layer {...labelLayer as any} />
+            </Source>
           </Map>
         </div>
       </div>
@@ -1034,11 +1004,11 @@ export default function App() {
         
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
@@ -1052,14 +1022,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none">
+             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -1086,6 +1056,7 @@ export default function App() {
            <MapaEspacial 
              loteActivo={lote}
              proyectoActivo={proyecto}
+             baseDeDatosLotes={baseDeDatosLotes}
            />
         </div>
 
@@ -1102,6 +1073,7 @@ export default function App() {
               </div>
               
               <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
+                {/* BOTÓN KILL-SWITCH (MODO SIGILOSO) */}
                 <button 
                     onClick={() => setUsarAPI(false)} 
                     className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
@@ -1519,7 +1491,7 @@ export default function App() {
                           <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.mzn || '-'}</div>
                         </div>
                         <div className={`text-center px-4 py-2 rounded-xl border flex-1 sm:flex-none shadow-[0_0_15px_rgba(0,0,0,0.5)] ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-950/60 border-cyan-500/50' : 'bg-emerald-950/60 border-emerald-500/50'}`}>
-                          <div className={`text-[8px] font-extrabold uppercase mb-1 ${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'textemerald-400'}`}>LOTE</div>
+                          <div className={`text-[8px] font-extrabold uppercase mb-1 ${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'}`}>LOTE</div>
                           <div className="text-white font-black text-base leading-none truncate">{resultado.lote || '-'}</div>
                         </div>
                       </div>
