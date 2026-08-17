@@ -25,58 +25,55 @@ const proyectosPorRegional = {
   ],
   "SATÉLITE NORTE": [
     "CELINA 7 FASE 3", "CELINA 8", "CLARA CHUCHIO", "SAN JORGE",
-    "CELINA VII FASE 1", "CELINA VII FASE 2", "PRADERAS DEL NORTE"
+    "CELINA VII FASE 1", "CELINA VII FASE 2", "PRADERAS DEL NORTE", "NARANJAL III", "CELINA II"
   ]
 };
 
 // ============================================================================
 // COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (VERSIÓN ESTABLE Y ELEGANTE)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
+const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
-  const [geoData, setGeoData] = useState(null);
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
   useEffect(() => {
     setIsMapReady(false);
-    fetch(geojsonPath)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (!data) return setIsMapReady(true);
-        
-        const cleanFeatures = data.features.map(f => {
-            const p = f.properties || {};
-            const nombreRaw = p.LOTE || p.lote || p.Lote || p.TextString || p.Text || p.text || p.name || p.Name || "";
-            const numLote = parseInt(String(nombreRaw).replace(/[^0-9]/g, ''), 10);
-            let q_lote = isNaN(numLote) ? "" : String(numLote);
-            
-            if (q_lote.length > 4) {
-                q_lote = "";
-            }
+    const safetyTimer = setTimeout(() => {
+      setIsMapReady(true);
+    }, 2500);
+    return () => clearTimeout(safetyTimer);
+  }, [proyectoActivo]);
 
-            return {
-                ...f,
-                properties: {
-                    ...p,
-                    q_lote: q_lote
-                }
-            };
-        });
+  useEffect(() => {
+    const volarAlProyecto = async () => {
+      try {
+        const response = await fetch(geojsonPath);
+        if (!response.ok) return;
+        const data = await response.json();
         
-        const dataLimpia = { type: "FeatureCollection", features: cleanFeatures };
-        setGeoData(dataLimpia);
-
-        if (dataLimpia.features[0] && mapRef.current) {
-            let coords = dataLimpia.features[0].geometry.coordinates;
-            while (Array.isArray(coords[0])) coords = coords[0];
-            mapRef.current.getMap().flyTo({ center: [coords[0], coords[1]], zoom: 14.5, speed: 1.5, essential: true });
+        if (data && data.features && data.features.length > 0) {
+          let coordenadas = data.features[0].geometry.coordinates;
+          while (Array.isArray(coordenadas[0])) {
+            coordenadas = coordenadas[0];
+          }
+          const [lng, lat] = coordenadas;
+          
+          if (mapRef.current && lng && lat) {
+            mapRef.current.getMap().flyTo({
+              center: [lng, lat],
+              zoom: 14.5,
+              speed: 1.5,
+              curve: 1.2,
+              essential: true
+            });
+          }
         }
-        setTimeout(() => setIsMapReady(true), 600);
-      })
-      .catch(() => setIsMapReady(true));
+      } catch (error) {}
+    };
+    volarAlProyecto();
   }, [geojsonPath]);
 
   useEffect(() => {
@@ -87,35 +84,57 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     }
   }, [isFullscreen]);
 
+  const { verdes, rojos, azules } = useMemo(() => {
+    let v = []; let r = []; let a = [];
+    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
+    lotesFiltrados.forEach(l => {
+      const numLote = String(parseInt(l.lote, 10) || l.lote);
+      const est = String(l.estado).toUpperCase();
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
+      else if (est === 'VENDIDO') a.push(numLote);
+    });
+    return { 
+      verdes: v.length > 0 ? v : ['__NONE_VERDE__'], 
+      rojos: r.length > 0 ? r : ['__NONE_ROJO__'],
+      azules: a.length > 0 ? a : ['__NONE_AZUL__']
+    };
+  }, [baseDeDatosLotes, proyectoActivo]);
+
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
-      'fill-color': 'rgba(6, 182, 212, 0.15)', 
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.45)', 
+        rojos, 'rgba(239, 68, 68, 0.45)',  
+        azules, 'rgba(59, 130, 246, 0.45)', 
+        'transparent'       
+      ],
       'fill-opacity': 1
     },
-    filter: ['!=', ['geometry-type'], 'Point'] 
-  }), []);
+    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+  }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 },
-    filter: ['!=', ['geometry-type'], 'Point'] 
+    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
   }), []);
 
+  // FILTRO ANTI-DESASTRE: Evita el highlight global cuando el string está vacío
   const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight-fill',
-    type: 'fill',
-    paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
-    filter: ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo]);
-
-  const highlightLineLayer = useMemo(() => ({
-    id: 'lotes-highlight-line',
+    id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
-    filter: ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '')] 
+    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
+    filter: ['all', 
+      ['!=', ['to-string', textProperty], ''], 
+      ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '___NONE___')] 
+    ]
   }), [loteActivo]);
 
   const labelLayer = useMemo(() => ({
@@ -123,7 +142,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
     type: 'symbol',
     minzoom: 16.5, 
     layout: {
-      'text-field': ['get', 'q_lote'],
+      'text-field': textProperty,
       'text-size': 12.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
@@ -133,7 +152,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
       'text-halo-color': '#000000',
       'text-halo-width': 1.5 
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote'], '']]
+    filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -152,7 +171,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
              <div>
                <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
                <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 Plataforma renderizada establemente.
+                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
+                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
+                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
                </p>
              </div>
            </div>
@@ -204,6 +225,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             maxZoom={20} 
+            interactiveLayerIds={[]} 
+            onLoad={() => setIsMapReady(true)}
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -213,15 +236,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo }) => {
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            {geoData && (
-              <Source id="dynamic-data" type="geojson" data={geoData}>
-                <Layer {...fillLayer as any} />
-                <Layer {...lineLayer as any} />
-                <Layer {...highlightLayer as any} />
-                <Layer {...highlightLineLayer as any} />
-                <Layer {...labelLayer as any} />
-              </Source>
-            )}
+            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
+              <Layer {...fillLayer as any} />
+              <Layer {...lineLayer as any} />
+              <Layer {...highlightLayer as any} />
+              <Layer {...labelLayer as any} />
+            </Source>
           </Map>
         </div>
       </div>
@@ -297,7 +317,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (AISLAMIENTO TOTAL)
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (DICCIONARIO INTELIGENTE)
   // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
@@ -329,37 +349,52 @@ export default function App() {
       };
 
       if (usarAPI) {
-        // MODO API
         try {
           const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
           if (!resProj.ok) throw new Error("API Falló");
           const dataProj = await resProj.json();
 
+          // DICCIONARIO MAESTRO: Enlaza nomenclaturas romanas y asimétricas
           const projAPI = dataProj.proyectos.find(p => {
              const apiName = String(p.proyecto).trim().toUpperCase();
              const local = proyecto.trim().toUpperCase();
 
-             if (local === "EL PORVENIR") return apiName === "EL PORVENIR" || apiName === "CELINA EL PORVENIR";
-             if (local === "EL PORVENIR FASE 2") return apiName === "EL PORVENIR FASE 2" || apiName === "EL PORVENIR 2" || apiName === "CELINA EL PORVENIR FASE 2";
-             if (local === "CELINA 3") return apiName === "CELINA III";
-             if (local === "CELINA 4") return apiName === "CELINA IV";
-             if (local === "CELINA 5") return apiName === "CELINA V";
-             if (local === "CELINA 8") return apiName === "CELINA 8" || apiName === "CELINA VIII";
-             if (local === "CELINA X") return apiName === "CELINA X" || apiName === "CELINA 10";
-             if (local === "CELINA 7 FASE 1") return apiName === "CELINA VII FASE 1";
-             if (local === "CELINA 7 FASE 2") return apiName === "CELINA VII FASE 2";
-             if (local === "CELINA 7 FASE 3") return apiName === "CELINA VII FASE 3";
-             if (local === "RANCHO NUEVO") return apiName === "CELINA - RANCHO NUEVO" || apiName === "RANCHO NUEVO";
-             if (local === "CLARA CHUCHIO") return apiName === "CELINA CLARA CHUCHIO" || apiName === "CLARA CHUCHIO";
-             if (local === "ROSA RODALI") return apiName === "ROSA RODALI" || apiName === "CELINA ROSA RODALI";
-             if (local === "SANTA ROSA - FASE 1") return apiName === "SANTA ROSA FASE 1" || apiName === "SANTA ROSA - FASE 1";
-             if (local === "SANTA ROSA - FASE 2") return apiName === "SANTA ROSA FASE 2" || apiName === "SANTA ROSA - FASE 2";
-             if (local === "SANTA ROSA - FASE 3") return apiName === "SANTA ROSA FASE 3" || apiName === "SANTA ROSA - FASE 3";
-             if (local === "SAN JORGE") return apiName === "SAN JORGE";
-             if (local === "CAÑAVERAL") return apiName === "CAÑAVERAL";
-             if (local === "EL ENCANTO") return apiName === "EL ENCANTO";
-             if (local === "TAMARINDO") return apiName === "TAMARINDO";
-
+             const map = {
+                "URUBÓ NORTE": ["CELINA URUBO DEL NORTE", "URUBO NORTE"],
+                "ROSA RODALI": ["ROSA RODALI", "CELINA ROSA RODALI"],
+                "CELINA PAILÓN": ["CELINA PAILON", "PAILON"],
+                "EL ENCANTO": ["EL ENCANTO", "CELINA EL ENCANTO"],
+                "EL ENCANTO FASE 2": ["EL ENCANTO FASE 2", "EL ENCANTO 2", "CELINA EL ENCANTO FASE 2"],
+                "SANTA ROSA - FASE 1": ["SANTA ROSA FASE 1", "SANTA ROSA - FASE 1"],
+                "SANTA ROSA - FASE 2": ["SANTA ROSA FASE 2", "SANTA ROSA - FASE 2"],
+                "SANTA ROSA - FASE 3": ["SANTA ROSA FASE 3", "SANTA ROSA - FASE 3"],
+                "TAMARINDO": ["TAMARINDO", "CELINA TAMARINDO"],
+                "JARDINES DEL BOSQUE": ["JARDINES DEL BOSQUE"],
+                "EL PORVENIR": ["EL PORVENIR", "CELINA EL PORVENIR"],
+                "EL PORVENIR FASE 2": ["EL PORVENIR FASE 2", "EL PORVENIR 2", "CELINA EL PORVENIR FASE 2"],
+                "MUYURINA": ["CELINA MUYURINA", "MUYURINA"],
+                "LOS JARDINES": ["LOS JARDINES", "CELINA LOS JARDINES"],
+                "EL RENACER": ["EL RENACER", "CELINA EL RENACER"],
+                "CELINA 3": ["CELINA III", "CELINA 3"],
+                "CELINA 4": ["CELINA IV", "CELINA 4"],
+                "CELINA 5": ["CELINA V", "CELINA 5"],
+                "RANCHO NUEVO": ["CELINA - RANCHO NUEVO", "RANCHO NUEVO"],
+                "CELINA X": ["CELINA X", "CELINA 10"],
+                "CAÑAVERAL": ["CAÑAVERAL", "CELINA CAÑAVERAL"],
+                "SANTA FE": ["CELINA SANTA FE", "SANTA FE"],
+                "VILLA BELLA VIVIENDAS": ["VILLA BELLA", "VILLA BELLA VIVIENDAS"],
+                "CELINA 7 FASE 3": ["CELINA VII FASE 3", "CELINA 7 FASE 3"],
+                "CELINA 8": ["CELINA 8", "CELINA VIII"],
+                "CLARA CHUCHIO": ["CELINA CLARA CHUCHIO", "CLARA CHUCHIO"],
+                "SAN JORGE": ["SAN JORGE", "CELINA SAN JORGE"],
+                "CELINA VII FASE 1": ["CELINA VII FASE 1", "CELINA 7 FASE 1"],
+                "CELINA VII FASE 2": ["CELINA VII FASE 2", "CELINA 7 FASE 2"],
+                "PRADERAS DEL NORTE": ["PRADERAS DEL NORTE", "CELINA PRADERAS DEL NORTE"],
+                "NARANJAL III": ["NARANJAL III", "NARANJAL 3"],
+                "CELINA II": ["CELINA II", "CELINA 2"]
+             };
+             
+             if (map[local] && map[local].includes(apiName)) return true;
              return apiName === local || apiName === `CELINA ${local}`;
           });
 
@@ -397,11 +432,9 @@ export default function App() {
           }
           throw new Error("Proyecto no encontrado en API");
         } catch (error) {
-          console.warn("⚠️ API inaccesible. Operando con Excel Local en modo sigiloso.");
           setUsarAPI(false); 
         }
       } else {
-        // MODO EXCEL LOCAL
         try {
           let rawData;
           try {
@@ -512,6 +545,7 @@ export default function App() {
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
+  // FILTRO ANTI-FANTASMAS (SOLO MENÚS)
   const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
 
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
@@ -523,6 +557,7 @@ export default function App() {
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
+  // CÁLCULO UNIVERSAL DE CUOTA INICIAL (Fórmula de la Empresa Inyectada)
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -895,6 +930,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
+      {/* ==============================================================================
+          PANTALLA DE LOGIN CON EFECTO CYBERTECH
+      ============================================================================== */}
       {!isAuthenticated && (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-500">
           <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
@@ -954,6 +992,7 @@ export default function App() {
         </div>
       )}
 
+      {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
@@ -1029,6 +1068,7 @@ export default function App() {
            <MapaEspacial 
              loteActivo={lote}
              proyectoActivo={proyecto}
+             baseDeDatosLotes={baseDeDatosLotes}
            />
         </div>
 
@@ -1388,6 +1428,7 @@ export default function App() {
                 </div>
                 )}
 
+                {/* BOTÓN PROCESAR CYBERTECH */}
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
