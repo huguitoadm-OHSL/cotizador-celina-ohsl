@@ -30,6 +30,12 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
+// EXPRESIONES MATEMÁTICAS GLOBALES (OPTIMIZACIÓN DE RAM FRENTE A VERCEL)
+// ============================================================================
+const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+const filterRegex = ['<=', ['length', ['to-string', textProperty]], 3];
+
+// ============================================================================
 // COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURACIÓN GPU + FASE 3)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
@@ -101,10 +107,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  // MOTOR EXPRESIVO GPU MAPBOX (Cero manipulación de RAM)
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
-  const filterRegex = ['<=', ['length', ['to-string', textProperty]], 3];
-
+  // MOTOR EXPRESIVO GPU MAPBOX
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
@@ -564,22 +567,6 @@ export default function App() {
     }
   }, [regional]);
 
-  const handleMapLoteClick = useCallback(({ lote: loteSeleccionado, uv: uvSeleccionada, mzn: mznSeleccionada }) => {
-    if (uvSeleccionada && uvsDisponibles.includes(uvSeleccionada)) {
-        setUv(uvSeleccionada);
-        setTimeout(() => {
-            setMzn(mznSeleccionada);
-            setTimeout(() => {
-                setLote(loteSeleccionado);
-            }, 50);
-        }, 50);
-    } else {
-        setLote(loteSeleccionado);
-    }
-    showNotification(`¡Lote ${loteSeleccionado} capturado desde satélite!`);
-    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [uvsDisponibles]); 
-
   const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleLoteChange = (e) => { setLote(e.target.value); };
@@ -638,6 +625,23 @@ export default function App() {
   const uvsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum), [lotesParaDropdown]);
   const mznsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum), [lotesParaDropdown, uv]);
   const lotesDisponibles = useMemo(() => lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum), [lotesParaDropdown, uv, mzn]);
+
+  // CORRECCIÓN TDZ: LA FUNCIÓN SE DECLARA DESPUÉS DE INICIALIZAR uvsDisponibles
+  const handleMapLoteClick = useCallback(({ lote: loteSeleccionado, uv: uvSeleccionada, mzn: mznSeleccionada }) => {
+    if (uvSeleccionada && uvsDisponibles.includes(uvSeleccionada)) {
+        setUv(uvSeleccionada);
+        setTimeout(() => {
+            setMzn(mznSeleccionada);
+            setTimeout(() => {
+                setLote(loteSeleccionado);
+            }, 50);
+        }, 50);
+    } else {
+        setLote(loteSeleccionado);
+    }
+    showNotification(`¡Lote ${loteSeleccionado} capturado desde satélite!`);
+    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [uvsDisponibles]); 
 
   useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
@@ -1577,7 +1581,7 @@ export default function App() {
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div>
-                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
+                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'textemerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
                         </div>
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div>
