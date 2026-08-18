@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair
+  Maximize, Minimize, Eye, Crosshair, Server, Info
 } from "lucide-react";
-// Aquí inyecté NavigationControl
 import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -26,69 +25,74 @@ const proyectosPorRegional = {
   ],
   "SATÉLITE NORTE": [
     "CELINA 7 FASE 3", "CELINA 8", "CLARA CHUCHIO", "SAN JORGE",
-    "CELINA VII FASE 1", "CELINA VII FASE 2", "PRADERAS DEL NORTE"
+    "CELINA VII FASE 1", "CELINA VII FASE 2", "PRADERAS DEL NORTE", "NARANJAL III", "CELINA II"
   ]
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR UNIFICADO Y BLINDADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (FASE 3 - INTERACTIVO)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
+const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
+  const [geoData, setGeoData] = useState(null);
+  const [hoverInfo, setHoverInfo] = useState(null);
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // SEGURO DE VIDA DEL LOADER: Se desvanece máximo a los 2.5s para nunca bloquear el mapa
   useEffect(() => {
     setIsMapReady(false);
-    const safetyTimer = setTimeout(() => {
-      setIsMapReady(true);
-    }, 2500);
+    const safetyTimer = setTimeout(() => setIsMapReady(true), 2500);
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO (DRON): Vuela al proyecto seleccionado al instante
+  // CARGA Y PARSEO DEL GEOJSON (Aseguramos que los números sean limpios)
   useEffect(() => {
-    const volarAlProyecto = async () => {
+    const cargarGeoData = async () => {
       try {
         const response = await fetch(geojsonPath);
-        if (!response.ok) return;
+        if (!response.ok) return setIsMapReady(true);
         const data = await response.json();
         
-        // Si el archivo GeoJSON existe y tiene datos, buscamos sus coordenadas
-        if (data && data.features && data.features.length > 0) {
-          let coordenadas = data.features[0].geometry.coordinates;
-          
-          // Profundizar en los arrays matemáticos por si es MultiPolygon o Polygon
-          while (Array.isArray(coordenadas[0])) {
-            coordenadas = coordenadas[0];
-          }
-          
+        const cleanFeatures = data.features.map(f => {
+            const p = f.properties || {};
+            const nombreRaw = p.LOTE || p.lote || p.Lote || p.TextString || p.Text || p.text || p.name || p.Name || "";
+            const soloNumeros = String(nombreRaw).replace(/[^0-9]/g, '');
+            let q_lote = "";
+            if (soloNumeros.length > 0 && soloNumeros.length <= 3) {
+                q_lote = String(parseInt(soloNumeros, 10)); 
+            }
+            
+            // Extraer UV y MZN del GeoJSON si existen (para autocompletar al hacer clic)
+            const uvRaw = p.UV || p.uv || p.Uv || "";
+            const mznRaw = p.MZA || p.mza || p.MZN || p.mzn || p.Manzano || p.manzano || "";
+
+            return {
+                ...f,
+                properties: { ...p, q_lote: q_lote, q_uv: String(uvRaw), q_mzn: String(mznRaw) }
+            };
+        });
+        
+        setGeoData({ type: "FeatureCollection", features: cleanFeatures });
+        
+        // Vuelo cinematográfico
+        if (cleanFeatures.length > 0) {
+          let coordenadas = cleanFeatures[0].geometry.coordinates;
+          while (Array.isArray(coordenadas[0])) { coordenadas = coordenadas[0]; }
           const [lng, lat] = coordenadas;
-          
-          // Ordenamos a la cámara hacer un vuelo cinematográfico
           if (mapRef.current && lng && lat) {
-            mapRef.current.getMap().flyTo({
-              center: [lng, lat],
-              zoom: 14.5,
-              speed: 1.5, // Velocidad del vuelo
-              curve: 1.2, // Curvatura cinematográfica
-              essential: true
-            });
+            mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 14.5, speed: 1.5, curve: 1.2, essential: true });
           }
         }
+        setTimeout(() => setIsMapReady(true), 600);
       } catch (error) {
-        console.warn("Piloto automático en espera de datos espaciales...");
+        setIsMapReady(true);
       }
     };
-
-    // Ejecutar vuelo cada vez que cambie el proyecto en el menú
-    volarAlProyecto();
+    cargarGeoData();
   }, [geojsonPath]);
 
-  // LA CURA DE LA PANTALLA NEGRA: Método correcto getMap().resize()
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -97,9 +101,11 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     }
   }, [isFullscreen]);
 
+  // LOGICA FASE 3: MAPEO DE COLORES POR ESTADO DESDE LA BASE DE DATOS
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
+    
     lotesFiltrados.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
       const est = String(l.estado).toUpperCase();
@@ -114,64 +120,96 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
-
+  // CAPAS RENDERIZADAS
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent' // <-- EL ESCUDO INVISIBLE: Ignora la basura de AutoCAD        
+        'match', ['get', 'q_lote'],
+        verdes, 'rgba(34, 197, 94, 0.45)', // Verde: Disponible
+        rojos, 'rgba(239, 68, 68, 0.45)',  // Rojo: Bloqueado/Reservado
+        azules, 'rgba(59, 130, 246, 0.45)', // Azul: Vendido
+        'rgba(6, 182, 212, 0.15)'           // Cyan por defecto
       ],
       'fill-opacity': 1
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote'], '']] 
   }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 },
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
   const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
+    id: 'lotes-highlight-fill',
+    type: 'fill',
+    paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
+    filter: ['all', ['!=', ['get', 'q_lote'], ''], ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '___NONE___')] ]
+  }), [loteActivo]);
+
+  const highlightLineLayer = useMemo(() => ({
+    id: 'lotes-highlight-line',
     type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
+    paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
+    filter: ['all', ['!=', ['get', 'q_lote'], ''], ['==', ['get', 'q_lote'], String(parseInt(loteActivo, 10) || '___NONE___')] ]
   }), [loteActivo]);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, // <-- Limpia la vista desde lejos
+    minzoom: 16.5, 
     layout: {
-      'text-field': textProperty,
+      'text-field': ['get', 'q_lote'],
       'text-size': 12.5,
       'text-anchor': 'center',
       'text-allow-overlap': false 
     },
-    paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.5 
-    },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.5 },
+    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote'], '']]
   }), []);
 
-  // CONTENEDORES RESPONSIVE ABSOLUTOS
+  // FASE 3: INTERACTIVIDAD (CLICK Y HOVER)
+  const onHover = useCallback(event => {
+    const { features, point: { x, y } } = event;
+    const hoveredFeature = features && features[0];
+    if (hoveredFeature && hoveredFeature.properties.q_lote) {
+      const loteNum = hoveredFeature.properties.q_lote;
+      let estadoTxt = "SIN REGISTRO";
+      let colorTxt = "text-slate-400";
+      
+      if (verdes.includes(loteNum)) { estadoTxt = "DISPONIBLE"; colorTxt = "text-emerald-400"; }
+      else if (rojos.includes(loteNum)) { estadoTxt = "BLOQUEADO"; colorTxt = "text-rose-400"; }
+      else if (azules.includes(loteNum)) { estadoTxt = "VENDIDO"; colorTxt = "text-blue-400"; }
+      
+      setHoverInfo({ x, y, lote: loteNum, estado: estadoTxt, color: colorTxt, uv: hoveredFeature.properties.q_uv, mzn: hoveredFeature.properties.q_mzn });
+    } else {
+      setHoverInfo(null);
+    }
+  }, [verdes, rojos, azules]);
+
+  const onClick = useCallback(event => {
+    const { features } = event;
+    const clickedFeature = features && features[0];
+    if (clickedFeature && clickedFeature.properties.q_lote) {
+       // Enviamos los datos al componente Padre (App) para autocompletar el formulario
+       onLoteClick({
+          lote: clickedFeature.properties.q_lote,
+          uv: clickedFeature.properties.q_uv,
+          mzn: clickedFeature.properties.q_mzn
+       });
+    }
+  }, [onLoteClick]);
+
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
     : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
 
   return (
     <div className={containerClasses}>
-      
-      {/* HEADER DEL NAVEGADOR */}
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -182,9 +220,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <div>
                <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
                <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
-                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
-                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
+                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]"></span> Disponible 
+                 <span className="w-2 h-2 rounded-full bg-rose-500 ml-1 shadow-[0_0_5px_rgba(244,63,94,0.8)]"></span> Bloqueado 
+                 <span className="w-2 h-2 rounded-full bg-blue-500 ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
                </p>
              </div>
            </div>
@@ -208,7 +246,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </div>
       )}
 
-      {/* BOTÓN FLOTANTE PARA SALIR DEL FULLSCREEN */}
       {isFullscreen && (
         <button 
           onClick={() => setIsFullscreen(false)}
@@ -218,10 +255,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         </button>
       )}
 
-      {/* LIENZO DE MAPA BLINDADO */}
       <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
-        
-        {/* PANTALLA DE CARGA (Con auto-desvanecimiento) */}
         {!isMapReady && (
           <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
             <div className="relative flex items-center justify-center">
@@ -238,30 +272,54 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             ref={mapRef}
             mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-            
-            // EL MOTOR BASE SEGURO: Previene excepciones de estilo en WebGL
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            
             maxZoom={20} 
-            interactiveLayerIds={[]} // Tracking Visual Puro
-            onLoad={() => setIsMapReady(true)} // Notifica que renderizó con éxito
-            style={{ width: '100%', height: '100%' }}
+            interactiveLayerIds={geoData ? ['lotes-fill'] : []} // Habilitamos eventos en los polígonos
+            onMouseMove={onHover}
+            onMouseLeave={() => setHoverInfo(null)}
+            onClick={onClick}
+            onLoad={() => setIsMapReady(true)}
+            style={{ width: '100%', height: '100%', cursor: hoverInfo ? 'pointer' : 'grab' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            {/* INYECCIÓN SATELITAL HD (Con maxzoom 17 para evitar la pantalla blanca) */}
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            {/* INYECCIÓN DE PLANIMETRÍA NEÓN */}
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer} />
-              <Layer {...lineLayer} />
-              <Layer {...highlightLayer} />
-              <Layer {...labelLayer} />
-            </Source>
+            {geoData && (
+              <Source id="dynamic-data" type="geojson" data={geoData}>
+                <Layer {...fillLayer as any} />
+                <Layer {...lineLayer as any} />
+                <Layer {...highlightLayer as any} />
+                <Layer {...highlightLineLayer as any} />
+                <Layer {...labelLayer as any} />
+              </Source>
+            )}
+
+            {/* FASE 3: POPUP INTELIGENTE DE TELEMETRÍA */}
+            {hoverInfo && (
+              <div 
+                className="absolute z-50 pointer-events-none bg-[#090e17]/90 backdrop-blur-md border border-cyan-500/50 p-3 rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.8)] transform -translate-x-1/2 -translate-y-full mt-[-15px]" 
+                style={{ left: hoverInfo.x, top: hoverInfo.y }}
+              >
+                <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2">
+                   <Info className="w-3.5 h-3.5 text-cyan-400" />
+                   <span className="text-[10px] font-black text-white uppercase tracking-widest">Lote {hoverInfo.lote}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[9px] uppercase tracking-wider font-bold">
+                   <div className="text-slate-500">MZN: <span className="text-cyan-100">{hoverInfo.mzn || '-'}</span></div>
+                   <div className="text-slate-500">UV: <span className="text-cyan-100">{hoverInfo.uv || '-'}</span></div>
+                </div>
+                <div className={`mt-2 pt-2 border-t border-slate-700 text-[10px] font-black tracking-widest text-center ${hoverInfo.color} drop-shadow-md`}>
+                   • {hoverInfo.estado} •
+                </div>
+                {/* Triángulo del tooltip */}
+                <div className="absolute left-1/2 bottom-[-6px] transform -translate-x-1/2 w-3 h-3 bg-[#090e17]/90 border-r border-b border-cyan-500/50 rotate-45"></div>
+              </div>
+            )}
+
           </Map>
         </div>
       </div>
@@ -270,9 +328,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 };
 
 export default function App() {
-  // ==========================================================================
-  // ESTADO DE AUTENTICACIÓN Y VARIABLES
-  // ==========================================================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
@@ -281,13 +336,9 @@ export default function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     if (passwordInput === "DIOSESMIGUIA") { 
-      setIsAuthenticated(true); 
-      setIsAdmin(false); 
-      setLoginError(false);
+      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
     } else if (passwordInput === "DIRECTOR2026") { 
-      setIsAuthenticated(true); 
-      setIsAdmin(true); 
-      setLoginError(false);
+      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
@@ -297,6 +348,9 @@ export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
+  
+  const [usarAPI, setUsarAPI] = useState(false); 
+  
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
@@ -337,78 +391,174 @@ export default function App() {
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
+  // ============================================================================
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
+  // ============================================================================
   useEffect(() => {
-    const cargarLotes = async () => {
-      try {
-        let rawData;
+    if (!isAuthenticated || !proyecto) return;
+
+    const cargarDatos = async () => {
+      setCargandoBD(true);
+
+      const getSafeVal = (obj, propName) => {
+          const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
+          return key ? obj[key] : undefined;
+      };
+
+      const extractNumber = (val) => {
+          if (val === undefined || val === null || val === '') return 0;
+          if (typeof val === 'number') return val;
+          let s = String(val).trim();
+          if (s.includes('.') && s.includes(',')) {
+              if (s.indexOf('.') < s.indexOf(',')) {
+                  s = s.replace(/\./g, '').replace(',', '.');
+              } else {
+                  s = s.replace(/,/g, '');
+              }
+          } else if (s.includes(',')) {
+              s = s.replace(',', '.');
+          }
+          s = s.replace(/[^0-9.-]/g, '');
+          const n = Number(s);
+          return isNaN(n) ? 0 : n;
+      };
+
+      if (usarAPI) {
         try {
-          const response = await fetch('/lotes.json');
-          if (!response.ok) throw new Error('Fallo local');
-          rawData = await response.json();
-        } catch (e) {
-          const timestamp = new Date().getTime();
-          const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
-          const fallbackResponse = await fetch(githubRawUrl);
-          if (!fallbackResponse.ok) throw new Error('Fallo github');
-          rawData = await fallbackResponse.json();
-        }
+          const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
+          if (!resProj.ok) throw new Error("API Falló");
+          const dataProj = await resProj.json();
 
-        if (!Array.isArray(rawData)) rawData = [];
-      
-        // BUSCADOR INTELIGENTE: Rastrea columnas ignorando espacios ocultos o mayúsculas
-        const getSafeVal = (obj, propName) => {
-            const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
-            return key ? obj[key] : undefined;
-        };
+          const projAPI = dataProj.proyectos.find(p => {
+             const apiName = String(p.proyecto).trim().toUpperCase();
+             const local = proyecto.trim().toUpperCase();
 
-        // PARSER MATEMÁTICO: Traduce comas latinas y puntos corporativos a números puros
-        const parseNum = (val) => {
-            if (val === undefined || val === null || val === '') return ''; 
-            if (typeof val === 'number') return val;
-            let strVal = String(val).trim();
-            
-            if (strVal.includes('.') && strVal.includes(',')) {
-                if (strVal.indexOf('.') < strVal.indexOf(',')) {
-                    strVal = strVal.replace(/\./g, '').replace(',', '.');
-                } else {
-                    strVal = strVal.replace(/,/g, '');
-                }
-            } else if (strVal.includes(',')) {
-                strVal = strVal.replace(',', '.');
+             const map = {
+                "URUBÓ NORTE": ["CELINA URUBO DEL NORTE", "URUBO NORTE"],
+                "ROSA RODALI": ["ROSA RODALI", "CELINA ROSA RODALI"],
+                "CELINA PAILÓN": ["CELINA PAILON", "PAILON"],
+                "EL ENCANTO": ["EL ENCANTO", "CELINA EL ENCANTO"],
+                "EL ENCANTO FASE 2": ["EL ENCANTO FASE 2", "EL ENCANTO 2", "CELINA EL ENCANTO FASE 2"],
+                "SANTA ROSA - FASE 1": ["SANTA ROSA FASE 1", "SANTA ROSA - FASE 1"],
+                "SANTA ROSA - FASE 2": ["SANTA ROSA FASE 2", "SANTA ROSA - FASE 2"],
+                "SANTA ROSA - FASE 3": ["SANTA ROSA FASE 3", "SANTA ROSA - FASE 3"],
+                "TAMARINDO": ["TAMARINDO", "CELINA TAMARINDO"],
+                "JARDINES DEL BOSQUE": ["JARDINES DEL BOSQUE"],
+                "EL PORVENIR": ["EL PORVENIR", "CELINA EL PORVENIR"],
+                "EL PORVENIR FASE 2": ["EL PORVENIR FASE 2", "EL PORVENIR 2", "CELINA EL PORVENIR FASE 2"],
+                "MUYURINA": ["CELINA MUYURINA", "MUYURINA"],
+                "LOS JARDINES": ["LOS JARDINES", "CELINA LOS JARDINES"],
+                "EL RENACER": ["EL RENACER", "CELINA EL RENACER"],
+                "CELINA 3": ["CELINA III", "CELINA 3"],
+                "CELINA 4": ["CELINA IV", "CELINA 4"],
+                "CELINA 5": ["CELINA V", "CELINA 5"],
+                "RANCHO NUEVO": ["CELINA - RANCHO NUEVO", "RANCHO NUEVO"],
+                "CELINA X": ["CELINA X", "CELINA 10"],
+                "CAÑAVERAL": ["CAÑAVERAL", "CELINA CAÑAVERAL"],
+                "SANTA FE": ["CELINA SANTA FE", "SANTA FE"],
+                "VILLA BELLA VIVIENDAS": ["VILLA BELLA", "VILLA BELLA VIVIENDAS"],
+                "CELINA 7 FASE 3": ["CELINA VII FASE 3", "CELINA 7 FASE 3"],
+                "CELINA 8": ["CELINA 8", "CELINA VIII"],
+                "CLARA CHUCHIO": ["CELINA CLARA CHUCHIO", "CLARA CHUCHIO"],
+                "SAN JORGE": ["SAN JORGE", "CELINA SAN JORGE"],
+                "CELINA VII FASE 1": ["CELINA VII FASE 1", "CELINA 7 FASE 1"],
+                "CELINA VII FASE 2": ["CELINA VII FASE 2", "CELINA 7 FASE 2"],
+                "PRADERAS DEL NORTE": ["PRADERAS DEL NORTE", "CELINA PRADERAS DEL NORTE"],
+                "NARANJAL III": ["NARANJAL III", "NARANJAL 3"],
+                "CELINA II": ["CELINA II", "CELINA 2"]
+             };
+             
+             if (map[local] && map[local].includes(apiName)) return true;
+             return apiName === local || apiName === `CELINA ${local}`;
+          });
+
+          if (projAPI && projAPI.project_id) {
+            const resLotes = await fetch(`https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`);
+            if (!resLotes.ok) throw new Error("API Lotes Falló");
+            const dataLotes = await resLotes.json();
+
+            if (dataLotes.lotes) {
+              const apiMapped = dataLotes.lotes.map(loteFresco => {
+                const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
+                const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
+                
+                return {
+                  proyecto: proyecto, 
+                  uv: loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN",
+                  mzn: loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN",
+                  lote: String(loteFresco.lote).trim().toUpperCase(),
+                  superficie: extractNumber(loteFresco.mt2 || loteFresco.superficie),
+                  precio: extractNumber(rawPrecio),
+                  estado: String(loteFresco.estado || "LIBRE").toUpperCase(),
+                  categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
+                  vendedor: "API VIVA",
+                  api_cuota_inicial: extractNumber(loteFresco.cuota_inicial),
+                  api_initial_tipo: String(loteFresco.initial_tipo || ""),
+                  api_initial_pct: extractNumber(loteFresco.initial_pct),
+                  api_initial_valor: extractNumber(loteFresco.initial_valor)
+                };
+              });
+
+              setBaseDeDatosLotes(apiMapped);
+              setCargandoBD(false);
+              return; 
             }
-            strVal = strVal.replace(/[^0-9.-]/g, '');
-            const finalNum = Number(strVal);
-            return isNaN(finalNum) ? '' : finalNum;
-        };
+          }
+          throw new Error("Proyecto no encontrado en API");
+        } catch (error) {
+          setUsarAPI(false); 
+        }
+      } else {
+        try {
+          let rawData;
+          try {
+            const response = await fetch('/lotes.json');
+            if (!response.ok) throw new Error('Fallo local');
+            rawData = await response.json();
+          } catch (e) {
+            const timestamp = new Date().getTime();
+            const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
+            const fallbackResponse = await fetch(githubRawUrl);
+            if (!fallbackResponse.ok) throw new Error('Fallo github');
+            rawData = await fallbackResponse.json();
+          }
 
-        const normalizedData = rawData.map(item => ({
-            proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
-            uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
-            mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
-            lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
-            superficie: parseNum(getSafeVal(item, 'superficie')),
-            precio: parseNum(getSafeVal(item, 'precio')),
-            estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
-            categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
-            vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase()
-        }));
+          if (!Array.isArray(rawData)) rawData = [];
 
-        // LECTOR TOTAL DE INVENTARIO: Permite visibilidad absoluta
-        const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
-        
-        setBaseDeDatosLotes(lotesPermitidos);
-        setCargandoBD(false);
+          const normalizedData = rawData.map(item => ({
+              proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
+              uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
+              mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
+              lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
+              superficie: extractNumber(getSafeVal(item, 'superficie')),
+              precio: extractNumber(getSafeVal(item, 'precio')),
+              estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
+              categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
+              vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
+              api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial') || getSafeVal(item, 'cuotainicial') || getSafeVal(item, 'inicial')),
+              api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
+              api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct') || getSafeVal(item, 'porcentaje')),
+              api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
+          }));
 
-      } catch (error) {
-        console.error('Error al cargar BD:', error);
-        setCargandoBD(false);
-        setUsarBD(false); 
+          const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
+          
+          setBaseDeDatosLotes(lotesPermitidos);
+          setCargandoBD(false);
+
+        } catch (error) {
+          setCargandoBD(false);
+          setUsarBD(false); 
+        }
       }
     };
-    cargarLotes();
-  }, [isAdmin]);
+
+    cargarDatos();
+  }, [proyecto, isAuthenticated, usarAPI]); 
+
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -423,6 +573,28 @@ export default function App() {
       setProyecto(proyectosPorRegional[regional][0] || "OTRO");
     }
   }, [regional]);
+
+  // FASE 3: LÓGICA DE CAPTURA DESDE EL MAPA
+  const handleMapLoteClick = useCallback(({ lote: loteSeleccionado, uv: uvSeleccionada, mzn: mznSeleccionada }) => {
+    // Si la UV del lote seleccionado está en la BD, la asignamos
+    if (uvSeleccionada && uvsDisponibles.includes(uvSeleccionada)) {
+        setUv(uvSeleccionada);
+        // Pequeño timeout para dar tiempo a los useMemo de actualizar mznsDisponibles
+        setTimeout(() => {
+            setMzn(mznSeleccionada);
+            setTimeout(() => {
+                setLote(loteSeleccionado);
+            }, 50);
+        }, 50);
+    } else {
+        // Si no hay UV válida, probamos inyectando el lote directo
+        setLote(loteSeleccionado);
+    }
+    
+    // Feedback visual
+    showNotification(`¡Lote ${loteSeleccionado} capturado desde satélite!`);
+    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []); // uvsDisponibles se evaluará dentro
 
   const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
@@ -464,17 +636,24 @@ export default function App() {
     return aliases;
   };
 
-  const currentAliases = getAlias(proyecto);
-  const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
-    currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
-  ) || [];
+  const currentAliases = useMemo(() => getAlias(proyecto), [proyecto]);
+  const lotesDelProyecto = useMemo(() => {
+    return baseDeDatosLotes?.filter(l => 
+      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+    ) || [];
+  }, [baseDeDatosLotes, currentAliases]);
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
+  
+  const lotesParaDropdown = useMemo(() => {
+    return lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
+  }, [lotesDelProyecto, isAdmin]);
+
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-  const uvsDisponibles = [...new Set(lotesDelProyecto?.map(l => l.uv))].sort(sortAlphaNum);
-  const mznsDisponibles = [...new Set(lotesDelProyecto?.filter(l => l.uv === uv)?.map(l => l.mzn))].sort(sortAlphaNum);
-  const lotesDisponibles = lotesDelProyecto?.filter(l => l.uv === uv && l.mzn === mzn)?.map(l => l.lote).sort(sortAlphaNum);
+  const uvsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum), [lotesParaDropdown]);
+  const mznsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum), [lotesParaDropdown, uv]);
+  const lotesDisponibles = useMemo(() => lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum), [lotesParaDropdown, uv, mzn]);
 
   useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
@@ -482,14 +661,36 @@ export default function App() {
 
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
-      const loteEncontrado = lotesDelProyecto.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
+      const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
         setPrecio(loteEncontrado.precio.toString()); 
         setCategoria(loteEncontrado.categoria || "ESTÁNDAR");
+
+        const precioCalculado = loteEncontrado.superficie * loteEncontrado.precio;
+        let iniCalculada = loteEncontrado.api_cuota_inicial || 0;
+        
+        if (loteEncontrado.api_initial_tipo === '2' && loteEncontrado.api_initial_pct > 0) {
+            iniCalculada = Math.ceil((precioCalculado * loteEncontrado.api_initial_pct) / 100);
+        } else if (loteEncontrado.api_initial_tipo === '1' && loteEncontrado.api_initial_valor > 0) {
+            iniCalculada = Math.round(loteEncontrado.api_initial_valor);
+        }
+
+        if (iniCalculada === 0 && loteEncontrado.api_cuota_inicial > 0) {
+            iniCalculada = loteEncontrado.api_cuota_inicial;
+        }
+
+        if (iniCalculada > 0) {
+            setModoInicial("monto");
+            setInicialMonto(iniCalculada.toString());
+        } else {
+            setModoInicial("porcentaje");
+            setInicialPorcentaje("");
+            setInicialMonto("");
+        }
       }
     }
-  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
+  }, [modoBD, uv, mzn, lote]); 
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -830,9 +1031,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* ==============================================================================
-          PANTALLA DE LOGIN CON EFECTO CYBERTECH
-      ============================================================================== */}
       {!isAuthenticated && (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-500">
           <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
@@ -868,7 +1066,8 @@ export default function App() {
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
-           <CheckCircle2 className="w-5 h-5 text-cyan-400" /> {toast}
+           {toast.includes('🛡️') || toast.includes('⚠️') ? <AlertCircle className="w-5 h-5 text-amber-400" /> : <CheckCircle2 className="w-5 h-5 text-cyan-400" />}
+           {toast}
         </div>
       )}
 
@@ -891,7 +1090,6 @@ export default function App() {
         </div>
       )}
 
-      {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
@@ -911,17 +1109,15 @@ export default function App() {
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
 
-      {/* CONTENEDOR PRINCIPAL - LIBRE DE CLASES "TRANSFORM" QUE ROMPAN EL FULLSCREEN */}
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
-        {/* CABECERA (FLEX-WRAP PARA EVITAR COLAPSO EN MÓVILES) */}
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
@@ -935,14 +1131,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none">
+             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -965,19 +1161,19 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* MAPA INTERACTIVO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivo={lote}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
+             onLoteClick={handleMapLoteClick}
            />
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
+        <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
-            <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800">
+            <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800 flex-wrap">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
               <div className="flex items-center gap-3 relative z-10">
                 <div className="bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/30 shadow-[inset_0_0_15px_rgba(34,211,238,0.15)]">
@@ -986,17 +1182,19 @@ export default function App() {
                 <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white drop-shadow-md">Datos de Inversión</h2>
               </div>
               
-              <div className="relative z-10">
-                {!cargandoBD && baseDeDatosLotes.length > 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/40 border border-emerald-500/40 rounded-full text-[9px] font-bold text-emerald-400 tracking-wider shadow-[0_0_10px_rgba(16,185,129,0.1)] backdrop-blur-md">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_8px_rgba(52,211,153,1)]"></div> BD Online
-                   </span>
-                )}
-                {!cargandoBD && baseDeDatosLotes.length === 0 && (
-                   <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-950/30 border border-rose-500/30 rounded-full text-[9px] font-bold text-rose-400 tracking-wider shadow-sm">
-                     <AlertCircle className="w-3 h-3 shrink-0" /> BD Offline
-                   </span>
-                )}
+              <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
+                <button 
+                    onClick={() => setUsarAPI(false)} 
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <Database className="w-3 h-3" /> Excel Local
+                </button>
+                <button 
+                    onClick={() => setUsarAPI(true)} 
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-emerald-400'}`}
+                >
+                    <Server className="w-3 h-3" /> API Server
+                </button>
               </div>
             </div>
             
@@ -1327,7 +1525,6 @@ export default function App() {
                 </div>
                 )}
 
-                {/* BOTÓN PROCESAR CYBERTECH */}
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
@@ -1533,7 +1730,7 @@ export default function App() {
                                 <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
                                   <th className="p-3 text-center">Mes</th>
                                   <th className="p-3 text-center">Pago Fijo ($)</th>
-                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Descuento</th>
+                                  <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-400' : 'text-slate-600'}`}>Desc.</th>
                                   <th className={`p-3 text-center transition-colors ${aplicarBonificacion ? 'text-emerald-300 bg-emerald-950/50' : 'text-slate-500'}`}>Pago c/Desc ($)</th>
                                   <th className="p-3 text-center text-white">Monto Real (Bs)</th>
                                   <th className="p-3 text-center">TC Efe.</th>
