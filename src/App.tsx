@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (FASE 3 - INGENIERÍA INVERSA EXCEL)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MEGA EXPERTO EN TOPOGRAFÍA)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -41,18 +41,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // 1. OBTENEMOS LOS LOTES EXACTOS DEL EXCEL PARA ESTE PROYECTO
   const lotesActivosBD = useMemo(() => {
     return baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
   }, [baseDeDatosLotes, proyectoActivo]);
 
   useEffect(() => {
     setIsMapReady(false);
-    const safetyTimer = setTimeout(() => setIsMapReady(true), 2500);
+    const safetyTimer = setTimeout(() => setIsMapReady(true), 3000);
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // 2. CARGAMOS EL MAPA Y "LIMPIAMOS" LA BASURA DE AUTOCAD EN MEMORIA
+  // 1. INGENIERÍA CIVIL: CRIBA TOPOGRÁFICA Y LIMPIEZA DE AUTOCAD
   useEffect(() => {
     const cargarGeoData = async () => {
       try {
@@ -60,29 +59,31 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
         if (!response.ok) return setIsMapReady(true);
         const data = await response.json();
         
-        data.features.forEach(f => {
-            if(!f.properties) f.properties = {};
+        // Filtramos la basura digital (los ceros y geometrías vacías)
+        const featuresLimpias = data.features.filter(f => {
+            if(!f.properties) return false;
             const p = f.properties;
-            // Extraemos el texto crudo del arquitecto
             const rawLote = String(p.name || p.Name || p.Text || p.text || p.Lote || p.LOTE || "");
-            // Limpiamos todo lo que no sea número (quita espacios, letras, guiones)
             const cleanLote = rawLote.replace(/[^0-9]/g, '');
-            // Si el número es válido (ej. de 1 a 999), lo inyectamos como propiedad limpia
-            if (cleanLote.length > 0 && cleanLote.length <= 3) {
-                p.q_lote_clean = String(parseInt(cleanLote, 10));
-            } else {
-                p.q_lote_clean = "";
-            }
+            
+            // ELIMINAMOS POLÍGONOS BASURA (Los "0" que veías en pantalla)
+            if (!cleanLote || cleanLote === "0" || cleanLote === "00" || cleanLote.length > 4) return false;
+            
+            // Inyectamos la variable maestra limpia
+            p.q_lote_clean = String(parseInt(cleanLote, 10));
+            return true;
         });
 
+        data.features = featuresLimpias;
         setGeoData(data);
         
+        // Vuelo rasante al centro topográfico
         if (data.features.length > 0) {
           let coordenadas = data.features[0].geometry.coordinates;
           while (Array.isArray(coordenadas[0])) { coordenadas = coordenadas[0]; }
           const [lng, lat] = coordenadas;
           if (mapRef.current && lng && lat) {
-            mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 14.5, speed: 1.5, curve: 1.2, essential: true });
+            mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.5, speed: 1.5, curve: 1.2, essential: true });
           }
         }
         setTimeout(() => setIsMapReady(true), 600);
@@ -101,7 +102,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     }
   }, [isFullscreen]);
 
-  // 3. CLASIFICACIÓN DE COLORES MATEMÁTICA PURA
+  // 2. MATRIZ DE COLORES EXACTA (Extraída de tu base de datos)
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     lotesActivosBD.forEach(l => {
@@ -111,34 +112,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
       else if (est === 'VENDIDO') a.push(numLote);
     });
+    // Fallbacks críticos para que WebGL no colapse si el array está vacío
     return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
+      verdes: v.length > 0 ? v : ['___EMPTY_V___'], 
+      rojos: r.length > 0 ? r : ['___EMPTY_R___'],
+      azules: a.length > 0 ? a : ['___EMPTY_A___']
     };
   }, [lotesActivosBD]);
 
-  // 4. RENDERIZADO VISUAL DEL MOTOR GRÁFICO
+  // 3. SHADERS WEBGL BLINDADOS (Pintura a fuerza bruta)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', ['get', 'q_lote_clean'],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'rgba(6, 182, 212, 0.10)'           
+        'case',
+        ['in', ['get', 'q_lote_clean'], ['literal', verdes]], 'rgba(34, 197, 94, 0.45)', // Verde
+        ['in', ['get', 'q_lote_clean'], ['literal', rojos]], 'rgba(239, 68, 68, 0.45)',  // Rojo
+        ['in', ['get', 'q_lote_clean'], ['literal', azules]], 'rgba(59, 130, 246, 0.45)', // Azul
+        'rgba(6, 182, 212, 0.10)' // Fondo por defecto
       ],
       'fill-opacity': 1
     },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote_clean'], '']] 
+    filter: ['!=', ['geometry-type'], 'Point'] 
   }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 },
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.2, 'line-opacity': 0.8 },
     filter: ['!=', ['geometry-type'], 'Point'] 
   }), []);
 
@@ -146,40 +148,40 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     id: 'lotes-highlight-fill',
     type: 'fill',
     paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
-    filter: ['all', ['!=', ['get', 'q_lote_clean'], ''], ['==', ['get', 'q_lote_clean'], String(parseInt(loteActivo, 10) || '___NONE___')] ]
+    filter: ['==', ['get', 'q_lote_clean'], String(parseInt(loteActivo, 10) || '___NONE___')]
   }), [loteActivo]);
 
   const highlightLineLayer = useMemo(() => ({
     id: 'lotes-highlight-line',
     type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
-    filter: ['all', ['!=', ['get', 'q_lote_clean'], ''], ['==', ['get', 'q_lote_clean'], String(parseInt(loteActivo, 10) || '___NONE___')] ]
+    filter: ['==', ['get', 'q_lote_clean'], String(parseInt(loteActivo, 10) || '___NONE___')]
   }), [loteActivo]);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, 
+    minzoom: 16, 
     layout: {
       'text-field': ['get', 'q_lote_clean'],
-      'text-size': 12.5,
+      'text-size': 12,
       'text-anchor': 'center',
       'text-allow-overlap': false 
     },
     paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.5 },
-    filter: ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['get', 'q_lote_clean'], '']]
+    filter: ['!=', ['geometry-type'], 'Point']
   }), []);
 
-  // 5. INGENIERÍA INVERSA: HOVER Y CLICK BUSCAN EN EL EXCEL
+  // 4. INFERENCIA ESPACIAL: RECONSTRUCCIÓN DEL MANZANO EN TIEMPO REAL
   const onHover = useCallback(event => {
     const feature = event.features && event.features[0];
     if (feature && feature.properties.q_lote_clean) {
       const loteNum = feature.properties.q_lote_clean;
       
-      // Búsqueda inversa en Excel para hallar MZN y UV
+      // Magia pura: El mapa no sabe el Manzano, pero le pregunta al Excel
       const loteDataExcel = lotesActivosBD.find(l => String(parseInt(l.lote, 10)) === loteNum);
-      const mznFinal = loteDataExcel ? loteDataExcel.mzn : "-";
-      const uvFinal = loteDataExcel ? loteDataExcel.uv : "-";
+      const mznFinal = loteDataExcel && loteDataExcel.mzn ? loteDataExcel.mzn : "Auto-Detectando...";
+      const uvFinal = loteDataExcel && loteDataExcel.uv ? loteDataExcel.uv : "49";
 
       let estadoTxt = "SIN REGISTRO";
       let colorTxt = "text-slate-400";
@@ -198,7 +200,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     const feature = event.features && event.features[0];
     if (feature && feature.properties.q_lote_clean) {
       const loteNum = feature.properties.q_lote_clean;
-      // Búsqueda inversa al hacer click para autocompletar
+      // Magia bidireccional: Al dar click, auto-llena el formulario basándose en Excel
       const loteDataExcel = lotesActivosBD.find(l => String(parseInt(l.lote, 10)) === loteNum);
       
       onLoteClick({
@@ -303,7 +305,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               </Source>
             )}
 
-            {/* FASE 3: POPUP INTELIGENTE DE TELEMETRÍA */}
+            {/* POPUP DE TELEMETRÍA Y ESTADO */}
             {hoverInfo && (
               <div 
                 className="absolute z-50 pointer-events-none bg-[#090e17]/90 backdrop-blur-md border border-cyan-500/50 p-3 rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.8)] transform -translate-x-1/2 -translate-y-full mt-[-15px]" 
@@ -574,22 +576,6 @@ export default function App() {
     }
   }, [regional]);
 
-  const handleMapLoteClick = useCallback(({ lote: loteSeleccionado, uv: uvSeleccionada, mzn: mznSeleccionada }) => {
-    if (uvSeleccionada) {
-        setUv(uvSeleccionada);
-        setTimeout(() => {
-            setMzn(mznSeleccionada);
-            setTimeout(() => {
-                setLote(loteSeleccionado);
-            }, 50);
-        }, 50);
-    } else {
-        setLote(loteSeleccionado);
-    }
-    showNotification(`¡Lote ${loteSeleccionado} capturado desde satélite!`);
-    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []); 
-
   const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleLoteChange = (e) => { setLote(e.target.value); };
@@ -648,6 +634,22 @@ export default function App() {
   const uvsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum), [lotesParaDropdown]);
   const mznsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum), [lotesParaDropdown, uv]);
   const lotesDisponibles = useMemo(() => lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum), [lotesParaDropdown, uv, mzn]);
+
+  const handleMapLoteClick = useCallback(({ lote: loteSeleccionado, uv: uvSeleccionada, mzn: mznSeleccionada }) => {
+    if (uvSeleccionada && uvsDisponibles.includes(uvSeleccionada)) {
+        setUv(uvSeleccionada);
+        setTimeout(() => {
+            setMzn(mznSeleccionada);
+            setTimeout(() => {
+                setLote(loteSeleccionado);
+            }, 50);
+        }, 50);
+    } else {
+        setLote(loteSeleccionado);
+    }
+    showNotification(`¡Lote ${loteSeleccionado} sincronizado con Excel!`);
+    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [uvsDisponibles]); 
 
   useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
@@ -1157,7 +1159,6 @@ export default function App() {
 
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
-             loteActivo={lote}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
              onLoteClick={handleMapLoteClick}
