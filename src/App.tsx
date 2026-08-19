@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RENDERIZADO ALÁMBRICO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CORREGIDO Y OPTIMIZADO)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -39,7 +39,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // SEGURO DE VIDA DEL LOADER
   useEffect(() => {
     setIsMapReady(false);
     const safetyTimer = setTimeout(() => {
@@ -48,7 +47,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO (DRON)
+  // DRON INTELIGENTE: AHORA BUSCA EL CENTRO REAL DE LOS LOTES
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -57,7 +56,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         const data = await response.json();
         
         if (data && data.features && data.features.length > 0) {
-          let coordenadas = data.features[0].geometry.coordinates;
+          // FILTRO: Encontrar un lote real (que tenga nombre o número) para evitar volar al borde del mapa
+          let featureDestino = data.features.find(f => {
+             const name = f.properties.name || f.properties.Name || f.properties.Text || f.properties.text || '';
+             return name.length > 0 && name.length <= 4;
+          });
+          
+          if (!featureDestino) featureDestino = data.features[0];
+
+          let coordenadas = featureDestino.geometry.coordinates;
           while (Array.isArray(coordenadas[0])) {
             coordenadas = coordenadas[0];
           }
@@ -66,7 +73,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           if (mapRef.current && lng && lat) {
             mapRef.current.getMap().flyTo({
               center: [lng, lat],
-              zoom: 14.5,
+              zoom: 15.5,
               speed: 1.5, 
               curve: 1.2, 
               essential: true
@@ -80,7 +87,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     volarAlProyecto();
   }, [geojsonPath]);
 
-  // LA CURA DE LA PANTALLA NEGRA
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -93,11 +99,14 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
     lotesFiltrados.forEach(l => {
-      const numLote = String(parseInt(l.lote, 10) || l.lote);
-      const est = String(l.estado).toUpperCase();
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else if (est === 'VENDIDO') a.push(numLote);
+      const numLote = String(parseInt(l.lote, 10) || l.lote).trim();
+      // BLOQUEO DE MANCHÓN: Si el texto está vacío, no se le asigna ningún color
+      if (numLote && numLote !== 'NaN' && numLote !== '') {
+        const est = String(l.estado).toUpperCase();
+        if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+        else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
+        else if (est === 'VENDIDO') a.push(numLote);
+      }
     });
     return { 
       verdes: v.length > 0 ? v : ['__NONE__'], 
@@ -108,32 +117,36 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
-  // DIRECTIVA DE RENDERIZADO ALÁMBRICO (TRANSPARENCIA ABSOLUTA)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
-      'fill-color': 'transparent', // Se anula el color de relleno
-      'fill-opacity': 0            // Se fuerza la opacidad a 0 para revelar el satélite
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.45)', 
+        rojos, 'rgba(239, 68, 68, 0.45)',  
+        azules, 'rgba(59, 130, 246, 0.45)', 
+        'transparent'       
+      ],
+      'fill-opacity': 1
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+    // BLOQUEO DE MANCHÓN: Solo rellena si el polígono TIENE un texto menor a 5 caracteres
+    filter: ['all', 
+      ['!=', ['to-string', textProperty], ''],
+      ['<=', ['length', ['to-string', textProperty]], 4]
+    ] 
   }), [verdes, rojos, azules]);
 
-  // TRAZADO DE POLÍGONOS (LÍNEAS LIMPIAS TIPO AUTOCAD)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 
-      'line-color': '#fbbf24', // Color dorado/naranja corporativo para visibilidad
-      'line-width': 1.2,       // Grosor fino
-      'line-opacity': 0.9 
-    }
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.2, 'line-opacity': 0.8 } // Trazos finos y limpios
   }), []);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#0ea5e9', 'line-width': 4, 'line-opacity': 1 }, // Resalte azul cian
+    paint: { 'line-color': '#fbbf24', 'line-width': 4, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
@@ -152,7 +165,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
       'text-halo-color': '#000000',
       'text-halo-width': 1.5 
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    filter: ['all', 
+      ['!=', ['to-string', textProperty], ''],
+      ['<=', ['length', ['to-string', textProperty]], 4]
+    ]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -172,7 +188,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <div>
                <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
                <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 * ESTRUCTURA ALÁMBRICA ACTIVADA
+                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
+                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
+                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
                </p>
              </div>
            </div>
@@ -221,7 +239,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           <Map
             ref={mapRef}
             mapLib={maplibregl}
-            initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
+            initialViewState={{ longitude: -63.2500, latitude: -17.3400, zoom: 14.5, pitch: 0 }}
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
@@ -276,7 +294,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); // DIRECTIVA: TC FIJO EN 11.52
+  const [tcFlexible, setTcFlexible] = useState(11.52); // DIRECTIVA APLICADA: 11.52
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -288,8 +306,8 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
-  const [descuentoM2, setDescuentoM2] = useState(0); // DIRECTIVA: DESCUENTOS EN 0
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); // DIRECTIVA: DESCUENTOS EN 0
+  const [descuentoM2, setDescuentoM2] = useState(0); // DIRECTIVA APLICADA: 0
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); // DIRECTIVA APLICADA: 0
   const [descuentoInicial, setDescuentoInicial] = useState(0);
 
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
@@ -505,7 +523,7 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(0); setDescuentoContadoM2(0); setDescuentoInicial(0); // DIRECTIVA: Descuentos en 0
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(0); setDescuentoContadoM2(0); setDescuentoInicial(0); // Topes Cero
   }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
@@ -587,7 +605,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modoBD, uv, mzn, lote]); 
 
-  // DIRECTIVA: LIMITAR DESCUENTOS A 0
+  // DIRECTIVA APLICADA: Límites de Descuento en 0
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 0, maxContadoM2: 0, maxBonoInicial: 0 }; };
 
   useEffect(() => {
