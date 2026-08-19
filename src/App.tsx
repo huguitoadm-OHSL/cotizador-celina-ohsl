@@ -1,14 +1,40 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair, Server
+  Maximize, Minimize, Eye, Crosshair, Server, Info
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+// ============================================================================
+// FUNCIONES TOPOGRÁFICAS DE INGENIERÍA CIVIL (ALGORITMOS IN-BROWSER)
+// ============================================================================
+function pointInPoly(pt, poly) {
+  let x = pt[0], y = pt[1];
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    let xi = poly[i][0], yi = poly[i][1];
+    let xj = poly[j][0], yj = poly[j][1];
+    let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getDistance(c1, c2) {
+  const R = 6371e3; // Radio de la Tierra (metros)
+  const lat1 = c1[1] * Math.PI/180;
+  const lat2 = c2[1] * Math.PI/180;
+  const dLat = (c2[1]-c1[1]) * Math.PI/180;
+  const dLon = (c2[0]-c1[0]) * Math.PI/180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; 
+}
 
 // ============================================================================
 // BASE DE DATOS DE REGIONALES Y PROYECTOS
@@ -30,57 +56,150 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURADO DESDE APP_3.TSX)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR DE INFERENCIA GEOESPACIAL)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
+const MapaEspacial = ({ loteActivo, uvActiva, mznActiva, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
+  const [geoData, setGeoData] = useState(null);
+  const [hoverInfo, setHoverInfo] = useState(null);
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // SEGURO DE VIDA DEL LOADER
+  const lotesActivosBD = useMemo(() => {
+    return baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
+  }, [baseDeDatosLotes, proyectoActivo]);
+
   useEffect(() => {
     setIsMapReady(false);
-    const safetyTimer = setTimeout(() => {
-      setIsMapReady(true);
-    }, 2500);
+    const safetyTimer = setTimeout(() => setIsMapReady(true), 3500);
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO (DRON)
+  // INGESTA Y PROCESAMIENTO ESPACIAL (NEAREST NEIGHBOR & HAVERSINE)
   useEffect(() => {
-    const volarAlProyecto = async () => {
+    const cargarGeoData = async () => {
       try {
         const response = await fetch(geojsonPath);
-        if (!response.ok) return;
+        if (!response.ok) return setIsMapReady(true);
         const data = await response.json();
         
-        if (data && data.features && data.features.length > 0) {
-          let coordenadas = data.features[0].geometry.coordinates;
-          while (Array.isArray(coordenadas[0])) {
-            coordenadas = coordenadas[0];
-          }
-          const [lng, lat] = coordenadas;
-          
-          if (mapRef.current && lng && lat) {
-            mapRef.current.getMap().flyTo({
-              center: [lng, lat],
-              zoom: 14.5,
-              speed: 1.5, 
-              curve: 1.2, 
-              essential: true
-            });
+        const puntosTextos = [];
+        const poligonosLotes = [];
+        const marcasMedidas = [];
+        const textosMzn = [];
+        const textosUv = [];
+
+        // 1. Clasificación Vectorial
+        data.features.forEach(f => {
+           if (f.geometry.type === 'Point') {
+               const rawText = String(f.properties.name || f.properties.Text || f.properties.Lote || "").trim().toUpperCase();
+               if (rawText.includes('UV') || rawText.includes('U.V')) {
+                   f.properties.q_text_clean = rawText.replace(/[^0-9A-Z]/g, '');
+                   textosUv.push(f);
+               } else if (rawText.includes('M-') || rawText.includes('MZ') || rawText.includes('MANZ')) {
+                   f.properties.q_text_clean = rawText.replace(/[^0-9A-Z]/g, '');
+                   textosMzn.push(f);
+               } else {
+                   puntosTextos.push(f);
+               }
+           } else if (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') {
+               poligonosLotes.push(f);
+               
+               // Cálculo Algorítmico de Medidas Perimetrales
+               const coords = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : f.geometry.coordinates[0][0];
+               if (coords) {
+                   for (let i = 0; i < coords.length - 1; i++) {
+                       const dist = getDistance(coords[i], coords[i+1]);
+                       if (dist > 3) { 
+                           const midPoint = [(coords[i][0] + coords[i+1][0])/2, (coords[i][1] + coords[i+1][1])/2];
+                           marcasMedidas.push({
+                               type: 'Feature',
+                               geometry: { type: 'Point', coordinates: midPoint },
+                               properties: { q_medida: `${dist.toFixed(2)}m`, is_medida: true }
+                           });
+                       }
+                   }
+               }
+           }
+        });
+
+        // 2. Spatial Join y Nearest Neighbor Ray-Casting
+        poligonosLotes.forEach(poly => {
+           if(!poly.properties) poly.properties = {};
+           const coords = poly.geometry.type === 'Polygon' ? poly.geometry.coordinates[0] : poly.geometry.coordinates[0][0];
+           
+           if (coords) {
+               // Extracción de número de lote por inclusión espacial
+               const puntoAdentro = puntosTextos.find(pt => pointInPoly(pt.geometry.coordinates, coords));
+               let cleanNum = "";
+               if (puntoAdentro) {
+                   const rawText = String(puntoAdentro.properties.name || puntoAdentro.properties.Text || puntoAdentro.properties.Lote || "");
+                   cleanNum = rawText.replace(/[^0-9]/g, '');
+               }
+               
+               if (cleanNum && cleanNum !== "0" && cleanNum.length <= 4) {
+                   poly.properties.q_lote = cleanNum;
+                   
+                   // Extracción de centroide
+                   let cx = 0, cy = 0;
+                   coords.forEach(c => { cx += c[0]; cy += c[1]; });
+                   cx /= coords.length; cy /= coords.length;
+                   const centroid = [cx, cy];
+
+                   // Inferencia de Manzano por proximidad
+                   let minMznDist = Infinity;
+                   let assignedMzn = "";
+                   textosMzn.forEach(tm => {
+                       const dist = getDistance(centroid, tm.geometry.coordinates);
+                       if (dist < minMznDist) {
+                           minMznDist = dist;
+                           assignedMzn = tm.properties.q_text_clean.replace(/[^0-9]/g, ''); 
+                       }
+                   });
+
+                   // Inferencia de UV por proximidad
+                   let minUvDist = Infinity;
+                   let assignedUv = "";
+                   textosUv.forEach(tu => {
+                       const dist = getDistance(centroid, tu.geometry.coordinates);
+                       if (dist < minUvDist) {
+                           minUvDist = dist;
+                           assignedUv = tu.properties.q_text_clean.replace(/[^0-9]/g, '');
+                       }
+                   });
+
+                   poly.properties.q_uv = assignedUv;
+                   poly.properties.q_mzn = assignedMzn;
+                   poly.properties.q_id_maestro = `${assignedUv}-${assignedMzn}-${cleanNum}`;
+               } else {
+                   poly.properties.q_id_maestro = `UNKNOWN`;
+               }
+           }
+        });
+
+        const dataProcesada = { type: "FeatureCollection", features: [...poligonosLotes, ...marcasMedidas] };
+        setGeoData(dataProcesada);
+        
+        if (poligonosLotes.length > 0) {
+          let coordenadas = poligonosLotes[0].geometry?.coordinates;
+          if(coordenadas) {
+             while (Array.isArray(coordenadas[0])) { coordenadas = coordenadas[0]; }
+             const [lng, lat] = coordenadas;
+             if (mapRef.current && lng && lat) {
+               mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.5, speed: 1.5, curve: 1.2, essential: true });
+             }
           }
         }
+        setTimeout(() => setIsMapReady(true), 600);
       } catch (error) {
-        console.warn("Piloto automático en espera de datos espaciales...");
+        setIsMapReady(true);
       }
     };
-    volarAlProyecto();
+    cargarGeoData();
   }, [geojsonPath]);
 
-  // LA CURA DE LA PANTALLA NEGRA
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -89,71 +208,131 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     }
   }, [isFullscreen]);
 
+  // MATRIZ DE COLORES POR LLAVE MAESTRA
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
-    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
-    lotesFiltrados.forEach(l => {
+    lotesActivosBD.forEach(l => {
       const numLote = String(parseInt(l.lote, 10) || l.lote);
+      const numUV = String(l.uv).replace(/[^0-9A-Za-z]/g, '');
+      const numMZN = String(l.mzn).replace(/[^0-9A-Za-z]/g, '');
+      const idMaestro = `${numUV}-${numMZN}-${numLote}`;
+
       const est = String(l.estado).toUpperCase();
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-      else if (est === 'VENDIDO') a.push(numLote);
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(idMaestro);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(idMaestro);
+      else if (est === 'VENDIDO') a.push(idMaestro);
     });
     return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
+      verdes: v.length > 0 ? v : ['___EMPTY_V___'], 
+      rojos: r.length > 0 ? r : ['___EMPTY_R___'],
+      azules: a.length > 0 ? a : ['___EMPTY_A___']
     };
-  }, [baseDeDatosLotes, proyectoActivo]);
+  }, [lotesActivosBD]);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
-
+  // SHADERS WEBGL
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
       'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent'       
+        'case',
+        ['in', ['get', 'q_id_maestro'], ['literal', verdes]], 'rgba(34, 197, 94, 0.45)', // Libre
+        ['in', ['get', 'q_id_maestro'], ['literal', rojos]], 'rgba(239, 68, 68, 0.45)',  // Bloqueado
+        ['in', ['get', 'q_id_maestro'], ['literal', azules]], 'rgba(59, 130, 246, 0.45)', // Vendido
+        'rgba(6, 182, 212, 0.12)' 
       ],
       'fill-opacity': 1
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+    filter: ['==', ['geometry-type'], 'Polygon'] 
   }), [verdes, rojos, azules]);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 },
+    filter: ['==', ['geometry-type'], 'Polygon'] 
   }), []);
 
-  const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
-    type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo]);
+  const medidasLayer = useMemo(() => ({
+    id: 'lotes-medidas',
+    type: 'symbol',
+    minzoom: 17.5, 
+    layout: {
+      'text-field': ['get', 'q_medida'],
+      'text-size': 11,
+      'text-anchor': 'center'
+    },
+    paint: { 'text-color': '#94a3b8', 'text-halo-color': '#020617', 'text-halo-width': 1 },
+    filter: ['==', ['get', 'is_medida'], true]
+  }), []);
 
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
     minzoom: 16.5, 
     layout: {
-      'text-field': textProperty,
-      'text-size': 12.5,
+      'text-field': [
+         'case',
+         ['==', ['get', 'q_id_maestro'], 'UNKNOWN'], '', 
+         ['get', 'q_lote']
+      ],
+      'text-size': 13,
       'text-anchor': 'center',
       'text-allow-overlap': false 
     },
-    paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.5 
-    },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.5 },
+    filter: ['==', ['geometry-type'], 'Polygon'] 
   }), []);
+
+  const activeIdMaestro = (uvActiva && mznActiva && loteActivo) 
+        ? `${String(uvActiva).replace(/[^0-9A-Za-z]/g, '')}-${String(mznActiva).replace(/[^0-9A-Za-z]/g, '')}-${String(parseInt(loteActivo, 10))}` 
+        : '___NONE___';
+
+  const highlightLayer = useMemo(() => ({
+    id: 'lotes-highlight-fill',
+    type: 'fill',
+    paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.6 },
+    filter: ['==', ['get', 'q_id_maestro'], activeIdMaestro]
+  }), [activeIdMaestro]);
+
+  const highlightLineLayer = useMemo(() => ({
+    id: 'lotes-highlight-line',
+    type: 'line',
+    paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 1 },
+    filter: ['==', ['get', 'q_id_maestro'], activeIdMaestro]
+  }), [activeIdMaestro]);
+
+  const onHover = useCallback(event => {
+    const feature = event.features && event.features[0];
+    if (feature && feature.properties.q_id_maestro && feature.properties.q_id_maestro !== "UNKNOWN") {
+      const idMaestro = feature.properties.q_id_maestro;
+      const loteNum = feature.properties.q_lote;
+      const mznNum = feature.properties.q_mzn || "-";
+      const uvNum = feature.properties.q_uv || "-";
+
+      let estadoTxt = "SIN REGISTRO";
+      let colorTxt = "text-slate-400";
+      
+      if (verdes.includes(idMaestro)) { estadoTxt = "DISPONIBLE"; colorTxt = "text-emerald-400"; }
+      else if (rojos.includes(idMaestro)) { estadoTxt = "BLOQUEADO"; colorTxt = "text-rose-400"; }
+      else if (azules.includes(idMaestro)) { estadoTxt = "VENDIDO"; colorTxt = "text-blue-400"; }
+      
+      setHoverInfo({ x: event.point.x, y: event.point.y, lote: loteNum, estado: estadoTxt, color: colorTxt, uv: uvNum, mzn: mznNum });
+    } else {
+      setHoverInfo(null);
+    }
+  }, [verdes, rojos, azules]);
+
+  const onClick = useCallback(event => {
+    const feature = event.features && event.features[0];
+    if (feature && feature.properties.q_id_maestro && feature.properties.q_id_maestro !== "UNKNOWN") {
+       onLoteClick({
+          lote: feature.properties.q_lote,
+          uv: feature.properties.q_uv,
+          mzn: feature.properties.q_mzn
+       });
+    }
+  }, [onLoteClick]);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -161,7 +340,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   return (
     <div className={containerClasses}>
-      
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -172,9 +350,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <div>
                <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
                <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
-                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
-                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
+                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]"></span> Disponible 
+                 <span className="w-2 h-2 rounded-full bg-rose-500 ml-1 shadow-[0_0_5px_rgba(244,63,94,0.8)]"></span> Bloqueado 
+                 <span className="w-2 h-2 rounded-full bg-blue-500 ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
                </p>
              </div>
            </div>
@@ -226,8 +404,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             maxZoom={20} 
+            interactiveLayerIds={geoData ? ['lotes-fill'] : []} 
+            onMouseMove={onHover}
+            onMouseLeave={() => setHoverInfo(null)}
+            onClick={onClick}
             onLoad={() => setIsMapReady(true)}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: '100%', cursor: hoverInfo ? 'pointer' : 'grab' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
@@ -236,12 +418,36 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 0.85 }} />
             </Source>
 
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer as any} />
-              <Layer {...lineLayer as any} />
-              <Layer {...highlightLayer as any} />
-              <Layer {...labelLayer as any} />
-            </Source>
+            {geoData && (
+              <Source id="dynamic-data" type="geojson" data={geoData}>
+                <Layer {...fillLayer as any} />
+                <Layer {...lineLayer as any} />
+                <Layer {...highlightLayer as any} />
+                <Layer {...highlightLineLayer as any} />
+                <Layer {...labelLayer as any} />
+                <Layer {...medidasLayer as any} /> 
+              </Source>
+            )}
+
+            {hoverInfo && (
+              <div 
+                className="absolute z-50 pointer-events-none bg-[#090e17]/90 backdrop-blur-md border border-cyan-500/50 p-3 rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.8)] transform -translate-x-1/2 -translate-y-full mt-[-15px]" 
+                style={{ left: hoverInfo.x, top: hoverInfo.y }}
+              >
+                <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-2">
+                   <Info className="w-3.5 h-3.5 text-cyan-400" />
+                   <span className="text-[10px] font-black text-white uppercase tracking-widest">Lote {hoverInfo.lote}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[9px] uppercase tracking-wider font-bold">
+                   <div className="text-slate-500">MZN: <span className="text-cyan-100">{hoverInfo.mzn}</span></div>
+                   <div className="text-slate-500">UV: <span className="text-cyan-100">{hoverInfo.uv}</span></div>
+                </div>
+                <div className={`mt-2 pt-2 border-t border-slate-700 text-[10px] font-black tracking-widest text-center ${hoverInfo.color} drop-shadow-md`}>
+                   • {hoverInfo.estado} •
+                </div>
+                <div className="absolute left-1/2 bottom-[-6px] transform -translate-x-1/2 w-3 h-3 bg-[#090e17]/90 border-r border-b border-cyan-500/50 rotate-45"></div>
+              </div>
+            )}
           </Map>
         </div>
       </div>
@@ -278,7 +484,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.55); 
+  const [tcFlexible, setTcFlexible] = useState(11.52);
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -316,9 +522,6 @@ export default function App() {
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
-  // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
-  // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
 
@@ -481,7 +684,6 @@ export default function App() {
     cargarDatos();
   }, [proyecto, isAuthenticated, usarAPI]); 
 
-
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
@@ -495,20 +697,6 @@ export default function App() {
       setProyecto(proyectosPorRegional[regional][0] || "OTRO");
     }
   }, [regional]);
-
-  const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleLoteChange = (e) => { setLote(e.target.value); };
-
-  useEffect(() => {
-    setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
-    setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
-    setResultado(null); setProyectoPersonalizado(""); 
-    setEscenarioGuardado(null); setMostrarComparativa(false);
-    setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
-    setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
-  }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
     if (!p) return [];
@@ -536,27 +724,56 @@ export default function App() {
     return aliases;
   };
 
-  const currentAliases = getAlias(proyecto);
-  const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
-    currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
-  ) || [];
+  const currentAliases = useMemo(() => getAlias(proyecto), [proyecto]);
+  const lotesDelProyecto = useMemo(() => {
+    return baseDeDatosLotes?.filter(l => 
+      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+    ) || [];
+  }, [baseDeDatosLotes, currentAliases]);
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
-  const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
+  const lotesParaDropdown = useMemo(() => {
+    return lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
+  }, [lotesDelProyecto, isAdmin]);
 
   const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-  const uvsDisponibles = [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum);
-  const mznsDisponibles = [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
-  const lotesDisponibles = lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
+  const uvsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum), [lotesParaDropdown]);
+  const mznsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum), [lotesParaDropdown, uv]);
+  const lotesDisponibles = useMemo(() => lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum), [lotesParaDropdown, uv, mzn]);
 
-  useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
-  useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
-  useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
+  const handleMapLoteClick = useCallback(({ lote: loteSeleccionado, uv: uvSeleccionada, mzn: mznSeleccionada }) => {
+    if (uvSeleccionada && uvsDisponibles.includes(uvSeleccionada)) {
+        setUv(uvSeleccionada);
+        setTimeout(() => {
+            setMzn(mznSeleccionada);
+            setTimeout(() => {
+                setLote(loteSeleccionado);
+            }, 50);
+        }, 50);
+    } else {
+        setLote(loteSeleccionado);
+    }
+    showNotification(`¡Lote ${loteSeleccionado} capturado desde satélite!`);
+    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [uvsDisponibles]); 
 
-  // CORRECCIÓN EXACTA: Se eliminó 'lotesDelProyecto' de las dependencias
-  // para evitar que el renderizado por teclear sobreescriba el campo.
+  const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleLoteChange = (e) => { setLote(e.target.value); };
+
+  useEffect(() => {
+    setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
+    setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
+    setResultado(null); setProyectoPersonalizado(""); 
+    setEscenarioGuardado(null); setMostrarComparativa(false);
+    setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
+    setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
+  }, [proyecto, tipoCotizacion]);
+
+  // EL BUG DE LA CUOTA INICIAL QUEDA ELIMINADO DEFINITIVAMENTE AQUÍ
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -589,7 +806,7 @@ export default function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modoBD, uv, mzn, lote]); // Solo ejecuta al cambiar de lote, NO al teclear
+  }, [modoBD, uv, mzn, lote]); 
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -625,7 +842,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.55;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -1063,8 +1280,11 @@ export default function App() {
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivo={lote}
+             uvActiva={uv}
+             mznActiva={mzn}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
+             onLoteClick={handleMapLoteClick}
            />
         </div>
 
