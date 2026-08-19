@@ -273,9 +273,9 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSES") { 
+    if (passwordInput === "DIOSESMIGUIA") { 
       setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
-    } else if (passwordInput === "DIRECTOR20") { 
+    } else if (passwordInput === "DIRECTOR2026") { 
       setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
     } else {
       setLoginError(true);
