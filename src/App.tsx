@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURADO DESDE APP_3.TSX)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RENDERIZADO ALÁMBRICO)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -108,32 +108,32 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
+  // DIRECTIVA DE RENDERIZADO ALÁMBRICO (TRANSPARENCIA ABSOLUTA)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: {
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent'       
-      ],
-      'fill-opacity': 1
+      'fill-color': 'transparent', // Se anula el color de relleno
+      'fill-opacity': 0            // Se fuerza la opacidad a 0 para revelar el satélite
     },
     filter: ['<=', ['length', ['to-string', textProperty]], 4] 
   }), [verdes, rojos, azules]);
 
+  // TRAZADO DE POLÍGONOS (LÍNEAS LIMPIAS TIPO AUTOCAD)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
+    paint: { 
+      'line-color': '#fbbf24', // Color dorado/naranja corporativo para visibilidad
+      'line-width': 1.2,       // Grosor fino
+      'line-opacity': 0.9 
+    }
   }), []);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
+    paint: { 'line-color': '#0ea5e9', 'line-width': 4, 'line-opacity': 1 }, // Resalte azul cian
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
@@ -172,9 +172,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <div>
                <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
                <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
-                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
-                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
+                 * ESTRUCTURA ALÁMBRICA ACTIVADA
                </p>
              </div>
            </div>
@@ -278,7 +276,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); 
+  const [tcFlexible, setTcFlexible] = useState(11.52); // DIRECTIVA: TC FIJO EN 11.52
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -290,8 +288,8 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
-  const [descuentoM2, setDescuentoM2] = useState(1);
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
+  const [descuentoM2, setDescuentoM2] = useState(0); // DIRECTIVA: DESCUENTOS EN 0
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); // DIRECTIVA: DESCUENTOS EN 0
   const [descuentoInicial, setDescuentoInicial] = useState(0);
 
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
@@ -507,7 +505,7 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(0); setDescuentoContadoM2(0); setDescuentoInicial(0); // DIRECTIVA: Descuentos en 0
   }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
@@ -555,8 +553,6 @@ export default function App() {
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
-  // CORRECCIÓN EXACTA: Se eliminó 'lotesDelProyecto' de las dependencias
-  // para evitar que el renderizado por teclear sobreescriba el campo.
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -589,9 +585,10 @@ export default function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modoBD, uv, mzn, lote]); // Solo ejecuta al cambiar de lote, NO al teclear
+  }, [modoBD, uv, mzn, lote]); 
 
-  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
+  // DIRECTIVA: LIMITAR DESCUENTOS A 0
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 0, maxContadoM2: 0, maxBonoInicial: 0 }; };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
@@ -625,7 +622,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52; // DIRECTIVA: FORZAR 11.52
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
