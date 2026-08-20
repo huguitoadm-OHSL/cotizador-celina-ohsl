@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V7 - DOBLE CAPA NATIVA)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURADO DESDE APP_3.TSX)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -39,6 +39,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
+  // SEGURO DE VIDA DEL LOADER
   useEffect(() => {
     setIsMapReady(false);
     const safetyTimer = setTimeout(() => {
@@ -47,7 +48,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO
+  // PILOTO AUTOMÁTICO (DRON)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -56,34 +57,30 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         const data = await response.json();
         
         if (data && data.features && data.features.length > 0) {
-          const featuresLimpios = data.features.filter(f => {
-             const name = f.properties?.name || f.properties?.Name || f.properties?.Text || f.properties?.text || '';
-             return name.trim().length > 0 && f.geometry?.type === 'Point'; 
-          });
-          
-          const featureDestino = featuresLimpios.length > 0 ? featuresLimpios[0] : data.features[0];
-          let coordenadas = featureDestino.geometry.coordinates;
-          while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
-          
+          let coordenadas = data.features[0].geometry.coordinates;
+          while (Array.isArray(coordenadas[0])) {
+            coordenadas = coordenadas[0];
+          }
           const [lng, lat] = coordenadas;
-          const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
-          const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
           
-          if (mapRef.current) {
-            mapRef.current.getMap().flyTo({ 
-              center: [lngFinal, latFinal], 
-              zoom: 16.5, 
-              pitch: 45, 
+          if (mapRef.current && lng && lat) {
+            mapRef.current.getMap().flyTo({
+              center: [lng, lat],
+              zoom: 14.5,
               speed: 1.5, 
-              essential: true 
+              curve: 1.2, 
+              essential: true
             });
           }
         }
-      } catch (error) { console.warn("Piloto automático en espera..."); }
+      } catch (error) {
+        console.warn("Piloto automático en espera de datos espaciales...");
+      }
     };
     volarAlProyecto();
   }, [geojsonPath]);
 
+  // LA CURA DE LA PANTALLA NEGRA
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -109,23 +106,28 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: { 'fill-color': 'transparent' }
-  }), []);
+    paint: {
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.45)', 
+        rojos, 'rgba(239, 68, 68, 0.45)',  
+        azules, 'rgba(59, 130, 246, 0.45)', 
+        'transparent'       
+      ],
+      'fill-opacity': 1
+    },
+    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
+  }), [verdes, rojos, azules]);
 
-  // CAPA DE LÍNEAS
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 
-      'line-color': '#00e5ff', 
-      'line-width': 1.5,      
-      'line-opacity': 0.85      
-    }
+    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
   }), []);
 
   const highlightLayer = useMemo(() => ({
@@ -135,48 +137,22 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // NUEVO: CAPA BASE CIRCULAR (BALIZAS NATIVAS)
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    minzoom: 14, 
-    paint: {
-      'circle-radius': 9, // Tamaño perfecto para encapsular el número
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#22c55e', 
-        rojos, '#ef4444',  
-        azules, '#3b82f6', 
-        'rgba(255, 255, 255, 0.25)' // Plomo translúcido para textos sin estado (ej. Manzanos o Calles)
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#020617' // Borde oscuro para generar contraste 3D
-    },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
-  }), [verdes, rojos, azules]);
-
-  // NUEVO: CAPA DE TEXTO (FUENTES LIBERADAS)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 14, 
+    minzoom: 16.5, 
     layout: {
       'text-field': textProperty,
-      'text-size': 10,
+      'text-size': 12.5,
       'text-anchor': 'center',
-      'text-allow-overlap': true,      // Fuerza a que los números aparezcan
-      'text-ignore-placement': true    // Elimina restricciones de colisión
+      'text-allow-overlap': false 
     },
     paint: {
-      'text-color': '#ffffff' // Número en blanco brillante
+      'text-color': '#ffffff', 
+      'text-halo-color': '#000000',
+      'text-halo-width': 1.5 
     },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    filter: ['<=', ['length', ['to-string', textProperty]], 4]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -185,6 +161,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   return (
     <div className={containerClasses}>
+      
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -263,7 +240,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...fillLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
           </Map>
@@ -302,7 +278,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); // TC ACTUALIZADO SEGÚN DIRECTIVA
+  const [tcFlexible, setTcFlexible] = useState(11.52); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -560,12 +536,10 @@ export default function App() {
     return aliases;
   };
 
-  const lotesDelProyecto = useMemo(() => {
-    const currentAliases = getAlias(proyecto);
-    return baseDeDatosLotes?.filter(l => 
-      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
-    ) || [];
-  }, [baseDeDatosLotes, proyecto]);
+  const currentAliases = getAlias(proyecto);
+  const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
+    currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+  ) || [];
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
@@ -605,7 +579,6 @@ export default function App() {
         if (iniCalculada > 0) {
             setModoInicial("monto");
             setInicialMonto(iniCalculada.toString());
-            setInicialPorcentaje("");
         } else {
             setModoInicial("porcentaje");
             setInicialPorcentaje("");
@@ -649,20 +622,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.55;
-
-    let beneficio_muyurina = 0;
-    if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
-       let porcentaje_comparacion = pct_efectivo;
-       if(modoInicial === 'porcentaje') {
-          porcentaje_comparacion = Number(inicialPorcentaje) || 0;
-       } else {
-          porcentaje_comparacion = (Number(inicialMonto) / valor_original) * 100;
-       }
-       if (Math.abs(porcentaje_comparacion - 1.5) < 0.1) {
-           beneficio_muyurina = sup * 1; 
-       }
-    }
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -687,7 +647,7 @@ export default function App() {
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
-        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal + beneficio_muyurina;
+        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
         valor_final = valor_original - ahorro_total; 
 
         const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
@@ -1411,45 +1371,37 @@ export default function App() {
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
-                    
                     <div className="space-y-2">
-                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                       </label>
                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        value={inicialPorcentaje} 
-                        onFocus={() => setModoInicial('porcentaje')}
-                        onChange={(e) => { 
-                          setModoInicial('porcentaje'); 
-                          setInicialPorcentaje(e.target.value); 
-                        }} 
+                        required={modoInicial === 'porcentaje'} 
+                        value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
+                        onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
-                        className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
+                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600 shadow-inner" 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'monto' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                       </label>
                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        value={inicialMonto} 
-                        onFocus={() => setModoInicial('monto')}
-                        onChange={(e) => { 
-                          setModoInicial('monto'); 
-                          setInicialMonto(e.target.value); 
-                        }} 
+                        required={modoInicial === 'monto'} 
+                        value={modoInicial === 'monto' ? inicialMonto : ''} 
+                        onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
-                        className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-amber-400' : 'border-slate-700 text-slate-500'}`} 
+                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-black text-amber-400 text-sm sm:text-base placeholder-slate-600 shadow-inner" 
                       />
                     </div>
                   </div>
-                  
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-emerald-400 shrink-0" /> Plazo
