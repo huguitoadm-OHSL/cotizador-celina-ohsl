@@ -5,7 +5,6 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  // Nuevos Íconos de Plusvalía Urbana
   TreePine, GraduationCap, Hospital, ShoppingBag, Landmark
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
@@ -42,7 +41,7 @@ const anclasUrbanas = [
 ];
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V8 - CINEMATIC)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V9 - OPTIMIZADO)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -68,7 +67,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         const data = await response.json();
         
         if (data && data.features && data.features.length > 0) {
-          const featureDestino = data.features[0];
+          const featuresLimpios = data.features.filter(f => {
+             const name = f.properties?.name || f.properties?.Name || f.properties?.Text || f.properties?.text || '';
+             return name.trim().length > 0 && f.geometry?.type === 'Point'; 
+          });
+          
+          const featureDestino = featuresLimpios.length > 0 ? featuresLimpios[0] : data.features[0];
           let coordenadas = featureDestino.geometry.coordinates;
           while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
           
@@ -80,8 +84,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           if (mapRef.current) {
             mapRef.current.getMap().flyTo({ 
               center: [lngFinal, latFinal], 
-              zoom: 15.2, // Zoom panorámico para visualizar los nodos urbanos
-              pitch: 55, // Inclinación 3D para efecto inmersivo
+              zoom: 15.2, // Vista panorámica para lucir los Nodos
+              pitch: 55, // Inclinación 3D
               speed: 1.5, 
               essential: true 
             });
@@ -100,14 +104,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     }
   }, [isFullscreen]);
 
-  // ALGORITMO DE LECTURA DE BASES DE DATOS (Múltiples variaciones para garantizar el cruce con AutoCAD)
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
     lotesFiltrados.forEach(l => {
       const raw = String(l.lote).trim();
       const num = String(parseInt(raw, 10) || raw);
-      // Blindaje de datos: Cruzará exacto aunque AutoCAD le haya puesto espacios vacíos
       const variaciones = [raw, num, `${num} `, ` ${num}`, `0${num}`, `LOTE ${num}`];
       
       const est = String(l.estado).toUpperCase();
@@ -130,7 +132,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     paint: { 'fill-color': 'transparent' }
   }), []);
 
-  // GLOW CYBERTECH (Emisión de luz detrás de las líneas)
   const lineGlowLayer = useMemo(() => ({
     id: 'lotes-line-glow',
     type: 'line',
@@ -142,7 +143,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     }
   }), []);
 
-  // MALLA NEÓN PRINCIPAL
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
@@ -160,33 +160,49 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // ETIQUETAS Y BALIZAS INTELIGENTES (Ajustadas para no amontonarse a lo lejos)
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 16, // A partir de aquí se revelan gradualmente
-    layout: {
-      'text-field': textProperty,
-      'text-size': 11,
-      'text-anchor': 'center',
-      'text-allow-overlap': false, // EL CEREBRO: Esto evita que se amontonen
-      'text-ignore-placement': false 
-    },
+  // LA SOLUCIÓN DEL AMONTONAMIENTO: Los círculos y números solo aparecen si haces ZOOM IN (16.2+)
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    minzoom: 16.2, // Proximidad táctica: Oculto de lejos, visible de cerca
     paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': [
+      'circle-radius': 9, 
+      'circle-color': [
         'match', ['to-string', textProperty],
         verdes, '#22c55e', 
         rojos, '#ef4444',  
         azules, '#3b82f6', 
-        'rgba(30, 41, 59, 0.8)' // Gris plomo oscuro para lotes no registrados
+        'rgba(255, 255, 255, 0.25)' 
       ],
-      'text-halo-width': 4.5, 
-      'text-halo-blur': 0
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#020617' 
     },
-    // Quitamos la restricción Point para que extraiga el texto directo de las líneas si es necesario
-    filter: ['<=', ['length', ['to-string', textProperty]], 5]
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
   }), [verdes, rojos, azules]);
+
+  const labelLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    minzoom: 16.2, // Proximidad táctica: Aparecen justo con los círculos
+    layout: {
+      'text-field': textProperty,
+      'text-size': 11,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], // Fuente infalible
+      'text-anchor': 'center',
+      'text-allow-overlap': true,      // NUNCA MÁS SE OCULTARÁN
+      'text-ignore-placement': true    // NUNCA MÁS SE OCULTARÁN
+    },
+    paint: {
+      'text-color': '#ffffff' 
+    },
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), []);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -265,7 +281,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
             <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
-              {/* FILTRO CINEMÁTICO: Oscurece el satélite y baja el color terroso para hacer brillar el Neón y las Balizas */}
               <Layer id="satellite-layer" type="raster" paint={{ 
                 'raster-opacity': 0.85,
                 'raster-brightness-max': 0.6,
@@ -278,6 +293,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...lineGlowLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
+              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
 
@@ -286,10 +302,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
                 <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
                   <div className="relative">
-                    {/* Efecto de Pulso de Radar */}
                     <div className="absolute -inset-2 bg-cyan-500/40 rounded-full blur-md group-hover:bg-cyan-400/60 group-hover:blur-xl transition-all duration-300 animate-ping"></div>
-                    
-                    {/* Cúpula del Nodo de Plusvalía */}
                     <div className="relative bg-[#020617]/90 backdrop-blur-xl border border-cyan-400 p-2.5 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.7)] group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">
                       {nodo.tipo === 'educacion' && <GraduationCap className="w-5 h-5 text-cyan-300" />}
                       {nodo.tipo === 'recreacion' && <TreePine className="w-5 h-5 text-emerald-400" />}
@@ -298,8 +311,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
                       {nodo.tipo === 'landmark' && <Landmark className="w-5 h-5 text-indigo-400" />}
                     </div>
                   </div>
-                  
-                  {/* Etiqueta Flotante Interactiva */}
                   <div className="mt-2 bg-[#020617]/95 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_10px_25px_rgba(0,0,0,0.8)] pointer-events-none">
                     <span className="text-[10px] font-black text-cyan-50 whitespace-nowrap uppercase tracking-widest">{nodo.nombre}</span>
                   </div>
@@ -343,7 +354,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); 
+  const [tcFlexible, setTcFlexible] = useState(11.52); // TC ACTUALIZADO
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -622,7 +633,6 @@ export default function App() {
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
-  // SOLUCIÓN DEFINITIVA BUCLE INPUT: Este efecto SOLO se dispara cuando el lote cambia en el dropdown, liberando tu teclado
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -655,7 +665,7 @@ export default function App() {
         }
       }
     }
-  }, [uv, mzn, lote]); 
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -691,7 +701,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52; // TASA DE CAMBIO ACTUALIZADA
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
 
     let beneficio_muyurina = 0;
     if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
@@ -1582,7 +1592,7 @@ export default function App() {
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div>
-                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
+                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'textemerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
                         </div>
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div>
