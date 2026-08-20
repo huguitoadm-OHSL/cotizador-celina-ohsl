@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V3)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V4)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -47,7 +47,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO (DRON TÁCTICO ANTIMANCHAS)
+  // PILOTO AUTOMÁTICO (DRON TÁCTICO)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -56,10 +56,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         const data = await response.json();
         
         if (data && data.features && data.features.length > 0) {
-          // Filtrar solo puntos (textos) que tengan un número de lote válido
           const featuresLimpios = data.features.filter(f => {
              const name = f.properties?.name || f.properties?.Name || f.properties?.Text || f.properties?.text || '';
-             return name.trim().length > 0 && name.trim().length <= 4 && f.geometry.type === 'Point'; 
+             return name.trim().length > 0 && f.geometry?.type === 'Point'; 
           });
           
           const featureDestino = featuresLimpios.length > 0 ? featuresLimpios[0] : data.features[0];
@@ -68,7 +67,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           
           const [lng, lat] = coordenadas;
           
-          // Seguro Geoespacial: Si el mapa de AutoCAD lo manda a la Antártida, forzamos Montero
           const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
           const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
           
@@ -76,7 +74,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             mapRef.current.getMap().flyTo({ 
               center: [lngFinal, latFinal], 
               zoom: 16.5, 
-              pitch: 45, // Modo inmersivo
+              pitch: 45, 
               speed: 1.5, 
               essential: true 
             });
@@ -114,21 +112,20 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
-  // APAGAMOS EL RELLENO (AutoCAD exportó líneas, no polígonos)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: { 'fill-color': 'transparent' }
   }), []);
 
-  // MALLA ALÁMBRICA CORPORATIVA
+  // SOLUCIÓN 1: MALLA ALÁMBRICA INTENSA Y NEÓN
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 
-      'line-color': '#0ea5e9', 
-      'line-width': 1.2, 
-      'line-opacity': 0.4 
+      'line-color': '#00e5ff', // Cyan neón ultra brillante
+      'line-width': 2.0,       // Grosor aumentado
+      'line-opacity': 0.9      // Opacidad máxima para resaltar sobre el satélite
     }
   }), []);
 
@@ -139,17 +136,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // LA MAGIA CYBERTECH: Convertimos los puntos (números) en indicadores de disponibilidad
+  // SOLUCIÓN 2: RENDERIZADO FORZADO DE TEXTOS Y COLORES
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 15, 
+    minzoom: 14, // Disminuido para que los números aparezcan desde más lejos
     layout: {
       'text-field': textProperty,
-      'text-size': 14,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-size': 13,
       'text-anchor': 'center',
-      'text-allow-overlap': true 
+      'text-allow-overlap': true,      // Fuerza a renderizar textos superpuestos
+      'text-ignore-placement': true    // Evita que el mapa oculte etiquetas por colisión
     },
     paint: {
       'text-color': '#ffffff', 
@@ -158,15 +155,11 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         verdes, '#22c55e', // VERDE para Disponible
         rojos, '#ef4444',  // ROJO para Bloqueado
         azules, '#3b82f6', // AZUL para Vendido
-        'transparent'       
+        'rgba(255, 255, 255, 0.2)' // Blanco translúcido para textos sin estado (calles/manzanos)
       ],
-      'text-halo-width': 6, 
+      'text-halo-width': 4, 
       'text-halo-blur': 0
-    },
-    filter: ['all',
-      ['!=', ['to-string', textProperty], ''],
-      ['<=', ['length', ['to-string', textProperty]], 4]
-    ]
+    }
   }), [verdes, rojos, azules]);
 
   const containerClasses = isFullscreen 
@@ -329,9 +322,6 @@ export default function App() {
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
-  // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (DICCIONARIO INTELIGENTE)
-  // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
 
@@ -476,7 +466,7 @@ export default function App() {
               api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
               api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
               api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
-              api_initial_valor: extractNumber(loteFresco.initial_valor)
+              api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
           }));
 
           const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
@@ -493,6 +483,7 @@ export default function App() {
 
     cargarDatos();
   }, [proyecto, isAuthenticated, usarAPI]); 
+
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -591,6 +582,7 @@ export default function App() {
         if (iniCalculada > 0) {
             setModoInicial("monto");
             setInicialMonto(iniCalculada.toString());
+            setInicialPorcentaje("");
         } else {
             setModoInicial("porcentaje");
             setInicialPorcentaje("");
@@ -636,7 +628,7 @@ export default function App() {
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
     const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
 
-    // Regla de Negocio Muurina -> Si entra cuota inicial 1.5%, habilitar beneficio $1/m2 automático
+    // Beneficio Automático Muyurina
     let beneficio_muyurina = 0;
     if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
        let porcentaje_comparacion = pct_efectivo;
@@ -1397,37 +1389,46 @@ export default function App() {
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
+                    
+                    {/* SOLUCIÓN 3: INGRESOS LIBRES PARA CUOTA INICIAL */}
                     <div className="space-y-2">
-                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                       </label>
                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        required={modoInicial === 'porcentaje'} 
-                        value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
-                        onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
-                        placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
-                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600 shadow-inner" 
+                        value={inicialPorcentaje} 
+                        onFocus={() => setModoInicial('porcentaje')}
+                        onChange={(e) => { 
+                          setModoInicial('porcentaje'); 
+                          setInicialPorcentaje(e.target.value); 
+                        }} 
+                        placeholder="Ej. 5" 
+                        className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'monto' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                       </label>
                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        required={modoInicial === 'monto'} 
-                        value={modoInicial === 'monto' ? inicialMonto : ''} 
-                        onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
-                        placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
-                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-black text-amber-400 text-sm sm:text-base placeholder-slate-600 shadow-inner" 
+                        value={inicialMonto} 
+                        onFocus={() => setModoInicial('monto')}
+                        onChange={(e) => { 
+                          setModoInicial('monto'); 
+                          setInicialMonto(e.target.value); 
+                        }} 
+                        placeholder="Ej. 500" 
+                        className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-amber-400' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                   </div>
+                  
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-emerald-400 shrink-0" /> Plazo
