@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CORREGIDO Y OPTIMIZADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V3)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -47,7 +47,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // DRON INTELIGENTE: AHORA BUSCA EL CENTRO REAL DE LOS LOTES
+  // PILOTO AUTOMÁTICO (DRON TÁCTICO ANTIMANCHAS)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -56,33 +56,33 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         const data = await response.json();
         
         if (data && data.features && data.features.length > 0) {
-          // FILTRO: Encontrar un lote real (que tenga nombre o número) para evitar volar al borde del mapa
-          let featureDestino = data.features.find(f => {
-             const name = f.properties.name || f.properties.Name || f.properties.Text || f.properties.text || '';
-             return name.length > 0 && name.length <= 4;
+          // Filtrar solo puntos (textos) que tengan un número de lote válido
+          const featuresLimpios = data.features.filter(f => {
+             const name = f.properties?.name || f.properties?.Name || f.properties?.Text || f.properties?.text || '';
+             return name.trim().length > 0 && name.trim().length <= 4 && f.geometry.type === 'Point'; 
           });
           
-          if (!featureDestino) featureDestino = data.features[0];
-
+          const featureDestino = featuresLimpios.length > 0 ? featuresLimpios[0] : data.features[0];
           let coordenadas = featureDestino.geometry.coordinates;
-          while (Array.isArray(coordenadas[0])) {
-            coordenadas = coordenadas[0];
-          }
+          while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
+          
           const [lng, lat] = coordenadas;
           
-          if (mapRef.current && lng && lat) {
-            mapRef.current.getMap().flyTo({
-              center: [lng, lat],
-              zoom: 15.5,
+          // Seguro Geoespacial: Si el mapa de AutoCAD lo manda a la Antártida, forzamos Montero
+          const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
+          const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
+          
+          if (mapRef.current) {
+            mapRef.current.getMap().flyTo({ 
+              center: [lngFinal, latFinal], 
+              zoom: 16.5, 
+              pitch: 45, // Modo inmersivo
               speed: 1.5, 
-              curve: 1.2, 
-              essential: true
+              essential: true 
             });
           }
         }
-      } catch (error) {
-        console.warn("Piloto automático en espera de datos espaciales...");
-      }
+      } catch (error) { console.warn("Piloto automático en espera..."); }
     };
     volarAlProyecto();
   }, [geojsonPath]);
@@ -99,14 +99,11 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
     lotesFiltrados.forEach(l => {
-      const numLote = String(parseInt(l.lote, 10) || l.lote).trim();
-      // BLOQUEO DE MANCHÓN: Si el texto está vacío, no se le asigna ningún color
-      if (numLote && numLote !== 'NaN' && numLote !== '') {
-        const est = String(l.estado).toUpperCase();
-        if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
-        else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
-        else if (est === 'VENDIDO') a.push(numLote);
-      }
+      const numLote = String(parseInt(l.lote, 10) || l.lote);
+      const est = String(l.estado).toUpperCase();
+      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(numLote);
+      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(numLote);
+      else if (est === 'VENDIDO') a.push(numLote);
     });
     return { 
       verdes: v.length > 0 ? v : ['__NONE__'], 
@@ -117,30 +114,22 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
 
+  // APAGAMOS EL RELLENO (AutoCAD exportó líneas, no polígonos)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: {
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent'       
-      ],
-      'fill-opacity': 1
-    },
-    // BLOQUEO DE MANCHÓN: Solo rellena si el polígono TIENE un texto menor a 5 caracteres
-    filter: ['all', 
-      ['!=', ['to-string', textProperty], ''],
-      ['<=', ['length', ['to-string', textProperty]], 4]
-    ] 
-  }), [verdes, rojos, azules]);
+    paint: { 'fill-color': 'transparent' }
+  }), []);
 
+  // MALLA ALÁMBRICA CORPORATIVA
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.2, 'line-opacity': 0.8 } // Trazos finos y limpios
+    paint: { 
+      'line-color': '#0ea5e9', 
+      'line-width': 1.2, 
+      'line-opacity': 0.4 
+    }
   }), []);
 
   const highlightLayer = useMemo(() => ({
@@ -150,26 +139,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
+  // LA MAGIA CYBERTECH: Convertimos los puntos (números) en indicadores de disponibilidad
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, 
+    minzoom: 15, 
     layout: {
       'text-field': textProperty,
-      'text-size': 12.5,
+      'text-size': 14,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
       'text-anchor': 'center',
-      'text-allow-overlap': false 
+      'text-allow-overlap': true 
     },
     paint: {
       'text-color': '#ffffff', 
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.5 
+      'text-halo-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', // VERDE para Disponible
+        rojos, '#ef4444',  // ROJO para Bloqueado
+        azules, '#3b82f6', // AZUL para Vendido
+        'transparent'       
+      ],
+      'text-halo-width': 6, 
+      'text-halo-blur': 0
     },
-    filter: ['all', 
+    filter: ['all',
       ['!=', ['to-string', textProperty], ''],
       ['<=', ['length', ['to-string', textProperty]], 4]
     ]
-  }), []);
+  }), [verdes, rojos, azules]);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -177,7 +175,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   return (
     <div className={containerClasses}>
-      
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -239,7 +236,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           <Map
             ref={mapRef}
             mapLib={maplibregl}
-            initialViewState={{ longitude: -63.2500, latitude: -17.3400, zoom: 14.5, pitch: 0 }}
+            initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
@@ -294,7 +291,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); // DIRECTIVA APLICADA: 11.52
+  const [tcFlexible, setTcFlexible] = useState(11.52); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -306,8 +303,8 @@ export default function App() {
   
   const [descuentoCredito, setDescuentoCredito] = useState(0);
   const [descuentoContado, setDescuentoContado] = useState(0);
-  const [descuentoM2, setDescuentoM2] = useState(0); // DIRECTIVA APLICADA: 0
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(0); // DIRECTIVA APLICADA: 0
+  const [descuentoM2, setDescuentoM2] = useState(1);
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
   const [descuentoInicial, setDescuentoInicial] = useState(0);
 
   const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
@@ -333,7 +330,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (DICCIONARIO INTELIGENTE)
   // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
@@ -476,10 +473,10 @@ export default function App() {
               estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
               categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
               vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
-              api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial') || getSafeVal(item, 'cuotainicial') || getSafeVal(item, 'inicial')),
+              api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
               api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
-              api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct') || getSafeVal(item, 'porcentaje')),
-              api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
+              api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
+              api_initial_valor: extractNumber(loteFresco.initial_valor)
           }));
 
           const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
@@ -496,7 +493,6 @@ export default function App() {
 
     cargarDatos();
   }, [proyecto, isAuthenticated, usarAPI]); 
-
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -523,7 +519,7 @@ export default function App() {
     setEscenarioGuardado(null); setMostrarComparativa(false);
     setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
     setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(0); setDescuentoContadoM2(0); setDescuentoInicial(0); // Topes Cero
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
   }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
@@ -602,11 +598,9 @@ export default function App() {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modoBD, uv, mzn, lote]); 
+  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
 
-  // DIRECTIVA APLICADA: Límites de Descuento en 0
-  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 0, maxContadoM2: 0, maxBonoInicial: 0 }; };
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
   useEffect(() => {
     const limites = calcularLimitesMaximos();
@@ -640,7 +634,21 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52; // DIRECTIVA: FORZAR 11.52
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
+
+    // Regla de Negocio Muurina -> Si entra cuota inicial 1.5%, habilitar beneficio $1/m2 automático
+    let beneficio_muyurina = 0;
+    if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
+       let porcentaje_comparacion = pct_efectivo;
+       if(modoInicial === 'porcentaje') {
+          porcentaje_comparacion = Number(inicialPorcentaje) || 0;
+       } else {
+          porcentaje_comparacion = (Number(inicialMonto) / valor_original) * 100;
+       }
+       if (Math.abs(porcentaje_comparacion - 1.5) < 0.1) {
+           beneficio_muyurina = sup * 1; 
+       }
+    }
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -665,7 +673,7 @@ export default function App() {
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
-        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
+        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal + beneficio_muyurina;
         valor_final = valor_original - ahorro_total; 
 
         const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
@@ -945,6 +953,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
+      {/* ==============================================================================
+          PANTALLA DE LOGIN CON EFECTO CYBERTECH
+      ============================================================================== */}
       {!isAuthenticated && (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-500">
           <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
@@ -1004,6 +1015,7 @@ export default function App() {
         </div>
       )}
 
+      {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
           <g transform="translate(500, 400) scale(1.6)">
@@ -1027,11 +1039,11 @@ export default function App() {
         
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
+             <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse shrink-0">
+                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
@@ -1045,14 +1057,14 @@ export default function App() {
                  <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
                </div>
              </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none max-w-[140px]">
+             <div className="relative shrink-0 flex-1 sm:flex-none">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
                   type="number" 
                   step="0.01" 
                   value={tcFlexible} 
                   onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
           </div>
@@ -1438,6 +1450,7 @@ export default function App() {
                 </div>
                 )}
 
+                {/* BOTÓN PROCESAR CYBERTECH */}
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
