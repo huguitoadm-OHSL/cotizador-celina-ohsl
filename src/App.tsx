@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (RESTAURADO DESDE APP_3.TSX)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -536,10 +536,13 @@ export default function App() {
     return aliases;
   };
 
-  const currentAliases = getAlias(proyecto);
-  const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
-    currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
-  ) || [];
+  // SOLUCIÓN: USEMEMO PARA ESTABILIZAR LA BÚSQUEDA Y PERMITIR ESCRIBIR LA CUOTA INICIAL A MANO
+  const lotesDelProyecto = useMemo(() => {
+    const currentAliases = getAlias(proyecto);
+    return baseDeDatosLotes?.filter(l => 
+      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+    ) || [];
+  }, [baseDeDatosLotes, proyecto]);
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
@@ -579,6 +582,7 @@ export default function App() {
         if (iniCalculada > 0) {
             setModoInicial("monto");
             setInicialMonto(iniCalculada.toString());
+            setInicialPorcentaje("");
         } else {
             setModoInicial("porcentaje");
             setInicialPorcentaje("");
@@ -622,7 +626,20 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.55;
+
+    let beneficio_muyurina = 0;
+    if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
+       let porcentaje_comparacion = pct_efectivo;
+       if(modoInicial === 'porcentaje') {
+          porcentaje_comparacion = Number(inicialPorcentaje) || 0;
+       } else {
+          porcentaje_comparacion = (Number(inicialMonto) / valor_original) * 100;
+       }
+       if (Math.abs(porcentaje_comparacion - 1.5) < 0.1) {
+           beneficio_muyurina = sup * 1; 
+       }
+    }
 
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
@@ -647,7 +664,7 @@ export default function App() {
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
-        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
+        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal + beneficio_muyurina;
         valor_final = valor_original - ahorro_total; 
 
         const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
@@ -1371,37 +1388,45 @@ export default function App() {
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
+                    
                     <div className="space-y-2">
-                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                       </label>
                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        required={modoInicial === 'porcentaje'} 
-                        value={modoInicial === 'porcentaje' ? inicialPorcentaje : ''} 
-                        onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
+                        value={inicialPorcentaje} 
+                        onFocus={() => setModoInicial('porcentaje')}
+                        onChange={(e) => { 
+                          setModoInicial('porcentaje'); 
+                          setInicialPorcentaje(e.target.value); 
+                        }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
-                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-bold text-white text-sm sm:text-base placeholder-slate-600 shadow-inner" 
+                        className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'monto' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                       </label>
                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        required={modoInicial === 'monto'} 
-                        value={modoInicial === 'monto' ? inicialMonto : ''} 
-                        onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
+                        value={inicialMonto} 
+                        onFocus={() => setModoInicial('monto')}
+                        onChange={(e) => { 
+                          setModoInicial('monto'); 
+                          setInicialMonto(e.target.value); 
+                        }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
-                        className="w-full bg-[#060b13] border border-slate-700 rounded-xl p-3 sm:p-3.5 outline-none focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)] transition-all font-black text-amber-400 text-sm sm:text-base placeholder-slate-600 shadow-inner" 
+                        className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-amber-400' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                   </div>
+                  
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-emerald-400 shrink-0" /> Plazo
