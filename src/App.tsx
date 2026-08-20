@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V5 - BALIZAS INTEGRADAS)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V6 - MOTOR DE COLISIONES)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -111,21 +111,20 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
-  // APAGAMOS EL RELLENO (AutoCAD exportó líneas)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: { 'fill-color': 'transparent' }
   }), []);
 
-  // SOLUCIÓN COLORES APAGADOS: MALLA NEÓN ULTRA BRILLANTE
+  // MALLA ALÁMBRICA INTENSA Y NEÓN
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 
       'line-color': '#00e5ff', 
-      'line-width': 2.0,       
-      'line-opacity': 0.95      
+      'line-width': 1.5,      
+      'line-opacity': 0.85      
     }
   }), []);
 
@@ -136,45 +135,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // SOLUCIÓN NÚMEROS: CAPA DE BALIZAS (Círculos de color)
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
+  // ETIQUETAS CON MOTOR DE COLISIÓN ACTIVO
+  const labelLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    minzoom: 15.5, 
+    layout: {
+      'text-field': textProperty,
+      'text-size': 11,
+      'text-anchor': 'center',
+      'text-allow-overlap': false,     
+      'text-ignore-placement': false,  
+    },
     paint: {
-      'circle-radius': 12,
-      'circle-color': [
+      'text-color': '#ffffff', 
+      'text-halo-color': [
         'match', ['to-string', textProperty],
         verdes, '#22c55e', 
         rojos, '#ef4444',  
         azules, '#3b82f6', 
         'rgba(255, 255, 255, 0.15)' 
       ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': 'rgba(255,255,255,0.4)'
-    },
-    filter: ['==', ['geometry-type'], 'Point']
-  }), [verdes, rojos, azules]);
-
-  // SOLUCIÓN NÚMEROS: TEXTO INFALIBLE SOBRE LAS BALIZAS
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 14.5, 
-    layout: {
-      'text-field': textProperty,
-      'text-size': 11,
-      'text-anchor': 'center',
-      'text-allow-overlap': true,      
-      'text-ignore-placement': true    
-    },
-    paint: {
-      'text-color': '#ffffff' 
+      'text-halo-width': 6, 
+      'text-halo-blur': 0
     },
     filter: ['all',
       ['==', ['geometry-type'], 'Point'],
       ['!=', ['to-string', textProperty], '']
     ]
-  }), []);
+  }), [verdes, rojos, azules]);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -260,9 +249,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...fillLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              {/* Capa de Puntos (Balizas) */}
-              <Layer {...pointLayer as any} />
-              {/* Capa de Texto sobre las balizas */}
               <Layer {...labelLayer as any} />
             </Source>
           </Map>
@@ -339,6 +325,9 @@ export default function App() {
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
+  // ============================================================================
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (DICCIONARIO INTELIGENTE)
+  // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
 
@@ -556,7 +545,6 @@ export default function App() {
     return aliases;
   };
 
-  // SOLUCIÓN BLOQUEO DE INPUTS: Congelamos esta consulta con useMemo para que React no recargue
   const lotesDelProyecto = useMemo(() => {
     const currentAliases = getAlias(proyecto);
     return baseDeDatosLotes?.filter(l => 
@@ -648,7 +636,6 @@ export default function App() {
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
     const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
 
-    // Beneficio Automático Muyurina
     let beneficio_muyurina = 0;
     if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
        let porcentaje_comparacion = pct_efectivo;
@@ -1410,7 +1397,6 @@ export default function App() {
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
                     
-                    {/* SOLUCIÓN BLOQUEO DE INPUTS: Desvinculado el borrado automático al escribir a mano */}
                     <div className="space-y-2">
                       <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
@@ -1448,7 +1434,7 @@ export default function App() {
                       />
                     </div>
                   </div>
-
+                  
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-emerald-400 shrink-0" /> Plazo
