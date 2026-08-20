@@ -4,9 +4,11 @@ import {
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
-  Maximize, Minimize, Eye, Crosshair, Server
+  Maximize, Minimize, Eye, Crosshair, Server,
+  // NUEVOS ÍCONOS PARA LOS NODOS DE PLUSVALÍA
+  TreePine, GraduationCap, Coffee, Hospital, ShoppingBag
 } from "lucide-react";
-import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl';
+import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -30,7 +32,18 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS
+// BASE DE DATOS ESTRATÉGICA: NODOS DE PLUSVALÍA (URBAN ANCHORS)
+// ============================================================================
+// Instrucción: Puedes agregar, mover o borrar estos nodos con las coordenadas exactas de Montero.
+const anclasUrbanas = [
+  { id: 'plaza-montero', nombre: 'Plaza Principal', tipo: 'recreacion', lat: -17.3392, lng: -63.2562 },
+  { id: 'hospital-montero', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3500, lng: -63.2600 },
+  { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 },
+  { id: 'supermercado', nombre: 'Centro Comercial', tipo: 'comercio', lat: -17.3580, lng: -63.2510 }
+];
+
+// ============================================================================
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V8)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -39,7 +52,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
 
-  // SEGURO DE VIDA DEL LOADER
   useEffect(() => {
     setIsMapReady(false);
     const safetyTimer = setTimeout(() => {
@@ -48,7 +60,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO (DRON)
+  // PILOTO AUTOMÁTICO (DRON TÁCTICO)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -57,30 +69,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
         const data = await response.json();
         
         if (data && data.features && data.features.length > 0) {
-          let coordenadas = data.features[0].geometry.coordinates;
-          while (Array.isArray(coordenadas[0])) {
-            coordenadas = coordenadas[0];
-          }
-          const [lng, lat] = coordenadas;
+          const featuresLimpios = data.features.filter(f => {
+             const name = f.properties?.name || f.properties?.Name || f.properties?.Text || f.properties?.text || '';
+             return name.trim().length > 0 && f.geometry?.type === 'Point'; 
+          });
           
-          if (mapRef.current && lng && lat) {
-            mapRef.current.getMap().flyTo({
-              center: [lng, lat],
-              zoom: 14.5,
+          const featureDestino = featuresLimpios.length > 0 ? featuresLimpios[0] : data.features[0];
+          let coordenadas = featureDestino.geometry.coordinates;
+          while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
+          
+          const [lng, lat] = coordenadas;
+          const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
+          const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
+          
+          if (mapRef.current) {
+            // Alejamos un poco el Dron (zoom 15) para que el cliente vea los colegios y plazas alrededor
+            mapRef.current.getMap().flyTo({ 
+              center: [lngFinal, latFinal], 
+              zoom: 15.0, 
+              pitch: 45, 
               speed: 1.5, 
-              curve: 1.2, 
-              essential: true
+              essential: true 
             });
           }
         }
-      } catch (error) {
-        console.warn("Piloto automático en espera de datos espaciales...");
-      }
+      } catch (error) { console.warn("Piloto automático en espera..."); }
     };
     volarAlProyecto();
   }, [geojsonPath]);
 
-  // LA CURA DE LA PANTALLA NEGRA
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (map) {
@@ -106,28 +123,23 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: {
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.45)', 
-        rojos, 'rgba(239, 68, 68, 0.45)',  
-        azules, 'rgba(59, 130, 246, 0.45)', 
-        'transparent'       
-      ],
-      'fill-opacity': 1
-    },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4] 
-  }), [verdes, rojos, azules]);
+    paint: { 'fill-color': 'transparent' }
+  }), []);
 
+  // MALLA ALÁMBRICA LIGERA
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
-    paint: { 'line-color': '#22d3ee', 'line-width': 1.5, 'line-opacity': 0.8 }
+    paint: { 
+      'line-color': '#00e5ff', 
+      'line-width': 1.5,      
+      'line-opacity': 0.85      
+    }
   }), []);
 
   const highlightLayer = useMemo(() => ({
@@ -137,23 +149,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
+  // ETIQUETAS CON MOTOR DE COLISIÓN ACTIVO
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, 
+    minzoom: 15.5, 
     layout: {
       'text-field': textProperty,
-      'text-size': 12.5,
+      'text-size': 11,
       'text-anchor': 'center',
-      'text-allow-overlap': false 
+      'text-allow-overlap': false,     
+      'text-ignore-placement': false,  
     },
     paint: {
       'text-color': '#ffffff', 
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.5 
+      'text-halo-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', 
+        rojos, '#ef4444',  
+        azules, '#3b82f6', 
+        'rgba(255, 255, 255, 0.15)' 
+      ],
+      'text-halo-width': 6, 
+      'text-halo-blur': 0
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 4]
-  }), []);
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), [verdes, rojos, azules]);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -161,7 +185,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
 
   return (
     <div className={containerClasses}>
-      
       {!isFullscreen && (
         <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
@@ -242,6 +265,33 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...highlightLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
+
+            {/* RENDERIZADO DE NODOS DE PLUSVALÍA (URBAN ANCHORS) */}
+            {anclasUrbanas.map((nodo) => (
+              <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
+                <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
+                  <div className="relative">
+                    {/* Efecto de Pulso Holográfico */}
+                    <div className="absolute -inset-2 bg-cyan-500/30 rounded-full blur-md group-hover:bg-cyan-400/50 group-hover:blur-xl transition-all duration-300 animate-pulse"></div>
+                    
+                    {/* Cúpula del Nodo */}
+                    <div className="relative bg-[#020617]/80 backdrop-blur-md border border-cyan-400 p-2.5 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.6)] group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">
+                      {nodo.tipo === 'educacion' && <GraduationCap className="w-5 h-5 text-cyan-300" />}
+                      {nodo.tipo === 'recreacion' && <TreePine className="w-5 h-5 text-emerald-400" />}
+                      {nodo.tipo === 'salud' && <Hospital className="w-5 h-5 text-rose-400" />}
+                      {nodo.tipo === 'comercio' && <ShoppingBag className="w-5 h-5 text-amber-400" />}
+                      {nodo.tipo === 'gastronomia' && <Coffee className="w-5 h-5 text-amber-500" />}
+                    </div>
+                  </div>
+                  
+                  {/* Etiqueta de Texto Táctica */}
+                  <div className="mt-2 bg-[#020617]/90 backdrop-blur-md border border-slate-700 px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-xl pointer-events-none">
+                    <span className="text-[10px] font-black text-white whitespace-nowrap uppercase tracking-widest">{nodo.nombre}</span>
+                  </div>
+                </div>
+              </Marker>
+            ))}
+
           </Map>
         </div>
       </div>
@@ -536,7 +586,6 @@ export default function App() {
     return aliases;
   };
 
-  // SOLUCIÓN: USEMEMO PARA ESTABILIZAR LA BÚSQUEDA Y PERMITIR ESCRIBIR LA CUOTA INICIAL A MANO
   const lotesDelProyecto = useMemo(() => {
     const currentAliases = getAlias(proyecto);
     return baseDeDatosLotes?.filter(l => 
@@ -1388,7 +1437,6 @@ export default function App() {
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
-                    
                     <div className="space-y-2">
                       <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
@@ -1426,7 +1474,6 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-emerald-400 shrink-0" /> Plazo
@@ -1449,7 +1496,6 @@ export default function App() {
                 </div>
                 )}
 
-                {/* BOTÓN PROCESAR CYBERTECH */}
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
