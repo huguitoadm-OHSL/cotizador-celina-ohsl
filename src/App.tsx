@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V6 - MOTOR DE COLISIONES)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V7 - DOBLE CAPA NATIVA)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -47,7 +47,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO (DRON TÁCTICO)
+  // PILOTO AUTOMÁTICO
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -117,7 +117,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     paint: { 'fill-color': 'transparent' }
   }), []);
 
-  // MALLA ALÁMBRICA INTENSA Y NEÓN
+  // CAPA DE LÍNEAS
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
@@ -135,35 +135,49 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // ETIQUETAS CON MOTOR DE COLISIÓN ACTIVO
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 15.5, 
-    layout: {
-      'text-field': textProperty,
-      'text-size': 11,
-      'text-anchor': 'center',
-      'text-allow-overlap': false,     
-      'text-ignore-placement': false,  
-    },
+  // NUEVO: CAPA BASE CIRCULAR (BALIZAS NATIVAS)
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    minzoom: 14, 
     paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': [
+      'circle-radius': 9, // Tamaño perfecto para encapsular el número
+      'circle-color': [
         'match', ['to-string', textProperty],
         verdes, '#22c55e', 
         rojos, '#ef4444',  
         azules, '#3b82f6', 
-        'rgba(255, 255, 255, 0.15)' 
+        'rgba(255, 255, 255, 0.25)' // Plomo translúcido para textos sin estado (ej. Manzanos o Calles)
       ],
-      'text-halo-width': 6, 
-      'text-halo-blur': 0
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#020617' // Borde oscuro para generar contraste 3D
     },
     filter: ['all',
       ['==', ['geometry-type'], 'Point'],
       ['!=', ['to-string', textProperty], '']
     ]
   }), [verdes, rojos, azules]);
+
+  // NUEVO: CAPA DE TEXTO (FUENTES LIBERADAS)
+  const labelLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    minzoom: 14, 
+    layout: {
+      'text-field': textProperty,
+      'text-size': 10,
+      'text-anchor': 'center',
+      'text-allow-overlap': true,      // Fuerza a que los números aparezcan
+      'text-ignore-placement': true    // Elimina restricciones de colisión
+    },
+    paint: {
+      'text-color': '#ffffff' // Número en blanco brillante
+    },
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), []);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -249,6 +263,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...fillLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
+              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
           </Map>
@@ -287,7 +302,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); 
+  const [tcFlexible, setTcFlexible] = useState(11.52); // TC ACTUALIZADO SEGÚN DIRECTIVA
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -634,7 +649,7 @@ export default function App() {
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosArreglo = [], transicionData = [], totalAhorroTransicion = 0;
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.52;
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 11.55;
 
     let beneficio_muyurina = 0;
     if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
