@@ -30,7 +30,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V4)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V5 - BALIZAS INTEGRADAS)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -66,7 +66,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
           
           const [lng, lat] = coordenadas;
-          
           const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
           const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
           
@@ -110,57 +109,72 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     };
   }, [baseDeDatosLotes, proyectoActivo]);
 
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ''];
+  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
+  // APAGAMOS EL RELLENO (AutoCAD exportó líneas)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: { 'fill-color': 'transparent' }
   }), []);
 
-  // SOLUCIÓN 1: MALLA ALÁMBRICA INTENSA Y NEÓN
+  // SOLUCIÓN COLORES APAGADOS: MALLA NEÓN ULTRA BRILLANTE
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 
-      'line-color': '#00e5ff', // Cyan neón ultra brillante
-      'line-width': 2.0,       // Grosor aumentado
-      'line-opacity': 0.9      // Opacidad máxima para resaltar sobre el satélite
+      'line-color': '#00e5ff', 
+      'line-width': 2.0,       
+      'line-opacity': 0.95      
     }
   }), []);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 4, 'line-opacity': 1 },
+    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // SOLUCIÓN 2: RENDERIZADO FORZADO DE TEXTOS Y COLORES
+  // SOLUCIÓN NÚMEROS: CAPA DE BALIZAS (Círculos de color)
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    paint: {
+      'circle-radius': 12,
+      'circle-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', 
+        rojos, '#ef4444',  
+        azules, '#3b82f6', 
+        'rgba(255, 255, 255, 0.15)' 
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': 'rgba(255,255,255,0.4)'
+    },
+    filter: ['==', ['geometry-type'], 'Point']
+  }), [verdes, rojos, azules]);
+
+  // SOLUCIÓN NÚMEROS: TEXTO INFALIBLE SOBRE LAS BALIZAS
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 14, // Disminuido para que los números aparezcan desde más lejos
+    minzoom: 14.5, 
     layout: {
       'text-field': textProperty,
-      'text-size': 13,
+      'text-size': 11,
       'text-anchor': 'center',
-      'text-allow-overlap': true,      // Fuerza a renderizar textos superpuestos
-      'text-ignore-placement': true    // Evita que el mapa oculte etiquetas por colisión
+      'text-allow-overlap': true,      
+      'text-ignore-placement': true    
     },
     paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#22c55e', // VERDE para Disponible
-        rojos, '#ef4444',  // ROJO para Bloqueado
-        azules, '#3b82f6', // AZUL para Vendido
-        'rgba(255, 255, 255, 0.2)' // Blanco translúcido para textos sin estado (calles/manzanos)
-      ],
-      'text-halo-width': 4, 
-      'text-halo-blur': 0
-    }
-  }), [verdes, rojos, azules]);
+      'text-color': '#ffffff' 
+    },
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), []);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -246,6 +260,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...fillLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
+              {/* Capa de Puntos (Balizas) */}
+              <Layer {...pointLayer as any} />
+              {/* Capa de Texto sobre las balizas */}
               <Layer {...labelLayer as any} />
             </Source>
           </Map>
@@ -539,10 +556,13 @@ export default function App() {
     return aliases;
   };
 
-  const currentAliases = getAlias(proyecto);
-  const lotesDelProyecto = baseDeDatosLotes?.filter(l => 
-    currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
-  ) || [];
+  // SOLUCIÓN BLOQUEO DE INPUTS: Congelamos esta consulta con useMemo para que React no recargue
+  const lotesDelProyecto = useMemo(() => {
+    const currentAliases = getAlias(proyecto);
+    return baseDeDatosLotes?.filter(l => 
+      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+    ) || [];
+  }, [baseDeDatosLotes, proyecto]);
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
@@ -1390,7 +1410,7 @@ export default function App() {
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
                     
-                    {/* SOLUCIÓN 3: INGRESOS LIBRES PARA CUOTA INICIAL */}
+                    {/* SOLUCIÓN BLOQUEO DE INPUTS: Desvinculado el borrado automático al escribir a mano */}
                     <div className="space-y-2">
                       <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
@@ -1405,7 +1425,7 @@ export default function App() {
                           setModoInicial('porcentaje'); 
                           setInicialPorcentaje(e.target.value); 
                         }} 
-                        placeholder="Ej. 5" 
+                        placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
                         className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
@@ -1423,12 +1443,12 @@ export default function App() {
                           setModoInicial('monto'); 
                           setInicialMonto(e.target.value); 
                         }} 
-                        placeholder="Ej. 500" 
+                        placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
                         className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-amber-400' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                   </div>
-                  
+
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Calendar className="w-4 h-4 text-emerald-400 shrink-0" /> Plazo
