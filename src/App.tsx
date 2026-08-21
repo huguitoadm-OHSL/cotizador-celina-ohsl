@@ -31,17 +31,29 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// NODOS DE PLUSVALÍA (URBAN ANCHORS)
+// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS MULTI-PROYECTO)
 // ============================================================================
-const anclasUrbanas = [
-  { id: 'plaza-montero', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
-  { id: 'hospital', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 },
-  { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 },
-  { id: 'comercio', nombre: 'Zona Comercial Norte', tipo: 'comercio', lat: -17.3550, lng: -63.2510 }
-];
+const baseAnclasUrbanas = {
+  "MUYURINA": [
+    { id: 'plaza-montero', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
+    { id: 'hospital', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 },
+    { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 },
+    { id: 'comercio', nombre: 'Zona Comercial Norte', tipo: 'comercio', lat: -17.3550, lng: -63.2510 }
+  ],
+  "URUBÓ NORTE": [
+    { id: 'puente-foianini', nombre: 'Puente Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
+    { id: 'urubo-business', nombre: 'Centro Empresarial Urubó', tipo: 'comercio', lat: -17.7450, lng: -63.2100 },
+    { id: 'club-urubo', nombre: 'Country Club', tipo: 'recreacion', lat: -17.7380, lng: -63.2150 }
+  ],
+  "CELINA PAILÓN": [
+    { id: 'plaza-pailon', nombre: 'Plaza Principal Pailón', tipo: 'landmark', lat: -17.6543, lng: -62.7231 },
+    { id: 'mercado-pailon', nombre: 'Mercado Municipal', tipo: 'comercio', lat: -17.6560, lng: -62.7250 }
+  ]
+  // Puedes seguir agregando proyectos aquí siguiendo el mismo formato
+};
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V9 - OPTIMIZADO)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V10)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -49,6 +61,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
+  
+  // INYECCIÓN DINÁMICA DE NODOS SEGÚN PROYECTO
+  const anclasActivas = baseAnclasUrbanas[proyectoActivo] || [];
 
   useEffect(() => {
     setIsMapReady(false);
@@ -77,15 +92,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
           
           const [lng, lat] = coordenadas;
-          // Coordenadas Maestras de Montero / Muyurina ancladas por seguridad
+          // Validación Geoespacial
           const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
           const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
           
           if (mapRef.current) {
             mapRef.current.getMap().flyTo({ 
               center: [lngFinal, latFinal], 
-              zoom: 15.2, // Vista panorámica para lucir los Nodos
-              pitch: 55, // Inclinación 3D
+              zoom: 15.2, 
+              pitch: 55, 
               speed: 1.5, 
               essential: true 
             });
@@ -160,11 +175,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // LA SOLUCIÓN DEL AMONTONAMIENTO: Los círculos y números solo aparecen si haces ZOOM IN (16.2+)
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
-    minzoom: 16.2, // Proximidad táctica: Oculto de lejos, visible de cerca
+    minzoom: 16.2, 
     paint: {
       'circle-radius': 9, 
       'circle-color': [
@@ -186,14 +200,14 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.2, // Proximidad táctica: Aparecen justo con los círculos
+    minzoom: 16.2, 
     layout: {
       'text-field': textProperty,
       'text-size': 11,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], // Fuente infalible
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
       'text-anchor': 'center',
-      'text-allow-overlap': true,      // NUNCA MÁS SE OCULTARÁN
-      'text-ignore-placement': true    // NUNCA MÁS SE OCULTARÁN
+      'text-allow-overlap': true,      
+      'text-ignore-placement': true    
     },
     paint: {
       'text-color': '#ffffff' 
@@ -298,7 +312,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             </Source>
 
             {/* RENDERIZADO DE NODOS DE PLUSVALÍA (URBAN ANCHORS) */}
-            {anclasUrbanas.map((nodo) => (
+            {anclasActivas.map((nodo) => (
               <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
                 <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
                   <div className="relative">
@@ -354,7 +368,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.52); // TC ACTUALIZADO
+  const [tcFlexible, setTcFlexible] = useState(11.52); 
   const TC_PROMOCIONAL = 6.97;
 
   const [uv, setUv] = useState("");
@@ -393,7 +407,7 @@ export default function App() {
   const resultadosRef = useRef(null);
 
   // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER (DICCIONARIO INTELIGENTE)
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
   // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
@@ -665,7 +679,7 @@ export default function App() {
         }
       }
     }
-  }, [modoBD, uv, mzn, lote, lotesDelProyecto]);
+  }, [uv, mzn, lote]); 
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -1592,7 +1606,7 @@ export default function App() {
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div>
-                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'textemerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
+                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-cyan-400' : 'text-emerald-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
                         </div>
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div>
