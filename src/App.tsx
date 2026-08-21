@@ -5,7 +5,7 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark
+  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Compass
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -31,29 +31,94 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS MULTI-PROYECTO)
+// DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS (FALLBACK DRON)
+// ============================================================================
+const coordenadasProyectos = {
+  // MONTERO
+  "MUYURINA": { lat: -17.3710, lng: -63.2550, zoom: 15.5 },
+  "LOS JARDINES": { lat: -17.3524, lng: -63.2718, zoom: 15.5 },
+  "EL RENACER": { lat: -17.3615, lng: -63.2652, zoom: 15.5 },
+  "CAÑAVERAL": { lat: -17.3255, lng: -63.2625, zoom: 15.5 },
+  "SANTA FE": { lat: -17.3150, lng: -63.2755, zoom: 15.5 },
+  "CELINA 3": { lat: -17.3452, lng: -63.2425, zoom: 15.5 },
+  "CELINA 4": { lat: -17.3485, lng: -63.2385, zoom: 15.5 },
+  "CELINA 5": { lat: -17.3518, lng: -63.2345, zoom: 15.5 },
+  "CELINA X": { lat: -17.3325, lng: -63.2515, zoom: 15.5 },
+  "RANCHO NUEVO": { lat: -17.3582, lng: -63.2482, zoom: 15.5 },
+  "VILLA BELLA VIVIENDAS": { lat: -17.3382, lng: -63.2412, zoom: 15.5 },
+
+  // SATÉLITE NORTE & WARNES
+  "CELINA 7 FASE 3": { lat: -17.5752, lng: -63.1425, zoom: 15.5 },
+  "CELINA VII FASE 1": { lat: -17.5785, lng: -63.1455, zoom: 15.5 },
+  "CELINA VII FASE 2": { lat: -17.5765, lng: -63.1435, zoom: 15.5 },
+  "CELINA 8": { lat: -17.5685, lng: -63.1352, zoom: 15.5 },
+  "CLARA CHUCHIO": { lat: -17.5925, lng: -63.1552, zoom: 15.5 },
+  "SAN JORGE": { lat: -17.5852, lng: -63.1482, zoom: 15.5 },
+  "PRADERAS DEL NORTE": { lat: -17.5625, lng: -63.1512, zoom: 15.5 },
+  "NARANJAL III": { lat: -17.5452, lng: -63.1625, zoom: 15.5 },
+  "CELINA II": { lat: -17.5815, lng: -63.1395, zoom: 15.5 },
+
+  // SANTA CRUZ, URUBÓ & ESTE
+  "URUBÓ NORTE": { lat: -17.7215, lng: -63.2385, zoom: 15.2 },
+  "ROSA RODALI": { lat: -17.6852, lng: -63.1252, zoom: 15.2 },
+  "CELINA PAILÓN": { lat: -17.6552, lng: -62.7225, zoom: 15.2 },
+  "EL ENCANTO": { lat: -17.6952, lng: -63.0852, zoom: 15.2 },
+  "EL ENCANTO FASE 2": { lat: -17.6982, lng: -63.0825, zoom: 15.2 },
+  "SANTA ROSA - FASE 1": { lat: -17.7125, lng: -63.0752, zoom: 15.2 },
+  "SANTA ROSA - FASE 2": { lat: -17.7155, lng: -63.0722, zoom: 15.2 },
+  "SANTA ROSA - FASE 3": { lat: -17.7185, lng: -63.0692, zoom: 15.2 },
+  "TAMARINDO": { lat: -17.7352, lng: -63.0952, zoom: 15.2 },
+  "JARDINES DEL BOSQUE": { lat: -17.7652, lng: -63.0452, zoom: 15.2 },
+  "EL PORVENIR": { lat: -17.7052, lng: -63.0652, zoom: 15.2 },
+  "EL PORVENIR FASE 2": { lat: -17.7082, lng: -63.0622, zoom: 15.2 }
+};
+
+// ============================================================================
+// RED DE CIUDADES PRINCIPALES (MACRO-REFERENCIAS REGIONALES)
+// ============================================================================
+const ciudadesRegionales = [
+  { id: 'scz', nombre: 'Santa Cruz de la Sierra', lat: -17.7833, lng: -63.1821 },
+  { id: 'montero', nombre: 'Montero', lat: -17.3386, lng: -63.2553 },
+  { id: 'warnes', nombre: 'Warnes', lat: -17.5147, lng: -63.1672 },
+  { id: 'cotoca', nombre: 'Cotoca', lat: -17.7544, lng: -62.9975 },
+  { id: 'satelite', nombre: 'Satélite Norte', lat: -17.5833, lng: -63.1500 },
+  { id: 'pailon', nombre: 'Pailón', lat: -17.6597, lng: -62.7194 },
+  { id: 'yapacani', nombre: 'Yapacaní', lat: -17.4047, lng: -63.8828 },
+  { id: 'mineros', nombre: 'Mineros', lat: -17.1197, lng: -63.2325 },
+  { id: 'saavedra', nombre: 'Gral. Saavedra', lat: -17.2289, lng: -63.2167 }
+];
+
+// ============================================================================
+// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS LOCALES)
 // ============================================================================
 const baseAnclasUrbanas = {
   "MUYURINA": [
     { id: 'plaza-montero', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
     { id: 'hospital', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 },
     { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 },
-    { id: 'comercio', nombre: 'Zona Comercial Norte', tipo: 'comercio', lat: -17.3550, lng: -63.2510 }
+    { id: 'comercio-norte', nombre: 'Zona Comercial Norte', tipo: 'comercio', lat: -17.3550, lng: -63.2510 }
   ],
   "URUBÓ NORTE": [
-    { id: 'puente-foianini', nombre: 'Puente Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
+    { id: 'puente-foianini', nombre: 'Puente Mario Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
     { id: 'urubo-business', nombre: 'Centro Empresarial Urubó', tipo: 'comercio', lat: -17.7450, lng: -63.2100 },
-    { id: 'club-urubo', nombre: 'Country Club', tipo: 'recreacion', lat: -17.7380, lng: -63.2150 }
+    { id: 'country-club', nombre: 'Urubó Golf Country Club', tipo: 'recreacion', lat: -17.7380, lng: -63.2150 }
   ],
   "CELINA PAILÓN": [
     { id: 'plaza-pailon', nombre: 'Plaza Principal Pailón', tipo: 'landmark', lat: -17.6543, lng: -62.7231 },
     { id: 'mercado-pailon', nombre: 'Mercado Municipal', tipo: 'comercio', lat: -17.6560, lng: -62.7250 }
+  ],
+  "ROSA RODALI": [
+    { id: 'surtidor-norte', nombre: 'Estación de Servicio Biocéanica', tipo: 'comercio', lat: -17.6890, lng: -63.1210 },
+    { id: 'parque-industrial', nombre: 'Parque Industrial Latinoamericano', tipo: 'landmark', lat: -17.6700, lng: -63.1400 }
+  ],
+  "CELINA 7 FASE 3": [
+    { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
+    { id: 'mercado-satelite', nombre: 'Mercado Satélite Norte', tipo: 'comercio', lat: -17.5850, lng: -63.1510 }
   ]
-  // Puedes seguir agregando proyectos aquí siguiendo el mismo formato
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V10)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V11)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -61,8 +126,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const mapRef = useRef(null);
   
   const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
-  
-  // INYECCIÓN DINÁMICA DE NODOS SEGÚN PROYECTO
   const anclasActivas = baseAnclasUrbanas[proyectoActivo] || [];
 
   useEffect(() => {
@@ -73,43 +136,57 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // DRON TÁCTICO DE POSICIONAMIENTO
+  // PILOTO AUTOMÁTICO INTELIGENTE (GEOJSON + DICCIONARIO GPS FALLBACK)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
         const response = await fetch(geojsonPath);
-        if (!response.ok) return;
-        const data = await response.json();
-        
-        if (data && data.features && data.features.length > 0) {
-          const featuresLimpios = data.features.filter(f => {
-             const name = f.properties?.name || f.properties?.Name || f.properties?.Text || f.properties?.text || '';
-             return name.trim().length > 0 && f.geometry?.type === 'Point'; 
-          });
-          
-          const featureDestino = featuresLimpios.length > 0 ? featuresLimpios[0] : data.features[0];
-          let coordenadas = featureDestino.geometry.coordinates;
-          while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
-          
-          const [lng, lat] = coordenadas;
-          // Validación Geoespacial
-          const lngFinal = (lng > -60 || lng < -65) ? -63.2550 : lng; 
-          const latFinal = (lat > -15 || lat < -20) ? -17.3710 : lat; 
-          
-          if (mapRef.current) {
-            mapRef.current.getMap().flyTo({ 
-              center: [lngFinal, latFinal], 
-              zoom: 15.2, 
-              pitch: 55, 
-              speed: 1.5, 
-              essential: true 
-            });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.features && data.features.length > 0) {
+            let coordenadas = data.features[0].geometry.coordinates;
+            while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
+            const [lng, lat] = coordenadas;
+            
+            if (mapRef.current && lng && lat) {
+              mapRef.current.getMap().flyTo({ 
+                center: [lng, lat], 
+                zoom: 15.2, 
+                pitch: 50, 
+                speed: 1.5, 
+                essential: true 
+              });
+              return;
+            }
           }
         }
-      } catch (error) { console.warn("Piloto automático en espera..."); }
+        
+        // ACTIVACIÓN DE RADAR POR DICCIONARIO GPS SI NO EXISTE GEOJSON
+        const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
+        if (mapRef.current) {
+          mapRef.current.getMap().flyTo({
+            center: [target.lng, target.lat],
+            zoom: target.zoom || 15.0,
+            pitch: 50,
+            speed: 1.5,
+            essential: true
+          });
+        }
+      } catch (error) {
+        const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
+        if (mapRef.current) {
+          mapRef.current.getMap().flyTo({
+            center: [target.lng, target.lat],
+            zoom: target.zoom || 15.0,
+            pitch: 50,
+            speed: 1.5,
+            essential: true
+          });
+        }
+      }
     };
     volarAlProyecto();
-  }, [geojsonPath]);
+  }, [geojsonPath, proyectoActivo]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -175,48 +252,31 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    minzoom: 16.2, 
+  const labelLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    minzoom: 16,
+    layout: {
+      'text-field': textProperty,
+      'text-size': 11,
+      'text-anchor': 'center',
+      'text-allow-overlap': false,
+      'text-ignore-placement': false 
+    },
     paint: {
-      'circle-radius': 9, 
-      'circle-color': [
+      'text-color': '#ffffff', 
+      'text-halo-color': [
         'match', ['to-string', textProperty],
         verdes, '#22c55e', 
         rojos, '#ef4444',  
         azules, '#3b82f6', 
-        'rgba(255, 255, 255, 0.25)' 
+        'rgba(30, 41, 59, 0.8)'
       ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#020617' 
+      'text-halo-width': 4.5, 
+      'text-halo-blur': 0
     },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    filter: ['<=', ['length', ['to-string', textProperty]], 5]
   }), [verdes, rojos, azules]);
-
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 16.2, 
-    layout: {
-      'text-field': textProperty,
-      'text-size': 11,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
-      'text-anchor': 'center',
-      'text-allow-overlap': true,      
-      'text-ignore-placement': true    
-    },
-    paint: {
-      'text-color': '#ffffff' 
-    },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
-  }), []);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
@@ -307,26 +367,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...lineGlowLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
 
-            {/* RENDERIZADO DE NODOS DE PLUSVALÍA (URBAN ANCHORS) */}
+            {/* BALIZAS REGIONALES: CIUDADES Y POLOS URBANOS */}
+            {ciudadesRegionales.map((ciudad) => (
+              <Marker key={ciudad.id} longitude={ciudad.lng} latitude={ciudad.lat} anchor="center">
+                <div className="flex items-center gap-1.5 bg-[#020617]/85 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] pointer-events-none">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+                  <span className="text-[9px] font-extrabold text-cyan-200 uppercase tracking-widest">{ciudad.nombre}</span>
+                </div>
+              </Marker>
+            ))}
+
+            {/* BALIZAS LOCALES: NODOS DE PLUSVALÍA DINÁMICOS */}
             {anclasActivas.map((nodo) => (
               <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
                 <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
                   <div className="relative">
                     <div className="absolute -inset-2 bg-cyan-500/40 rounded-full blur-md group-hover:bg-cyan-400/60 group-hover:blur-xl transition-all duration-300 animate-ping"></div>
-                    <div className="relative bg-[#020617]/90 backdrop-blur-xl border border-cyan-400 p-2.5 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.7)] group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">
-                      {nodo.tipo === 'educacion' && <GraduationCap className="w-5 h-5 text-cyan-300" />}
-                      {nodo.tipo === 'recreacion' && <TreePine className="w-5 h-5 text-emerald-400" />}
-                      {nodo.tipo === 'salud' && <Hospital className="w-5 h-5 text-rose-400" />}
-                      {nodo.tipo === 'comercio' && <ShoppingBag className="w-5 h-5 text-amber-400" />}
-                      {nodo.tipo === 'landmark' && <Landmark className="w-5 h-5 text-indigo-400" />}
+                    <div className="relative bg-[#020617]/90 backdrop-blur-xl border border-cyan-400 p-2 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.7)] group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">
+                      {nodo.tipo === 'educacion' && <GraduationCap className="w-4 h-4 text-cyan-300" />}
+                      {nodo.tipo === 'recreacion' && <TreePine className="w-4 h-4 text-emerald-400" />}
+                      {nodo.tipo === 'salud' && <Hospital className="w-4 h-4 text-rose-400" />}
+                      {nodo.tipo === 'comercio' && <ShoppingBag className="w-4 h-4 text-amber-400" />}
+                      {nodo.tipo === 'landmark' && <Landmark className="w-4 h-4 text-indigo-400" />}
                     </div>
                   </div>
-                  <div className="mt-2 bg-[#020617]/95 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_10px_25px_rgba(0,0,0,0.8)] pointer-events-none">
-                    <span className="text-[10px] font-black text-cyan-50 whitespace-nowrap uppercase tracking-widest">{nodo.nombre}</span>
+                  <div className="mt-1.5 bg-[#020617]/95 backdrop-blur-md border border-slate-700 px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_10px_25px_rgba(0,0,0,0.8)] pointer-events-none">
+                    <span className="text-[9px] font-black text-cyan-50 whitespace-nowrap uppercase tracking-widest">{nodo.nombre}</span>
                   </div>
                 </div>
               </Marker>
@@ -406,9 +475,6 @@ export default function App() {
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
-  // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
-  // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
 
@@ -570,7 +636,6 @@ export default function App() {
 
     cargarDatos();
   }, [proyecto, isAuthenticated, usarAPI]); 
-
 
   useEffect(() => {
     const link = document.createElement('link');
