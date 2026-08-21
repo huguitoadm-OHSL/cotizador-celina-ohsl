@@ -102,15 +102,6 @@ const baseAnclasUrbanas = {
     { id: 'plaza-pailon', nombre: 'Plaza Principal Pailón', tipo: 'landmark', lat: -17.6543, lng: -62.7231 },
     { id: 'mercado-pailon', nombre: 'Mercado Municipal', tipo: 'comercio', lat: -17.6560, lng: -62.7250 }
   ],
-  "ROSA RODALI": [
-    { id: 'surtidor-norte', nombre: 'Estación de Servicio Biocéanica', tipo: 'comercio', lat: -17.6890, lng: -63.1210 },
-    { id: 'parque-industrial', nombre: 'Parque Industrial Latinoamericano', tipo: 'landmark', lat: -17.6700, lng: -63.1400 }
-  ],
-  "CELINA 7 FASE 3": [
-    { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
-    { id: 'mercado-satelite', nombre: 'Mercado Satélite Norte', tipo: 'comercio', lat: -17.5850, lng: -63.1510 }
-  ],
-  // Preparación para Fase 3:
   "LOS JARDINES": [
     { id: 'plaza-montero-jard', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
     { id: 'hospital-jard', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 }
@@ -118,7 +109,7 @@ const baseAnclasUrbanas = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 READY)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MOTOR HÍBRIDO PUNTOS/POLÍGONOS)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -136,7 +127,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO INTELIGENTE
+  // DRON TÁCTICO DE POSICIONAMIENTO
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -195,26 +186,23 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     }
   }, [isFullscreen]);
 
-  // CLIC TÁCTICO: Preparado para Fase 3 (Polígonos interactivos)
+  // CLIC TÁCTICO: HÍBRIDO (Puntos y Polígonos)
   const handleMapClick = useCallback((event) => {
     if (!onLoteClick) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
     
-    // Buscará colisiones de clic en las capas de relleno o etiquetas
     const features = map.queryRenderedFeatures(event.point, {
-      layers: ['lotes-fill', 'lotes-labels', 'lotes-points']
+      layers: ['lotes-fill', 'lotes-points', 'lotes-labels']
     });
 
     if (features && features.length > 0) {
       const prop = features[0].properties;
-      // Extrae la data. En Fase 3 inyectaremos UV, MZN, LOTE directamente al GeoJSON
-      const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
+      const loteTocado = prop.Lote || prop.lote || prop.name || prop.Name || prop.Text || prop.text;
       const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
       const uvTocada = prop.UV || prop.uv;
       
       if (loteTocado) {
-         // Dispara la orden al formulario izquierdo
          onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
       }
     }
@@ -242,17 +230,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
+  // RELLENO (Solo se verá si hay Polígonos, si hay Puntos los ignora y no rompe nada)
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
     paint: { 
-      // Relleno Dinámico para la Fase 3
       'fill-color': [
         'match', ['to-string', textProperty],
         verdes, 'rgba(34, 197, 94, 0.35)', 
         rojos, 'rgba(239, 68, 68, 0.35)',  
         azules, 'rgba(59, 130, 246, 0.35)', 
-        'transparent'       
+        'rgba(255, 255, 255, 0.05)'       
       ],
       'fill-opacity': 1 
     }
@@ -286,7 +274,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  // CAPA DE CÍRCULOS (RESTAURADA A V9 PERFECTA)
+  // PUNTOS (Solo se verán si hay Puntos como en Muyurina)
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
@@ -309,7 +297,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     ]
   }), [verdes, rojos, azules]);
 
-  // CAPA DE TEXTO (RESTAURADA A V9 PERFECTA)
+  // ETIQUETAS UNIVERSALES
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
@@ -319,16 +307,15 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       'text-size': 11,
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
       'text-anchor': 'center',
-      'text-allow-overlap': true,      // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
-      'text-ignore-placement': true    // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
+      'text-allow-overlap': true,
+      'text-ignore-placement': true 
     },
     paint: {
-      'text-color': '#ffffff' 
+      'text-color': '#ffffff',
+      'text-halo-color': 'rgba(2, 6, 23, 0.7)',
+      'text-halo-width': 1.5
     },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    filter: ['!=', ['to-string', textProperty], '']
   }), []);
 
   const containerClasses = isFullscreen 
@@ -403,7 +390,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
             onClick={handleMapClick}
-            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']} // Hacer clicleable el lote
+            interactiveLayerIds={['lotes-fill', 'lotes-points', 'lotes-labels']}
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
