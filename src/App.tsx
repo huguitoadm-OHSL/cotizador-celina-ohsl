@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, Tag, 
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Compass
+  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -34,7 +34,6 @@ const proyectosPorRegional = {
 // DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS (FALLBACK DRON)
 // ============================================================================
 const coordenadasProyectos = {
-  // MONTERO
   "MUYURINA": { lat: -17.3710, lng: -63.2550, zoom: 15.5 },
   "LOS JARDINES": { lat: -17.3524, lng: -63.2718, zoom: 15.5 },
   "EL RENACER": { lat: -17.3615, lng: -63.2652, zoom: 15.5 },
@@ -46,8 +45,6 @@ const coordenadasProyectos = {
   "CELINA X": { lat: -17.3325, lng: -63.2515, zoom: 15.5 },
   "RANCHO NUEVO": { lat: -17.3582, lng: -63.2482, zoom: 15.5 },
   "VILLA BELLA VIVIENDAS": { lat: -17.3382, lng: -63.2412, zoom: 15.5 },
-
-  // SATÉLITE NORTE & WARNES
   "CELINA 7 FASE 3": { lat: -17.5752, lng: -63.1425, zoom: 15.5 },
   "CELINA VII FASE 1": { lat: -17.5785, lng: -63.1455, zoom: 15.5 },
   "CELINA VII FASE 2": { lat: -17.5765, lng: -63.1435, zoom: 15.5 },
@@ -57,8 +54,6 @@ const coordenadasProyectos = {
   "PRADERAS DEL NORTE": { lat: -17.5625, lng: -63.1512, zoom: 15.5 },
   "NARANJAL III": { lat: -17.5452, lng: -63.1625, zoom: 15.5 },
   "CELINA II": { lat: -17.5815, lng: -63.1395, zoom: 15.5 },
-
-  // SANTA CRUZ, URUBÓ & ESTE
   "URUBÓ NORTE": { lat: -17.7215, lng: -63.2385, zoom: 15.2 },
   "ROSA RODALI": { lat: -17.6852, lng: -63.1252, zoom: 15.2 },
   "CELINA PAILÓN": { lat: -17.6552, lng: -62.7225, zoom: 15.2 },
@@ -114,13 +109,18 @@ const baseAnclasUrbanas = {
   "CELINA 7 FASE 3": [
     { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
     { id: 'mercado-satelite', nombre: 'Mercado Satélite Norte', tipo: 'comercio', lat: -17.5850, lng: -63.1510 }
+  ],
+  // Preparación para Fase 3:
+  "LOS JARDINES": [
+    { id: 'plaza-montero-jard', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
+    { id: 'hospital-jard', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 }
   ]
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V11)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 READY)
 // ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
+const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false); 
   const mapRef = useRef(null);
@@ -136,7 +136,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO INTELIGENTE (GEOJSON + DICCIONARIO GPS FALLBACK)
+  // PILOTO AUTOMÁTICO INTELIGENTE
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -161,7 +161,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
           }
         }
         
-        // ACTIVACIÓN DE RADAR POR DICCIONARIO GPS SI NO EXISTE GEOJSON
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
         if (mapRef.current) {
           mapRef.current.getMap().flyTo({
@@ -196,6 +195,31 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     }
   }, [isFullscreen]);
 
+  // CLIC TÁCTICO: Preparado para Fase 3 (Polígonos interactivos)
+  const handleMapClick = useCallback((event) => {
+    if (!onLoteClick) return;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    
+    // Buscará colisiones de clic en las capas de relleno o etiquetas
+    const features = map.queryRenderedFeatures(event.point, {
+      layers: ['lotes-fill', 'lotes-labels', 'lotes-points']
+    });
+
+    if (features && features.length > 0) {
+      const prop = features[0].properties;
+      // Extrae la data. En Fase 3 inyectaremos UV, MZN, LOTE directamente al GeoJSON
+      const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
+      const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
+      const uvTocada = prop.UV || prop.uv;
+      
+      if (loteTocado) {
+         // Dispara la orden al formulario izquierdo
+         onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
+      }
+    }
+  }, [onLoteClick]);
+
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
@@ -221,8 +245,18 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: { 'fill-color': 'transparent' }
-  }), []);
+    paint: { 
+      // Relleno Dinámico para la Fase 3
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.35)', 
+        rojos, 'rgba(239, 68, 68, 0.35)',  
+        azules, 'rgba(59, 130, 246, 0.35)', 
+        'transparent'       
+      ],
+      'fill-opacity': 1 
+    }
+  }), [verdes, rojos, azules]);
 
   const lineGlowLayer = useMemo(() => ({
     id: 'lotes-line-glow',
@@ -252,35 +286,54 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
 
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 16,
-    layout: {
-      'text-field': textProperty,
-      'text-size': 11,
-      'text-anchor': 'center',
-      'text-allow-overlap': false,
-      'text-ignore-placement': false 
-    },
+  // CAPA DE CÍRCULOS (RESTAURADA A V9 PERFECTA)
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    minzoom: 16.2, 
     paint: {
-      'text-color': '#ffffff', 
-      'text-halo-color': [
+      'circle-radius': 9, 
+      'circle-color': [
         'match', ['to-string', textProperty],
         verdes, '#22c55e', 
         rojos, '#ef4444',  
         azules, '#3b82f6', 
-        'rgba(30, 41, 59, 0.8)'
+        'rgba(255, 255, 255, 0.25)' 
       ],
-      'text-halo-width': 4.5, 
-      'text-halo-blur': 0
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#020617' 
     },
-    filter: ['<=', ['length', ['to-string', textProperty]], 5]
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
   }), [verdes, rojos, azules]);
 
+  // CAPA DE TEXTO (RESTAURADA A V9 PERFECTA)
+  const labelLayer = useMemo(() => ({
+    id: 'lotes-labels',
+    type: 'symbol',
+    minzoom: 16.2, 
+    layout: {
+      'text-field': textProperty,
+      'text-size': 11,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
+      'text-anchor': 'center',
+      'text-allow-overlap': true,      // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
+      'text-ignore-placement': true    // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
+    },
+    paint: {
+      'text-color': '#ffffff' 
+    },
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), []);
+
   const containerClasses = isFullscreen 
-    ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300" 
-    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500";
+    ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300 cursor-crosshair" 
+    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500 cursor-crosshair";
 
   return (
     <div className={containerClasses}>
@@ -311,7 +364,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
              <button 
                type="button"
                onClick={() => setIsFullscreen(true)} 
-               className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+               className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
                title="Pantalla Completa"
              >
                <Maximize className="w-5 h-5"/>
@@ -349,6 +402,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
+            onClick={handleMapClick}
+            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']} // Hacer clicleable el lote
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -367,6 +422,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes }) => {
               <Layer {...lineGlowLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
+              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
 
@@ -475,6 +531,9 @@ export default function App() {
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
+  // ============================================================================
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
+  // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
 
@@ -637,6 +696,7 @@ export default function App() {
     cargarDatos();
   }, [proyecto, isAuthenticated, usarAPI]); 
 
+
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
@@ -654,6 +714,13 @@ export default function App() {
   const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleLoteChange = (e) => { setLote(e.target.value); };
+
+  // FASE 3: Receptor de clics desde el mapa
+  const handleMapClickSelection = (uvTocado, mznTocada, loteTocado) => {
+    if (uvTocado) setUv(uvTocado);
+    if (mznTocada) setMzn(mznTocada);
+    if (loteTocado) setLote(loteTocado);
+  };
 
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
@@ -744,7 +811,7 @@ export default function App() {
         }
       }
     }
-  }, [uv, mzn, lote]); 
+  }, [uv, mzn, lote, lotesDelProyecto]); 
 
   const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
 
@@ -1237,6 +1304,7 @@ export default function App() {
              loteActivo={lote}
              proyectoActivo={proyecto}
              baseDeDatosLotes={baseDeDatosLotes}
+             onLoteClick={handleMapClickSelection}
            />
         </div>
 
