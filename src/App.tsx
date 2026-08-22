@@ -31,7 +31,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS (FALLBACK DRON)
+// DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS
 // ============================================================================
 const coordenadasProyectos = {
   "MUYURINA": { lat: -17.3710, lng: -63.2550, zoom: 15.5 },
@@ -110,7 +110,6 @@ const baseAnclasUrbanas = {
     { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
     { id: 'mercado-satelite', nombre: 'Mercado Satélite Norte', tipo: 'comercio', lat: -17.5850, lng: -63.1510 }
   ],
-  // Preparación para Fase 3:
   "LOS JARDINES": [
     { id: 'plaza-montero-jard', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
     { id: 'hospital-jard', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 }
@@ -118,7 +117,7 @@ const baseAnclasUrbanas = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 READY)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MASTERPLAN 360 - HD SATELLITE)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -136,7 +135,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO INTELIGENTE
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -149,39 +147,16 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             const [lng, lat] = coordenadas;
             
             if (mapRef.current && lng && lat) {
-              mapRef.current.getMap().flyTo({ 
-                center: [lng, lat], 
-                zoom: 15.2, 
-                pitch: 50, 
-                speed: 1.5, 
-                essential: true 
-              });
+              mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.2, pitch: 50, speed: 1.5, essential: true });
               return;
             }
           }
         }
-        
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) {
-          mapRef.current.getMap().flyTo({
-            center: [target.lng, target.lat],
-            zoom: target.zoom || 15.0,
-            pitch: 50,
-            speed: 1.5,
-            essential: true
-          });
-        }
+        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
       } catch (error) {
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) {
-          mapRef.current.getMap().flyTo({
-            center: [target.lng, target.lat],
-            zoom: target.zoom || 15.0,
-            pitch: 50,
-            speed: 1.5,
-            essential: true
-          });
-        }
+        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
       }
     };
     volarAlProyecto();
@@ -195,28 +170,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     }
   }, [isFullscreen]);
 
-  // CLIC TÁCTICO: Preparado para Fase 3 (Polígonos interactivos)
   const handleMapClick = useCallback((event) => {
     if (!onLoteClick) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
-    
-    // Buscará colisiones de clic en las capas de relleno o etiquetas
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: ['lotes-fill', 'lotes-labels', 'lotes-points']
-    });
-
+    const features = map.queryRenderedFeatures(event.point, { layers: ['lotes-fill', 'lotes-labels', 'lotes-points'] });
     if (features && features.length > 0) {
       const prop = features[0].properties;
-      // Extrae la data. En Fase 3 inyectaremos UV, MZN, LOTE directamente al GeoJSON
       const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
       const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
       const uvTocada = prop.UV || prop.uv;
-      
-      if (loteTocado) {
-         // Dispara la orden al formulario izquierdo
-         onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
-      }
+      if (loteTocado && loteTocado !== 'FONDO') onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
     }
   }, [onLoteClick]);
 
@@ -227,17 +191,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       const raw = String(l.lote).trim();
       const num = String(parseInt(raw, 10) || raw);
       const variaciones = [raw, num, `${num} `, ` ${num}`, `0${num}`, `LOTE ${num}`];
-      
       const est = String(l.estado).toUpperCase();
       if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variaciones);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variaciones);
       else if (est === 'VENDIDO') a.push(...variaciones);
     });
-    return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
-    };
+    return { verdes: v.length > 0 ? v : ['__NONE__'], rojos: r.length > 0 ? r : ['__NONE__'], azules: a.length > 0 ? a : ['__NONE__'] };
   }, [baseDeDatosLotes, proyectoActivo]);
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
@@ -245,71 +204,63 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: { 
-      // Relleno Dinámico para la Fase 3
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.35)', 
-        rojos, 'rgba(239, 68, 68, 0.35)',  
-        azules, 'rgba(59, 130, 246, 0.35)', 
-        'transparent'       
-      ],
-      'fill-opacity': 1 
-    }
-  }), [verdes, rojos, azules]);
+    paint: { 'fill-color': 'transparent', 'fill-opacity': 1 }
+  }), []);
 
   const lineGlowLayer = useMemo(() => ({
     id: 'lotes-line-glow',
     type: 'line',
-    paint: { 
-      'line-color': '#00e5ff', 
-      'line-width': 8,      
-      'line-opacity': 0.35,
-      'line-blur': 4      
-    }
+    paint: { 'line-color': '#00e5ff', 'line-width': 6, 'line-opacity': 0.2, 'line-blur': 4 }
   }), []);
 
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 
-      'line-color': '#00e5ff', 
-      'line-width': 1.5,      
+      'line-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', 
+        rojos, '#ef4444',  
+        azules, '#3b82f6', 
+        '#00e5ff'          
+      ],
+      'line-width': 1.5, 
       'line-opacity': 0.9      
     }
-  }), []);
+  }), [verdes, rojos, azules, textProperty]);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo]);
+  }), [loteActivo, textProperty]);
 
-  // CAPA DE CÍRCULOS (RESTAURADA A V9 PERFECTA)
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
-    minzoom: 16.2, 
     paint: {
-      'circle-radius': 9, 
+      'circle-radius': 7, 
       'circle-color': [
         'match', ['to-string', textProperty],
         verdes, '#22c55e', 
         rojos, '#ef4444',  
         azules, '#3b82f6', 
-        'rgba(255, 255, 255, 0.25)' 
+        'rgba(255, 255, 255, 0)' 
       ],
-      'circle-stroke-width': 1.5,
+      'circle-stroke-width': [
+        'match', ['to-string', textProperty],
+        verdes, 2, rojos, 2, azules, 2, 0 
+      ],
       'circle-stroke-color': '#020617' 
     },
     filter: ['all',
       ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
     ]
-  }), [verdes, rojos, azules]);
+  }), [verdes, rojos, azules, textProperty]);
 
-  // CAPA DE TEXTO (RESTAURADA A V9 PERFECTA)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
@@ -319,17 +270,16 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       'text-size': 11,
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
       'text-anchor': 'center',
-      'text-allow-overlap': true,      // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
-      'text-ignore-placement': true    // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
+      'text-allow-overlap': true,      
+      'text-ignore-placement': true    
     },
-    paint: {
-      'text-color': '#ffffff' 
-    },
+    paint: { 'text-color': '#ffffff' },
     filter: ['all',
       ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
     ]
-  }), []);
+  }), [textProperty]);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300 cursor-crosshair" 
@@ -403,17 +353,18 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
             onClick={handleMapClick}
-            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']} // Hacer clicleable el lote
+            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']}
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
+            {/* SERVIDOR SATELITAL DE GOOGLE EN ALTA DEFINICIÓN */}
+            <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20}>
               <Layer id="satellite-layer" type="raster" paint={{ 
-                'raster-opacity': 0.85,
-                'raster-brightness-max': 0.6,
-                'raster-saturation': -0.3
+                'raster-opacity': 1.0,
+                'raster-brightness-max': 1.0,
+                'raster-saturation': 0.1
               }} />
             </Source>
 
@@ -426,7 +377,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               <Layer {...labelLayer as any} />
             </Source>
 
-            {/* BALIZAS REGIONALES: CIUDADES Y POLOS URBANOS */}
+            {/* BALIZAS REGIONALES */}
             {ciudadesRegionales.map((ciudad) => (
               <Marker key={ciudad.id} longitude={ciudad.lng} latitude={ciudad.lat} anchor="center">
                 <div className="flex items-center gap-1.5 bg-[#020617]/85 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] pointer-events-none">
@@ -436,7 +387,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               </Marker>
             ))}
 
-            {/* BALIZAS LOCALES: NODOS DE PLUSVALÍA DINÁMICOS */}
+            {/* BALIZAS LOCALES */}
             {anclasActivas.map((nodo) => (
               <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
                 <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
@@ -696,7 +647,6 @@ export default function App() {
     cargarDatos();
   }, [proyecto, isAuthenticated, usarAPI]); 
 
-
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
@@ -715,7 +665,6 @@ export default function App() {
   const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleLoteChange = (e) => { setLote(e.target.value); };
 
-  // FASE 3: Receptor de clics desde el mapa
   const handleMapClickSelection = (uvTocado, mznTocada, loteTocado) => {
     if (uvTocado) setUv(uvTocado);
     if (mznTocada) setMzn(mznTocada);
@@ -849,19 +798,6 @@ export default function App() {
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
     const TC_FLEX_NUMBER = Number(tcFlexible) || 11.50;
 
-    let beneficio_muyurina = 0;
-    if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
-       let porcentaje_comparacion = pct_efectivo;
-       if(modoInicial === 'porcentaje') {
-          porcentaje_comparacion = Number(inicialPorcentaje) || 0;
-       } else {
-          porcentaje_comparacion = (Number(inicialMonto) / valor_original) * 100;
-       }
-       if (Math.abs(porcentaje_comparacion - 1.5) < 0.1) {
-           beneficio_muyurina = sup * 1; 
-       }
-    }
-
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
         const descContadoPct = aplicarDescContadoPct ? ((Number(descuentoContado) || 0) / 100) : 0; 
@@ -885,7 +821,8 @@ export default function App() {
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
-        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal + beneficio_muyurina;
+        // El ahorro total ahora es estrictamente matemático en base a los toggles manuales
+        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
         valor_final = valor_original - ahorro_total; 
 
         const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
