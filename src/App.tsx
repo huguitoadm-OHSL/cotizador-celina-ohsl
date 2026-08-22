@@ -31,7 +31,7 @@ const proyectosPorRegional = {
 };
 
 // ============================================================================
-// DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS
+// DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS (FALLBACK DRON)
 // ============================================================================
 const coordenadasProyectos = {
   "MUYURINA": { lat: -17.3710, lng: -63.2550, zoom: 15.5 },
@@ -110,6 +110,7 @@ const baseAnclasUrbanas = {
     { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
     { id: 'mercado-satelite', nombre: 'Mercado Satélite Norte', tipo: 'comercio', lat: -17.5850, lng: -63.1510 }
   ],
+  // Preparación para Fase 3:
   "LOS JARDINES": [
     { id: 'plaza-montero-jard', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
     { id: 'hospital-jard', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 }
@@ -117,7 +118,7 @@ const baseAnclasUrbanas = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 REAL)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 READY)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -194,24 +195,26 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     }
   }, [isFullscreen]);
 
-  // CLIC TÁCTICO
+  // CLIC TÁCTICO: Preparado para Fase 3 (Polígonos interactivos)
   const handleMapClick = useCallback((event) => {
     if (!onLoteClick) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
     
-    // Captura clics en las esferas, textos o el relleno
+    // Buscará colisiones de clic en las capas de relleno o etiquetas
     const features = map.queryRenderedFeatures(event.point, {
-      layers: ['lotes-fill', 'lotes-labels', 'lotes-spheres', 'lotes-line']
+      layers: ['lotes-fill', 'lotes-labels', 'lotes-points']
     });
 
     if (features && features.length > 0) {
       const prop = features[0].properties;
+      // Extrae la data. En Fase 3 inyectaremos UV, MZN, LOTE directamente al GeoJSON
       const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
       const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
       const uvTocada = prop.UV || prop.uv;
       
       if (loteTocado) {
+         // Dispara la orden al formulario izquierdo
          onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
       }
     }
@@ -239,108 +242,94 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
-  // ============================================================================
-  // FASE 3: LÓGICA VISUAL MASTERPLAN 360 (LIMPIEZA DE AUTOCAD + ESFERAS 3D)
-  // ============================================================================
-
-  // 1. Capa invisible para permitir clics dentro del terreno
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: { 'fill-color': 'rgba(255, 255, 255, 0.01)' },
-    filter: ['!=', ['to-string', textProperty], '']
-  }), [textProperty]);
-
-  // 2. Tinte sutil (15% de opacidad) solo para los lotes en venta, el resto transparente
-  const fillGlowLayer = useMemo(() => ({
-    id: 'lotes-fill-glow',
-    type: 'fill',
     paint: { 
+      // Relleno Dinámico para la Fase 3
       'fill-color': [
         'match', ['to-string', textProperty],
-        verdes, 'rgba(0, 255, 0, 0.15)', // Verde sutil
-        rojos, 'rgba(255, 0, 0, 0.15)',  // Rojo sutil
-        azules, 'rgba(0, 136, 255, 0.15)', // Azul sutil
-        'transparent' // Oculta relleno de basura o áreas comunes
-      ]
-    },
-    filter: ['!=', ['to-string', textProperty], '']
-  }), [verdes, rojos, azules, textProperty]);
+        verdes, 'rgba(34, 197, 94, 0.35)', 
+        rojos, 'rgba(239, 68, 68, 0.35)',  
+        azules, 'rgba(59, 130, 246, 0.35)', 
+        'transparent'       
+      ],
+      'fill-opacity': 1 
+    }
+  }), [verdes, rojos, azules]);
 
-  // 3. Bordes de Neón precisos (solo 2.5px de grosor)
+  const lineGlowLayer = useMemo(() => ({
+    id: 'lotes-line-glow',
+    type: 'line',
+    paint: { 
+      'line-color': '#00e5ff', 
+      'line-width': 8,      
+      'line-opacity': 0.35,
+      'line-blur': 4      
+    }
+  }), []);
+
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 
-      'line-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#00FF00', 
-        rojos, '#FF0000',  
-        azules, '#0088FF', 
-        'rgba(0, 229, 255, 0.3)' // Cyan apagado para calles/áreas verdes
-      ],
-      'line-width': 2.5, 
+      'line-color': '#00e5ff', 
+      'line-width': 1.5,      
       'line-opacity': 0.9      
-    },
-    filter: ['!=', ['to-string', textProperty], '']
-  }), [verdes, rojos, azules, textProperty]);
+    }
+  }), []);
 
-  // 4. Highlight al hacer clic en un lote
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
     paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo, textProperty]);
+  }), [loteActivo]);
 
-  // 5. LA ESFERA 3D (HACK DE CENTROIDE): Fuerza a la bolita a estar en el centro del polígono
-  const sphereLayer = useMemo(() => ({
-    id: 'lotes-spheres',
-    type: 'symbol', // Usamos Symbol en lugar de Circle para forzar el centroide
-    minzoom: 15.5,
-    layout: {
-      'text-field': '●', // Carácter esférico
-      'text-size': 28,
-      'text-anchor': 'center',
-      'text-allow-overlap': true,
-      'text-ignore-placement': true
-    },
+  // CAPA DE CÍRCULOS (RESTAURADA A V9 PERFECTA)
+  const pointLayer = useMemo(() => ({
+    id: 'lotes-points',
+    type: 'circle',
+    minzoom: 16.2, 
     paint: {
-      'text-color': [
+      'circle-radius': 9, 
+      'circle-color': [
         'match', ['to-string', textProperty],
-        verdes, '#00FF00', 
-        rojos, '#FF0000',  
-        azules, '#0088FF', 
-        'rgba(255, 255, 255, 0.3)' // Bolita semi-transparente para áreas comunes
+        verdes, '#22c55e', 
+        rojos, '#ef4444',  
+        azules, '#3b82f6', 
+        'rgba(255, 255, 255, 0.25)' 
       ],
-      'text-halo-color': '#020617', // Sombra oscura para efecto 3D
-      'text-halo-width': 1.5
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#020617' 
     },
-    filter: ['!=', ['to-string', textProperty], '']
-  }), [verdes, rojos, azules, textProperty]);
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), [verdes, rojos, azules]);
 
-  // 6. El Número del Lote (Se sobrepone exacto encima de la esfera)
+  // CAPA DE TEXTO (RESTAURADA A V9 PERFECTA)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 15.5, 
+    minzoom: 16.2, 
     layout: {
       'text-field': textProperty,
-      'text-size': 10,
+      'text-size': 11,
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
       'text-anchor': 'center',
-      'text-allow-overlap': true,      
-      'text-ignore-placement': true    
+      'text-allow-overlap': true,      // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
+      'text-ignore-placement': true    // MOTOR DE COLISIÓN APAGADO: NUNCA DESAPARECEN
     },
     paint: {
       'text-color': '#ffffff' 
     },
-    filter: ['!=', ['to-string', textProperty], '']
-  }), [textProperty]);
-
-  // ============================================================================
-  // FIN DE LA INYECCIÓN MASTERPLAN 360
-  // ============================================================================
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
+  }), []);
 
   const containerClasses = isFullscreen 
     ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300 cursor-crosshair" 
@@ -414,7 +403,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
             onClick={handleMapClick}
-            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-spheres', 'lotes-line']}
+            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']} // Hacer clicleable el lote
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -430,10 +419,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
 
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer as any} />
-              <Layer {...fillGlowLayer as any} />
+              <Layer {...lineGlowLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              <Layer {...sphereLayer as any} />
+              <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
 
@@ -726,6 +715,7 @@ export default function App() {
   const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
   const handleLoteChange = (e) => { setLote(e.target.value); };
 
+  // FASE 3: Receptor de clics desde el mapa
   const handleMapClickSelection = (uvTocado, mznTocada, loteTocado) => {
     if (uvTocado) setUv(uvTocado);
     if (mznTocada) setMzn(mznTocada);
