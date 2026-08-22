@@ -117,7 +117,7 @@ const baseAnclasUrbanas = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MASTERPLAN 360 - OPACIDAD CUÁNTICA)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MASTERPLAN 360 ULTRA-ESTABLE)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -135,7 +135,6 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // Vuelo Cinemático en 3D (Pitch 60 para ver las extrusiones)
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -148,16 +147,16 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             const [lng, lat] = coordenadas;
             
             if (mapRef.current && lng && lat) {
-              mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.5, pitch: 60, bearing: -15, speed: 1.2, essential: true });
+              mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.5, pitch: 45, bearing: -15, speed: 1.2, essential: true });
               return;
             }
           }
         }
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.5, pitch: 60, bearing: -15, speed: 1.2, essential: true });
+        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.5, pitch: 45, bearing: -15, speed: 1.2, essential: true });
       } catch (error) {
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.5, pitch: 60, bearing: -15, speed: 1.2, essential: true });
+        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.5, pitch: 45, bearing: -15, speed: 1.2, essential: true });
       }
     };
     volarAlProyecto();
@@ -175,17 +174,16 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     if (!onLoteClick) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
-    const features = map.queryRenderedFeatures(event.point, { layers: ['lotes-3d-blocks', 'lotes-labels', 'lotes-points'] });
+    const features = map.queryRenderedFeatures(event.point, { layers: ['lotes-fill', 'lotes-labels', 'lotes-points'] });
     if (features && features.length > 0) {
       const prop = features[0].properties;
       const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
       const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
       const uvTocada = prop.UV || prop.uv;
-      if (loteTocado) onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
+      if (loteTocado && loteTocado !== 'FONDO') onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
     }
   }, [onLoteClick]);
 
-  // Lógica de Matching Robusta
   const { verdes, rojos, azules } = useMemo(() => {
     let v = []; let r = []; let a = [];
     const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
@@ -198,120 +196,113 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variaciones);
       else if (est === 'VENDIDO') a.push(...variaciones);
     });
-    return { verdes, rojos, azules };
+    return { 
+      verdes: v.length > 0 ? v : ['__NONE__'], 
+      rojos: r.length > 0 ? r : ['__NONE__'], 
+      azules: a.length > 0 ? a : ['__NONE__'] 
+    };
   }, [baseDeDatosLotes, proyectoActivo]);
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
-  // ============================================================================
-  // FASE 3: ESTÉTICA MASTERPLAN 360 (EFECTO CRISTAL 3D + FILTRO INTELIGENTE)
-  // ============================================================================
-
-  // Variables Matemáticas para Mapbox: Garantiza que nunca falle un array vacío
   const matchColors = useMemo(() => [
     'match', ['to-string', textProperty],
-    verdes.length > 0 ? verdes : ['__EMPTY__'], '#4ade80', // Verde Neón (Disponible)
-    rojos.length > 0 ? rojos : ['__EMPTY__'], '#f87171',   // Rojo Neón (Bloqueado)
-    azules.length > 0 ? azules : ['__EMPTY__'], '#60a5fa', // Azul Neón (Vendido)
-    '#ffffff' // Fallback (No debería usarse gracias al filtro de opacidad)
+    verdes, '#4ade80', // Verde Neón
+    rojos, '#f87171',  // Rojo Neón
+    azules, '#60a5fa', // Azul Neón
+    '#00e5ff'          // Default Cyan
   ], [verdes, rojos, azules, textProperty]);
 
-  const matchOpacity = useMemo(() => [
-    'match', ['to-string', textProperty],
-    verdes.length > 0 ? verdes : ['__EMPTY__'], 1,
-    rojos.length > 0 ? rojos : ['__EMPTY__'], 1,
-    azules.length > 0 ? azules : ['__EMPTY__'], 1,
-    0 // MAGIA: Si AutoCAD mandó basura ("FONDO", números fantasma), la opacidad es CERO. Desaparece.
-  ], [verdes, rojos, azules, textProperty]);
+  // CAPA 1: RELLENO TRANSPARENTE PARA CLICS (Excluye basura)
+  const fillLayer = useMemo(() => ({
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: { 'fill-color': 'transparent', 'fill-opacity': 1 },
+    filter: ['all',
+      ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']],
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
+    ]
+  }), [textProperty]);
 
-  const matchExtrusionOpacity = useMemo(() => [
-    'match', ['to-string', textProperty],
-    verdes.length > 0 ? verdes : ['__EMPTY__'], 0.6,
-    rojos.length > 0 ? rojos : ['__EMPTY__'], 0.6,
-    azules.length > 0 ? azules : ['__EMPTY__'], 0.6,
-    0 // Los polígonos basura no se levantan en 3D
-  ], [verdes, rojos, azules, textProperty]);
-
-  const matchHeights = useMemo(() => [
-    'match', ['to-string', textProperty],
-    verdes.length > 0 ? verdes : ['__EMPTY__'], 6, // Disponibles se alzan 6 metros
-    rojos.length > 0 ? rojos : ['__EMPTY__'], 2,   // Bloqueados 2 metros
-    azules.length > 0 ? azules : ['__EMPTY__'], 2, // Vendidos 2 metros
-    0
-  ], [verdes, rojos, azules, textProperty]);
-
-  // 1. CAPA BASE DE CONTEXTO (Muestra las rayas originales muy finitas para dar contexto)
-  const blueprintLayer = useMemo(() => ({
-    id: 'lotes-blueprint',
-    type: 'line',
-    paint: { 'line-color': '#06b6d4', 'line-width': 1, 'line-opacity': 0.15 }
-  }), []);
-
-  // 2. BLOQUES CRISTAL 3D (El corazón del Masterplan)
-  const extrusionLayer = useMemo(() => ({
-    id: 'lotes-3d-blocks',
-    type: 'fill-extrusion',
-    paint: {
-      'fill-extrusion-color': matchColors,
-      'fill-extrusion-height': matchHeights,
-      'fill-extrusion-base': 0,
-      'fill-extrusion-opacity': matchExtrusionOpacity
-    },
-    filter: ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']]
-  }), [matchColors, matchHeights, matchExtrusionOpacity]);
-
-  // 3. BORDES NEÓN (Marcan el perímetro del lote en colores vivos)
-  const activeLineLayer = useMemo(() => ({
-    id: 'lotes-active-borders',
+  // CAPA 2: GLOW EFFECT (Borde ancho difuminado)
+  const lineGlowLayer = useMemo(() => ({
+    id: 'lotes-line-glow',
     type: 'line',
     paint: {
       'line-color': matchColors,
-      'line-width': 2.5,
-      'line-opacity': matchOpacity
+      'line-width': 6,
+      'line-opacity': 0.25,
+      'line-blur': 4
     },
-    filter: ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'LineString']]
-  }), [matchColors, matchOpacity]);
+    filter: ['all',
+      ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon'], ['==', ['geometry-type'], 'LineString']],
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
+    ]
+  }), [matchColors, textProperty]);
 
-  // 4. ESFERAS FLOTANTES DE ESTADO
+  // CAPA 3: BORDE CRISP
+  const lineLayer = useMemo(() => ({
+    id: 'lotes-line',
+    type: 'line',
+    paint: {
+      'line-color': matchColors,
+      'line-width': 2,
+      'line-opacity': 0.9
+    },
+    filter: ['all',
+      ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon'], ['==', ['geometry-type'], 'LineString']],
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
+    ]
+  }), [matchColors, textProperty]);
+
+  // CAPA 4: ESFERA FLOTANTE
   const pointLayer = useMemo(() => ({
     id: 'lotes-points',
     type: 'circle',
     paint: {
-      'circle-radius': 7, 
+      'circle-radius': 6,
       'circle-color': matchColors,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#020617',
-      'circle-opacity': matchOpacity,
-      'circle-stroke-opacity': matchOpacity
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#020617'
     },
-    filter: ['==', ['geometry-type'], 'Point']
-  }), [matchColors, matchOpacity]);
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
+    ]
+  }), [matchColors, textProperty]);
 
-  // 5. ETIQUETAS LIMPIAS (Solo se muestran si son lotes reales)
+  // CAPA 5: ETIQUETAS
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.5, 
+    minzoom: 16.5,
     layout: {
       'text-field': textProperty,
-      'text-size': 12,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
+      'text-size': 11,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
       'text-anchor': 'bottom',
       'text-offset': [0, -1]
     },
-    paint: { 
+    paint: {
       'text-color': '#ffffff',
       'text-halo-color': '#020617',
-      'text-halo-width': 1.5,
-      'text-opacity': matchOpacity
+      'text-halo-width': 1.5
     },
-    filter: ['==', ['geometry-type'], 'Point']
-  }), [textProperty, matchOpacity]);
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], ''],
+      ['!=', ['to-string', textProperty], 'FONDO']
+    ]
+  }), [textProperty]);
 
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 6, 'line-opacity': 1 },
+    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo, textProperty]);
 
@@ -387,7 +378,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
             onClick={handleMapClick}
-            interactiveLayerIds={['lotes-3d-blocks', 'lotes-labels', 'lotes-points']}
+            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']}
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -403,11 +394,11 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               }} />
             </Source>
 
-            {/* APLICACIÓN DE CAPAS ESTILO MASTERPLAN 360 */}
+            {/* APLICACIÓN DE CAPAS ESTILO MASTERPLAN 360 LIGERAS Y SEGURAS */}
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...blueprintLayer as any} />
-              <Layer {...extrusionLayer as any} />
-              <Layer {...activeLineLayer as any} />
+              <Layer {...fillLayer as any} />
+              <Layer {...lineGlowLayer as any} />
+              <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
               <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
@@ -858,7 +849,6 @@ export default function App() {
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
-        // AHORRO ESTRICTO A BASE DE TOGGLES MANUALES (EXTIRPADO EL $1 AUTOMÁTICO)
         ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal;
         valor_final = valor_original - ahorro_total; 
 
