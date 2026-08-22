@@ -117,7 +117,7 @@ const baseAnclasUrbanas = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 READY)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 REAL)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -200,8 +200,9 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     const map = mapRef.current?.getMap();
     if (!map) return;
     
+    // Captura clics en las esferas, textos o el relleno
     const features = map.queryRenderedFeatures(event.point, {
-      layers: ['lotes-fill', 'lotes-labels', 'lotes-points', 'lotes-line']
+      layers: ['lotes-fill', 'lotes-labels', 'lotes-spheres', 'lotes-line']
     });
 
     if (features && features.length > 0) {
@@ -239,58 +240,52 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
 
   // ============================================================================
-  // FASE 3: LÓGICA VISUAL MASTERPLAN 360 (INYECCIÓN PURA)
+  // FASE 3: LÓGICA VISUAL MASTERPLAN 360 (LIMPIEZA DE AUTOCAD + ESFERAS 3D)
   // ============================================================================
 
+  // 1. Capa invisible para permitir clics dentro del terreno
   const fillLayer = useMemo(() => ({
     id: 'lotes-fill',
     type: 'fill',
-    paint: { 
-      'fill-color': 'transparent', // Relleno invisible para ver el satélite
-      'fill-opacity': 1 
-    },
-    // FILTRO DE BASURA: Solo muestra polígonos que tengan un número de lote
-    filter: ['all',
-      ['==', ['geometry-type'], 'Polygon'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    paint: { 'fill-color': 'rgba(255, 255, 255, 0.01)' },
+    filter: ['!=', ['to-string', textProperty], '']
   }), [textProperty]);
 
-  const lineGlowLayer = useMemo(() => ({
-    id: 'lotes-line-glow',
-    type: 'line',
+  // 2. Tinte sutil (15% de opacidad) solo para los lotes en venta, el resto transparente
+  const fillGlowLayer = useMemo(() => ({
+    id: 'lotes-fill-glow',
+    type: 'fill',
     paint: { 
-      'line-color': '#00e5ff', 
-      'line-width': 8,      
-      'line-opacity': 0.15,
-      'line-blur': 4      
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(0, 255, 0, 0.15)', // Verde sutil
+        rojos, 'rgba(255, 0, 0, 0.15)',  // Rojo sutil
+        azules, 'rgba(0, 136, 255, 0.15)', // Azul sutil
+        'transparent' // Oculta relleno de basura o áreas comunes
+      ]
     },
-    filter: ['all',
-      ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'LineString']],
-      ['!=', ['to-string', textProperty], '']
-    ]
-  }), [textProperty]);
+    filter: ['!=', ['to-string', textProperty], '']
+  }), [verdes, rojos, azules, textProperty]);
 
+  // 3. Bordes de Neón precisos (solo 2.5px de grosor)
   const lineLayer = useMemo(() => ({
     id: 'lotes-line',
     type: 'line',
     paint: { 
       'line-color': [
         'match', ['to-string', textProperty],
-        verdes, '#22c55e', 
-        rojos, '#ef4444',  
-        azules, '#3b82f6', 
-        '#00e5ff'          
+        verdes, '#00FF00', 
+        rojos, '#FF0000',  
+        azules, '#0088FF', 
+        'rgba(0, 229, 255, 0.3)' // Cyan apagado para calles/áreas verdes
       ],
       'line-width': 2.5, 
       'line-opacity': 0.9      
     },
-    filter: ['all',
-      ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'LineString']],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    filter: ['!=', ['to-string', textProperty], '']
   }), [verdes, rojos, azules, textProperty]);
 
+  // 4. Highlight al hacer clic en un lote
   const highlightLayer = useMemo(() => ({
     id: 'lotes-highlight',
     type: 'line',
@@ -298,34 +293,40 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo, textProperty]);
 
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    paint: {
-      'circle-radius': 6, 
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#22c55e', 
-        rojos, '#ef4444',  
-        azules, '#3b82f6', 
-        'rgba(255, 255, 255, 0.9)' 
-      ],
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#020617' 
+  // 5. LA ESFERA 3D (HACK DE CENTROIDE): Fuerza a la bolita a estar en el centro del polígono
+  const sphereLayer = useMemo(() => ({
+    id: 'lotes-spheres',
+    type: 'symbol', // Usamos Symbol en lugar de Circle para forzar el centroide
+    minzoom: 15.5,
+    layout: {
+      'text-field': '●', // Carácter esférico
+      'text-size': 28,
+      'text-anchor': 'center',
+      'text-allow-overlap': true,
+      'text-ignore-placement': true
     },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    paint: {
+      'text-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#00FF00', 
+        rojos, '#FF0000',  
+        azules, '#0088FF', 
+        'rgba(255, 255, 255, 0.3)' // Bolita semi-transparente para áreas comunes
+      ],
+      'text-halo-color': '#020617', // Sombra oscura para efecto 3D
+      'text-halo-width': 1.5
+    },
+    filter: ['!=', ['to-string', textProperty], '']
   }), [verdes, rojos, azules, textProperty]);
 
+  // 6. El Número del Lote (Se sobrepone exacto encima de la esfera)
   const labelLayer = useMemo(() => ({
     id: 'lotes-labels',
     type: 'symbol',
-    minzoom: 16.2, 
+    minzoom: 15.5, 
     layout: {
       'text-field': textProperty,
-      'text-size': 11,
+      'text-size': 10,
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
       'text-anchor': 'center',
       'text-allow-overlap': true,      
@@ -334,10 +335,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     paint: {
       'text-color': '#ffffff' 
     },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    filter: ['!=', ['to-string', textProperty], '']
   }), [textProperty]);
 
   // ============================================================================
@@ -416,7 +414,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             maxZoom={20} 
             onLoad={() => setIsMapReady(true)}
             onClick={handleMapClick}
-            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points', 'lotes-line']}
+            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-spheres', 'lotes-line']}
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
@@ -432,10 +430,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
 
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer as any} />
-              <Layer {...lineGlowLayer as any} />
+              <Layer {...fillGlowLayer as any} />
               <Layer {...lineLayer as any} />
               <Layer {...highlightLayer as any} />
-              <Layer {...pointLayer as any} />
+              <Layer {...sphereLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
 
