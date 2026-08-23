@@ -118,7 +118,7 @@ const baseAnclasUrbanas = {
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (CYBERTECH V12 - FASE 3 READY)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MASTERPLAN 360 - HD SATELLITE)
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -409,11 +409,12 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
-            <Source id="satellite-source" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']} tileSize={256} maxzoom={17}>
+            {/* SERVIDOR SATELITAL DE GOOGLE EN ALTA DEFINICIÓN */}
+            <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20}>
               <Layer id="satellite-layer" type="raster" paint={{ 
-                'raster-opacity': 0.85,
-                'raster-brightness-max': 0.6,
-                'raster-saturation': -0.3
+                'raster-opacity': 1.0,
+                'raster-brightness-max': 1.0,
+                'raster-saturation': 0.1
               }} />
             </Source>
 
@@ -849,19 +850,6 @@ export default function App() {
     let ahorro_contra_mercado = 0, costo_esperar_octubre = 0, descPctOct = 0;
     const TC_FLEX_NUMBER = Number(tcFlexible) || 11.50;
 
-    let beneficio_muyurina = 0;
-    if (nombreProyectoFinal.toUpperCase().includes('MUYURINA')) {
-       let porcentaje_comparacion = pct_efectivo;
-       if(modoInicial === 'porcentaje') {
-          porcentaje_comparacion = Number(inicialPorcentaje) || 0;
-       } else {
-          porcentaje_comparacion = (Number(inicialMonto) / valor_original) * 100;
-       }
-       if (Math.abs(porcentaje_comparacion - 1.5) < 0.1) {
-           beneficio_muyurina = sup * 1; 
-       }
-    }
-
     if (tipoCotizacion === 'contado') {
         const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
         const descContadoPct = aplicarDescContadoPct ? ((Number(descuentoContado) || 0) / 100) : 0; 
@@ -884,8 +872,9 @@ export default function App() {
         let monto_descuento_m2 = sup * descM2Val;
         const valor_post_desc_m2 = valor_original - monto_descuento_m2;
         const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
-        
-        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal + beneficio_muyurina;
+
+        // El ahorro total ahora es estrictamente matemático en base a los toggles manuales
+        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal; 
         valor_final = valor_original - ahorro_total; 
 
         const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
