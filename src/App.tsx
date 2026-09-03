@@ -5,7 +5,7 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer
+  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer, Equals
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -321,7 +321,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.32); // ACTUALIZACIÓN: TC BASE ANCLADO
+  const [tcFlexible, setTcFlexible] = useState(12.32); // ACTUALIZACIÓN: TC BASE ANCLADO SEGÚN IMAGEN
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
@@ -330,10 +330,10 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoM2, setDescuentoM2] = useState(1); // ACTUALIZACIÓN: Default paramétrico Crédito
-  const [aplicarDescM2, setAplicarDescM2] = useState(true); // ACTUALIZACIÓN: Default activo Crédito
+  const [descuentoM2, setDescuentoM2] = useState(1); 
+  const [aplicarDescM2, setAplicarDescM2] = useState(true); 
   
-  // NUEVO ESTADO: Segmentación Liquidación
+  // ESTADO: Segmentación Liquidación
   const [plazoLiquidacion, setPlazoLiquidacion] = useState("30"); 
 
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
@@ -605,7 +605,7 @@ export default function App() {
   const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 4000); };
 
   // ============================================================================
-  // MOTOR DE CÁLCULO REFACTORIZADO (SEPTIEMBRE 2026 - MATRIZ DE DESCUENTOS)
+  // MOTOR DE CÁLCULO REFACTORIZADO (SEPTIEMBRE 2026 - DEMOSTRADOR MATEMÁTICO)
   // ============================================================================
   const calcular = () => {
     const sup = Number(superficie) || 0; 
@@ -623,9 +623,12 @@ export default function App() {
     
     let tcEfectivoAplicado = TC_FLEX_NUMBER;
     let descPctMapeo = 0;
+    
+    // Variables para el demostrador (Option A y Option B)
+    let totalBs_OpcionA = 0;
+    let totalBs_OpcionB = 0;
 
     if (tipoCotizacion === 'contado') {
-        // MATRIZ CONTADO-LIQUIDACION
         if (plazoLiquidacion === '30') descPctMapeo = 0.30;
         else if (plazoLiquidacion === '60') descPctMapeo = 0.20;
         else if (plazoLiquidacion === '90') descPctMapeo = 0.10;
@@ -633,15 +636,20 @@ export default function App() {
         ahorro_total = valor_original * descPctMapeo;
         valor_final = valor_original - ahorro_total;
         tcEfectivoAplicado = TC_FLEX_NUMBER * (1 - descPctMapeo);
+
+        // DEMOSTRACIÓN A: Descuento sobre Precio de Lista
+        totalBs_OpcionA = valor_final * TC_FLEX_NUMBER;
+
+        // DEMOSTRACIÓN B: Descuento sobre Tipo de Cambio
+        totalBs_OpcionB = valor_original * tcEfectivoAplicado;
         
     } else {
-        // MATRIZ CRÉDITO
         const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 1) : 0;
         let monto_descuento_m2 = sup * descM2Val;
         
         ahorro_total = monto_descuento_m2; 
         valor_final = valor_original - ahorro_total; 
-        const base_para_inicial = valor_final; // Base post descuento m2
+        const base_para_inicial = valor_final;
 
         if (modoInicial === 'porcentaje') {
            pct_efectivo = Number(inicialPorcentaje) || 0;
@@ -663,7 +671,6 @@ export default function App() {
         seguro = saldo * factorSeguro;
         cuota_final = pago_puro + seguro + cbdi;
 
-        // INFERENCIA DETERMINISTA: Inicio de pagos diferido (Octubre 2026)
         const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         let mesInicioIndex = 9; 
         let añoInicio = 2026; 
@@ -696,7 +703,10 @@ export default function App() {
       plazo: ans, 
       planPagosDetallado: planPagosDetallado,
       descPctAplicado: descPctMapeo,
+      tcOriginal: TC_FLEX_NUMBER,
       tcEfectivo: tcEfectivoAplicado,
+      totalBsA: formatMoney(totalBs_OpcionA),
+      totalBsB: formatMoney(totalBs_OpcionB),
       plazoLiquidacionVisual: plazoLiquidacion === '30' ? '30 Días' : plazoLiquidacion === '60' ? '60 Días' : '90 Días',
       descuentoM2Aplicado: tipoCotizacion === 'credito' && aplicarDescM2 ? descuentoM2 : 0,
       timestampId: new Date().getTime()
@@ -731,7 +741,7 @@ export default function App() {
         contentStr += `⏱️ *Plazo de Pago:* Hasta ${resultado.plazoLiquidacionVisual}\n`;
         contentStr += `🔥 *Descuento Aplicado:* ${resultado.descPctAplicado * 100}%\n`;
         contentStr += `💵 *T.C. Efectivo Equivalente:* Bs. ${resultado.tcEfectivo.toFixed(3)}\n`;
-        contentStr += `*Inversión Final:* $us ${resultado.valorFinal}\n\n`;
+        contentStr += `*Inversión Final:* $us ${resultado.valorFinal} (Equivalente a Bs. ${resultado.totalBsA})\n\n`;
     } else {
         contentStr += `✅ *[FINANCIAMIENTO_ESTRATÉGICO]*\n`;
         if (resultado.descuentoM2Aplicado > 0) contentStr += `🎁 *Bono Promocional:* Descuento de $us ${resultado.descuentoM2Aplicado} x m²\n`;
@@ -840,6 +850,22 @@ export default function App() {
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
+          </div>
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] w-full sm:w-auto hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
+             <div className="flex items-center gap-2">
+               <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
+               <div>
+                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC Mercado</div>
+                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
+               </div>
+             </div>
+             <div className="relative shrink-0 flex-1 sm:flex-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
+                <input 
+                  type="number" step="0.01" value={tcFlexible} onChange={(e) => setTcFlexible(Number(e.target.value))} 
+                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                />
+             </div>
           </div>
         </div>
 
@@ -1303,7 +1329,7 @@ export default function App() {
                       </div>
                   </div>
 
-                  {/* BLOQUE AL CONTADO REDISEÑADO */}
+                  {/* BLOQUE AL CONTADO REDISEÑADO CON COMPARACIÓN CONMUTATIVA */}
                   {resultado.tipoCotizacion === 'contado' && (
                     <div className="animate-in zoom-in-95 duration-500 space-y-6">
                        <div className="relative overflow-hidden bg-gradient-to-br from-cyan-950 via-[#04070b] to-[#04070b] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(6,182,212,0.15)] border border-cyan-500/50 group text-center">
@@ -1316,28 +1342,53 @@ export default function App() {
                                <span className="text-cyan-200 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                                  <Timer className="w-4 h-4 text-cyan-400"/> Liquidación en {resultado.plazoLiquidacionVisual}
                                </span>
-                               <span className="text-cyan-400 text-sm font-black tracking-wider">
-                                 T.C. Efectivo Congelado: {resultado.tcEfectivo.toFixed(3)}
-                               </span>
                              </div>
 
                              <div className="text-[3.5rem] sm:text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] leading-none mb-3">
                                $us {resultado.valorFinal}
                              </div>
                              
-                             {resultado.ahorroTotalRaw > 0 && (
-                               <div className="mt-8 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-center gap-4 shadow-[0_0_20px_rgba(52,211,153,0.15)] max-w-xl mx-auto w-full">
-                                 <div className="bg-emerald-500/20 p-3 rounded-full shrink-0 border border-emerald-500/40">
-                                   <Gift className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/>
-                                 </div>
-                                 <div className="text-center sm:text-left">
-                                   <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">
-                                     Descuento Aplicado ({resultado.descPctAplicado * 100}%)
-                                   </div>
-                                   <div className="text-2xl font-black text-white">$us {resultado.ahorroTotal}</div>
-                                 </div>
+                             {/* DEMOSTRADOR DE PROPIEDAD CONMUTATIVA */}
+                             <div className="mt-8 w-full max-w-3xl">
+                               <div className="flex items-center justify-center gap-3 text-cyan-400 text-xs font-black uppercase tracking-widest mb-4">
+                                 <Equals className="w-4 h-4" /> Demostración de Equivalencia
                                </div>
-                             )}
+                               
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 
+                                 {/* DEMO A: DESC. AL PRECIO */}
+                                 <div className="bg-[#0b111a] border border-cyan-500/30 p-5 rounded-2xl relative shadow-[0_0_20px_rgba(6,182,212,0.1)] text-left hover:border-cyan-500/50 transition-colors">
+                                   <div className="text-cyan-400 font-bold text-[10px] tracking-widest uppercase mb-4 text-center border-b border-cyan-500/20 pb-2">
+                                     Opción A: Descuento al Precio
+                                   </div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">$us {resultado.valorOriginal}</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({resultado.descPctAplicado * 100}%)</span> <span className="text-emerald-400 font-bold">-$us {resultado.ahorroTotal}</span></div>
+                                   <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Precio Final</span> <span className="font-black text-white">$us {resultado.valorFinal}</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">x {resultado.tcOriginal}</span></div>
+                                   <div className="flex justify-between text-lg border-t border-cyan-500/50 pt-2 mt-2 bg-cyan-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
+                                     <span className="text-cyan-400 font-black mt-2">Total Bs.</span> 
+                                     <span className="font-black text-cyan-300 mt-2">Bs. {resultado.totalBsA}</span>
+                                   </div>
+                                 </div>
+
+                                 {/* DEMO B: DESC. AL TC */}
+                                 <div className="bg-[#0b111a] border border-emerald-500/30 p-5 rounded-2xl relative shadow-[0_0_20px_rgba(16,185,129,0.1)] text-left hover:border-emerald-500/50 transition-colors">
+                                   <div className="text-emerald-400 font-bold text-[10px] tracking-widest uppercase mb-4 text-center border-b border-emerald-500/20 pb-2">
+                                     Opción B: Descuento al T.C.
+                                   </div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">{resultado.tcOriginal}</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({resultado.descPctAplicado * 100}%)</span> <span className="text-emerald-400 font-bold">-{resultado.descPctAplicado * 100}%</span></div>
+                                   <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Nuevo T.C. (Hoy)</span> <span className="font-black text-white">{resultado.tcEfectivo.toFixed(3)}</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">x $us {resultado.valorOriginal}</span></div>
+                                   <div className="flex justify-between text-lg border-t border-emerald-500/50 pt-2 mt-2 bg-emerald-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
+                                     <span className="text-emerald-400 font-black mt-2">Total Bs.</span> 
+                                     <span className="font-black text-emerald-300 mt-2">Bs. {resultado.totalBsB}</span>
+                                   </div>
+                                 </div>
+
+                               </div>
+                             </div>
+
                              <div className="mt-8 flex justify-between w-full max-w-xl mx-auto border-t border-cyan-500/30 pt-6">
                                <div className="text-center">
                                  <div className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mb-1">Precio de Lista</div>
