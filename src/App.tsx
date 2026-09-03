@@ -68,6 +68,9 @@ const coordenadasProyectos = {
   "EL PORVENIR FASE 2": { lat: -17.7082, lng: -63.0622, zoom: 15.2 }
 };
 
+// ============================================================================
+// RED DE CIUDADES PRINCIPALES
+// ============================================================================
 const ciudadesRegionales = [
   { id: 'scz', nombre: 'Santa Cruz de la Sierra', lat: -17.7833, lng: -63.1821 },
   { id: 'montero', nombre: 'Montero', lat: -17.3386, lng: -63.2553 },
@@ -80,6 +83,9 @@ const ciudadesRegionales = [
   { id: 'saavedra', nombre: 'Gral. Saavedra', lat: -17.2289, lng: -63.2167 }
 ];
 
+// ============================================================================
+// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS LOCALES)
+// ============================================================================
 const baseAnclasUrbanas = {
   "MUYURINA": [
     { id: 'plaza-montero', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
@@ -129,6 +135,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
+  // PILOTO AUTOMÁTICO INTELIGENTE
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -141,19 +148,38 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             const [lng, lat] = coordenadas;
             
             if (mapRef.current && lng && lat) {
-              mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.2, pitch: 50, speed: 1.5, essential: true });
+              mapRef.current.getMap().flyTo({ 
+                center: [lng, lat], 
+                zoom: 15.2, 
+                pitch: 50, 
+                speed: 1.5, 
+                essential: true 
+              });
               return;
             }
           }
         }
+        
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
         if (mapRef.current) {
-          mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
+          mapRef.current.getMap().flyTo({
+            center: [target.lng, target.lat],
+            zoom: target.zoom || 15.0,
+            pitch: 50,
+            speed: 1.5,
+            essential: true
+          });
         }
       } catch (error) {
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
         if (mapRef.current) {
-          mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
+          mapRef.current.getMap().flyTo({
+            center: [target.lng, target.lat],
+            zoom: target.zoom || 15.0,
+            pitch: 50,
+            speed: 1.5,
+            essential: true
+          });
         }
       }
     };
@@ -168,6 +194,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
     }
   }, [isFullscreen]);
 
+  // CLIC TÁCTICO: Polígonos interactivos
   const handleMapClick = useCallback((event) => {
     if (!onLoteClick) return;
     const map = mapRef.current?.getMap();
@@ -181,7 +208,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
       const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
       const uvTocada = prop.UV || prop.uv;
-      if (loteTocado) onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
+      
+      if (loteTocado) {
+         onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
+      }
     }
   }, [onLoteClick]);
 
@@ -192,48 +222,95 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       const raw = String(l.lote).trim();
       const num = String(parseInt(raw, 10) || raw);
       const variaciones = [raw, num, `${num} `, ` ${num}`, `0${num}`, `LOTE ${num}`];
+      
       const est = String(l.estado).toUpperCase();
       if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variaciones);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variaciones);
       else if (est === 'VENDIDO') a.push(...variaciones);
     });
-    return { verdes: v.length > 0 ? v : ['__NONE__'], rojos: r.length > 0 ? r : ['__NONE__'], azules: a.length > 0 ? a : ['__NONE__'] };
+    return { 
+      verdes: v.length > 0 ? v : ['__NONE__'], 
+      rojos: r.length > 0 ? r : ['__NONE__'],
+      azules: a.length > 0 ? a : ['__NONE__']
+    };
   }, [baseDeDatosLotes, proyectoActivo]);
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
   const fillLayer = useMemo(() => ({
-    id: 'lotes-fill', type: 'fill', paint: { 
-      'fill-color': ['match', ['to-string', textProperty], verdes, 'rgba(34, 197, 94, 0.35)', rojos, 'rgba(239, 68, 68, 0.35)', azules, 'rgba(59, 130, 246, 0.35)', 'transparent'],
+    id: 'lotes-fill',
+    type: 'fill',
+    paint: { 
+      'fill-color': [
+        'match', ['to-string', textProperty],
+        verdes, 'rgba(34, 197, 94, 0.35)', 
+        rojos, 'rgba(239, 68, 68, 0.35)',  
+        azules, 'rgba(59, 130, 246, 0.35)', 
+        'transparent'       
+      ],
       'fill-opacity': 1 
     }
   }), [verdes, rojos, azules]);
-  
+
   const lineGlowLayer = useMemo(() => ({
-    id: 'lotes-line-glow', type: 'line', paint: { 'line-color': '#00e5ff', 'line-width': 8, 'line-opacity': 0.35, 'line-blur': 4 }
+    id: 'lotes-line-glow',
+    type: 'line',
+    paint: { 'line-color': '#00e5ff', 'line-width': 8, 'line-opacity': 0.35, 'line-blur': 4 }
   }), []);
-  
+
   const lineLayer = useMemo(() => ({
-    id: 'lotes-line', type: 'line', paint: { 'line-color': '#00e5ff', 'line-width': 1.5, 'line-opacity': 0.9 }
+    id: 'lotes-line',
+    type: 'line',
+    paint: { 'line-color': '#00e5ff', 'line-width': 1.5, 'line-opacity': 0.9 }
   }), []);
-  
+
   const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight', type: 'line', paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
+    id: 'lotes-highlight',
+    type: 'line',
+    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
     filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
   }), [loteActivo]);
-  
+
   const pointLayer = useMemo(() => ({
-    id: 'lotes-points', type: 'circle', minzoom: 16.2, paint: {
+    id: 'lotes-points',
+    type: 'circle',
+    minzoom: 16.2, 
+    paint: {
       'circle-radius': 9, 
-      'circle-color': ['match', ['to-string', textProperty], verdes, '#22c55e', rojos, '#ef4444', azules, '#3b82f6', 'rgba(255, 255, 255, 0.25)'],
-      'circle-stroke-width': 1.5, 'circle-stroke-color': '#020617' 
-    }, filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['to-string', textProperty], '']]
+      'circle-color': [
+        'match', ['to-string', textProperty],
+        verdes, '#22c55e', 
+        rojos, '#ef4444',  
+        azules, '#3b82f6', 
+        'rgba(255, 255, 255, 0.25)' 
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#020617' 
+    },
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
   }), [verdes, rojos, azules]);
-  
+
   const labelLayer = useMemo(() => ({
-    id: 'lotes-labels', type: 'symbol', minzoom: 16.2, layout: {
-      'text-field': textProperty, 'text-size': 11, 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
-      'text-anchor': 'center', 'text-allow-overlap': true, 'text-ignore-placement': true
-    }, paint: { 'text-color': '#ffffff' }, filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['to-string', textProperty], '']]
+    id: 'lotes-labels',
+    type: 'symbol',
+    minzoom: 16.2, 
+    layout: {
+      'text-field': textProperty,
+      'text-size': 11,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
+      'text-anchor': 'center',
+      'text-allow-overlap': true,
+      'text-ignore-placement': true
+    },
+    paint: {
+      'text-color': '#ffffff' 
+    },
+    filter: ['all',
+      ['==', ['geometry-type'], 'Point'],
+      ['!=', ['to-string', textProperty], '']
+    ]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -270,6 +347,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
                type="button"
                onClick={() => setIsFullscreen(true)} 
                className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+               title="Pantalla Completa"
              >
                <Maximize className="w-5 h-5"/>
              </button>
@@ -311,7 +389,11 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             <NavigationControl position="bottom-right" visualizePitch={true} />
             
             <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20}>
-              <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 1.0, 'raster-brightness-max': 1.0, 'raster-saturation': 0.1 }} />
+              <Layer id="satellite-layer" type="raster" paint={{ 
+                'raster-opacity': 1.0,
+                'raster-brightness-max': 1.0,
+                'raster-saturation': 0.1
+              }} />
             </Source>
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer as any} />
@@ -321,6 +403,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               <Layer {...pointLayer as any} />
               <Layer {...labelLayer as any} />
             </Source>
+            
             {ciudadesRegionales.map((ciudad) => (
               <Marker key={ciudad.id} longitude={ciudad.lng} latitude={ciudad.lat} anchor="center">
                 <div className="flex items-center gap-1.5 bg-[#020617]/85 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] pointer-events-none">
@@ -329,6 +412,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
                 </div>
               </Marker>
             ))}
+            
             {anclasActivas.map((nodo) => (
               <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
                 <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
@@ -360,10 +444,11 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false); 
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState(false);
+  const [expandedPlan, setExpandedPlan] = useState(false); 
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "SALMO23") { 
+    if (passwordInput === "DIOSTODOPODEROSO") { 
       setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
     } else if (passwordInput === "OHSARAVIA") { 
       setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
@@ -376,13 +461,15 @@ export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
+  
   const [usarAPI, setUsarAPI] = useState(true); 
+  
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
-
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.32); // PARAMETRIZACIÓN DETERMINISTA
+  const [tcFlexible, setTcFlexible] = useState(12.12); 
+  const TC_PROMOCIONAL = 6.97;
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
@@ -391,8 +478,17 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [plazoLiquidacion, setPlazoLiquidacion] = useState(30);
-  const [aplicarDescM2, setAplicarDescM2] = useState(true); 
+  const [descuentoCredito, setDescuentoCredito] = useState(0);
+  const [descuentoContado, setDescuentoContado] = useState(0);
+  const [descuentoM2, setDescuentoM2] = useState(1);
+  const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
+  const [descuentoInicial, setDescuentoInicial] = useState(0);
+  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
+  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(false);
+  const [aplicarDescM2, setAplicarDescM2] = useState(false);
+  const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(false);
+  const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(false);
+  
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
   const [inicialMonto, setInicialMonto] = useState(""); 
@@ -401,12 +497,13 @@ export default function App() {
   const [resultado, setResultado] = useState(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [copiado, setCopiado] = useState(false);
-  const [escenarioGuardado, setEscenarioGuardado] = useState(null);
-  const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [toast, setToast] = useState(null);
   const formRef = useRef(null);
   const resultadosRef = useRef(null);
 
+  // ============================================================================
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
+  // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
     const cargarDatos = async () => {
@@ -420,9 +517,14 @@ export default function App() {
           if (typeof val === 'number') return val;
           let s = String(val).trim();
           if (s.includes('.') && s.includes(',')) {
-              if (s.indexOf('.') < s.indexOf(',')) s = s.replace(/\./g, '').replace(',', '.');
-              else s = s.replace(/,/g, '');
-          } else if (s.includes(',')) s = s.replace(',', '.');
+              if (s.indexOf('.') < s.indexOf(',')) {
+                  s = s.replace(/\./g, '').replace(',', '.');
+              } else {
+                  s = s.replace(/,/g, '');
+              }
+          } else if (s.includes(',')) {
+              s = s.replace(',', '.');
+          }
           s = s.replace(/[^0-9.-]/g, '');
           const n = Number(s);
           return isNaN(n) ? 0 : n;
@@ -481,15 +583,18 @@ export default function App() {
             if (dataLotes.lotes) {
               const apiMapped = dataLotes.lotes.map(loteFresco => {
                 const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
+                const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
+                
                 return {
                   proyecto: proyecto, 
                   uv: loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN",
                   mzn: loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN",
                   lote: String(loteFresco.lote).trim().toUpperCase(),
                   superficie: extractNumber(loteFresco.mt2 || loteFresco.superficie),
-                  precio: extractNumber(keyPrecio ? loteFresco[keyPrecio] : 0),
+                  precio: extractNumber(rawPrecio),
                   estado: String(loteFresco.estado || "LIBRE").toUpperCase(),
                   categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
+                  vendedor: "API VIVA",
                   api_cuota_inicial: extractNumber(loteFresco.cuota_inicial),
                   api_initial_tipo: String(loteFresco.initial_tipo || ""),
                   api_initial_pct: extractNumber(loteFresco.initial_pct),
@@ -502,7 +607,9 @@ export default function App() {
             }
           }
           throw new Error("Proyecto no encontrado en API");
-        } catch (error) { setUsarAPI(false); }
+        } catch (error) {
+          setUsarAPI(false); 
+        }
       } else {
         try {
           let rawData;
@@ -512,7 +619,8 @@ export default function App() {
             rawData = await response.json();
           } catch (e) {
             const timestamp = new Date().getTime();
-            const fallbackResponse = await fetch(`https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`);
+            const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
+            const fallbackResponse = await fetch(githubRawUrl);
             if (!fallbackResponse.ok) throw new Error('Fallo github');
             rawData = await fallbackResponse.json();
           }
@@ -526,14 +634,20 @@ export default function App() {
               precio: extractNumber(getSafeVal(item, 'precio')),
               estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
               categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
+              vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
               api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
               api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
               api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
               api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
           }));
-          setBaseDeDatosLotes(normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto)));
+          const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
+          
+          setBaseDeDatosLotes(lotesPermitidos);
           setCargandoBD(false);
-        } catch (error) { setCargandoBD(false); setUsarBD(false); }
+        } catch (error) {
+          setCargandoBD(false);
+          setUsarBD(false); 
+        }
       }
     };
     cargarDatos();
@@ -567,7 +681,10 @@ export default function App() {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
     setResultado(null); setProyectoPersonalizado(""); 
-    setEscenarioGuardado(null); setMostrarComparativa(false);
+    setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
+    setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
+    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
+    setExpandedPlan(false);
   }, [proyecto, tipoCotizacion]);
 
   const getAlias = (p) => {
@@ -598,7 +715,9 @@ export default function App() {
 
   const lotesDelProyecto = useMemo(() => {
     const currentAliases = getAlias(proyecto);
-    return baseDeDatosLotes?.filter(l => currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)) || [];
+    return baseDeDatosLotes?.filter(l => 
+      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
+    ) || [];
   }, [baseDeDatosLotes, proyecto]);
   
   const tieneBD = lotesDelProyecto.length > 0;
@@ -609,11 +728,11 @@ export default function App() {
   const uvsDisponibles = [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
-  
+
   useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
-  
+
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
       const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
@@ -645,13 +764,27 @@ export default function App() {
     }
   }, [uv, mzn, lote, lotesDelProyecto]); 
 
+  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
+  
+  useEffect(() => {
+    const limites = calcularLimitesMaximos();
+    setDescuentoCredito(limites.maxCreditoPct);
+    setDescuentoContado(limites.maxContadoPct);
+  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
+
+  const handleDescContadoM2Change = (e) => { setDescuentoContadoM2(Number(e.target.value)); };
+  const handleDescM2Change = (e) => { setDescuentoM2(Number(e.target.value)); };
+  
   const formatMoney = (amount) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
   };
   
   const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 4000); };
-  
+
+  // ============================================================================
+  // MOTOR DE CÁLCULO REFACTORIZADO
+  // ============================================================================
   const calcular = () => {
     const sup = Number(superficie) || 0; 
     const prec = Number(precio) || 0; 
@@ -661,36 +794,40 @@ export default function App() {
     
     const valor_original = sup * prec;
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.26;
     
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
-    let descContadoPct = 0, montoBsOpcionA = 0, montoBsOpcionB = 0;
-    let planPagosArreglo = [];
-    let proyeccionTC = [];
+    let planPagosDetallado = [];
 
     if (tipoCotizacion === 'contado') {
-        descContadoPct = plazoLiquidacion === 30 ? 0.30 : plazoLiquidacion === 60 ? 0.20 : 0.10;
-        ahorro_total = valor_original * descContadoPct;
+        const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
+        const descContadoPct = aplicarDescContadoPct ? ((Number(descuentoContado) || 0) / 100) : 0; 
+        
+        let monto_desc_contado_m2 = sup * descContadoM2Val;
+        let base_post_m2 = valor_original - monto_desc_contado_m2;
+        ahorro_total = monto_desc_contado_m2 + (base_post_m2 * descContadoPct);
         valor_final = valor_original - ahorro_total;
         
-        // MATRIZ DE COMPROBACIÓN SIMÉTRICA (OPCIÓN A vs OPCIÓN B)
-        montoBsOpcionA = valor_final * TC_FLEX_NUMBER; 
-        const tcDescontado = TC_FLEX_NUMBER * (1 - descContadoPct);
-        montoBsOpcionB = valor_original * tcDescontado;
-        
     } else {
-        const descM2Val = aplicarDescM2 ? 1 : 0; // 1 dólar por m2
-        ahorro_total = sup * descM2Val; 
-        valor_final = valor_original - ahorro_total; 
+        const descCreditoPct = aplicarDescCreditoPct ? ((Number(descuentoCredito) || 0) / 100) : 0;
+        const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 0) : 0;
+        let descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min((Number(descuentoInicial) || 0), 500) : 0;
         
+        let monto_descuento_m2 = sup * descM2Val;
+        const valor_post_desc_m2 = valor_original - monto_descuento_m2;
+        const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
+        
+        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal; 
+        valor_final = valor_original - ahorro_total; 
+        const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
+
         if (modoInicial === 'porcentaje') {
            pct_efectivo = Number(inicialPorcentaje) || 0;
-           cuota_inicial = valor_final * (pct_efectivo / 100);
+           cuota_inicial = base_para_inicial * (pct_efectivo / 100);
         } else {
            cuota_inicial = Number(inicialMonto) || 0;
-           pct_efectivo = valor_final > 0 ? (cuota_inicial / valor_final) * 100 : 0;
+           pct_efectivo = base_para_inicial > 0 ? (cuota_inicial / base_para_inicial) * 100 : 0;
         }
-        
+
         const saldo = valor_final - cuota_inicial;
         const meses = ans * 12;
         const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
@@ -703,36 +840,24 @@ export default function App() {
         seguro = saldo * factorSeguro;
         cuota_final = pago_puro + seguro + cbdi;
 
-        for (let i = 14; i >= 1; i--) {
-          const m_i = i * 12;
-          let pp_i = tasa === 0 ? saldo / m_i : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
-          if(isNaN(pp_i) || !isFinite(pp_i)) pp_i = 0;
-          const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1.3) / refSaldo;
-          const c_final_i = pp_i + (saldo * fS_i) + cbdi;
-          
-          planPagosArreglo.push({ 
-            año: i, 
-            cuotaUsd: formatMoney(c_final_i), 
-            cuotaBs: formatMoney(c_final_i * TC_FLEX_NUMBER), 
-            isCurrent: i === ans 
-          });
-        }
+        // INFERENCIA DETERMINISTA: Inicio de pagos diferido (Octubre 2026)
+        const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        let mesInicioIndex = 9; // Octubre (Índice 9)
+        let añoInicio = 2026; 
 
-        // MOTOR PREDICTIVO DE RIESGO CAMBIARIO (PROYECCIÓN A 6 MESES)
-        let currentTC = TC_FLEX_NUMBER;
-        for(let m=1; m<=6; m++) {
-            proyeccionTC.push({
-                mes: m,
-                tc: currentTC.toFixed(2),
-                cuotaBs: (cuota_final * currentTC).toFixed(2),
-                incremento: ((cuota_final * currentTC) - (cuota_final * TC_FLEX_NUMBER)).toFixed(2)
+        for(let m=1; m<=meses; m++) {
+            let currentMIndex = (mesInicioIndex + (m - 1)) % 12;
+            let currentY = añoInicio + Math.floor((mesInicioIndex + (m - 1)) / 12);
+            
+            planPagosDetallado.push({
+                nro: m, 
+                mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
+                cuotaUsd: cuota_final
             });
-            currentTC += 1.19; // Incremento histórico proyectado
         }
     }
     
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
-    
     setResultado({
       tipoCotizacion, regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria,
       valorOriginalRaw: valor_original, 
@@ -740,50 +865,52 @@ export default function App() {
       valorFinal: formatMoney(valor_final), 
       ahorroTotalRaw: ahorro_total, 
       ahorroTotal: formatMoney(ahorro_total),
-      plazoLiquidacion, descContadoPct, montoBsOpcionA, montoBsOpcionB,
       inicialRaw: cuota_inicial, 
       inicial: formatMoney(cuota_inicial), 
-      inicialBs: formatMoney(cuota_inicial * TC_FLEX_NUMBER), 
       inicialPct: formatPct,
       saldoRaw: tipoCotizacion === 'credito' ? valor_final - cuota_inicial : 0, 
-      pagoAmortizacion: formatMoney(pago_puro), 
-      seguro: formatMoney(seguro), 
-      cbdi: formatMoney(cbdi),
       mensualRaw: cuota_final, 
       mensual: formatMoney(cuota_final), 
-      mensualBs: formatMoney(cuota_final * TC_FLEX_NUMBER), 
       plazo: ans, 
-      planPagos: planPagosArreglo, 
-      proyeccionTC: proyeccionTC,
+      planPagosDetallado: planPagosDetallado, 
       timestampId: new Date().getTime()
     });
     setCopiado(false); 
   };
 
+  const handleProcesar = (e) => {
+    e.preventDefault();
+    setIsCalculating(true);
+    setTimeout(() => {
+      try { calcular(); } catch(err) { showNotification("Error de ingesta de datos. Revisa la integridad del lote."); } 
+      finally { 
+        setIsCalculating(false); 
+        if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
+      }
+    }, 500);
+  };
+
+  // ============================================================================
+  // EXPORTACIÓN B2C PARA WHATSAPP
+  // ============================================================================
   const getTextToCopy = () => {
     if (!resultado) return "";
-    let contentStr = `🔹 *PROPUESTA DE INVERSIÓN CELINA* 🔹\n\n`;
-    contentStr += `👤 Cliente: [Nombre_Cliente]\n`;
-    contentStr += `📍 Proyecto: [Proyecto_Nombre] | UV ${resultado.uv || '-'} | MZN ${resultado.mzn || '-'} | LOTE ${resultado.lote || '-'}\n`;
-    contentStr += `📐 Superficie: ${resultado.superficie} m²\n`;
-    contentStr += `💎 Valor de Lista: $us ${resultado.valorOriginal}\n\n`;
-
+    const saludo = "Estimado cliente, es un gusto saludarle. Le presento su propuesta oficial de inversión estructurada:\n\n";
+    const ubicacion = `📍 *[Proyecto_${resultado.proyecto}]*\nUV ${resultado.uv || '-'} | MZN ${resultado.mzn || '-'} | Lote ${resultado.lote || '-'} (${resultado.superficie} m²)\n\n`;
+    const precioLista = `💎 *Precio de Lista:* $us ${resultado.valorOriginal}\n\n`;
+    
+    let contentStr = "";
     if (resultado.tipoCotizacion === 'contado') {
-        contentStr += `💰 *LIQUIDACIÓN AL CONTADO (${resultado.plazoLiquidacion} DÍAS)*\n`;
-        contentStr += `▪️ Descuento Estructural: ${resultado.descContadoPct * 100}%\n`;
-        contentStr += `▪️ Inversión Final: $us ${resultado.valorFinal}\n`;
-        contentStr += `▪️ Equivalente Exacto: Bs. ${formatMoney(resultado.montoBsOpcionA)}\n`;
-        contentStr += `▪️ [Proyeccion_Plusvalia] asegurada al liquidar con precisión.\n\n`;
+        contentStr += `💰 *[PLAN_AL_CONTADO]*\n`;
+        contentStr += `🔥 *Plusvalía Inmediata:* Su lote adquiere una rentabilidad instantánea gracias a nuestro modelo paramétrico.\n`;
+        contentStr += `*Inversión Final:* $us ${resultado.valorFinal}\n\n`;
     } else {
-        contentStr += `✅ *CRÉDITO DIRECTO A ${resultado.plazo} AÑOS*\n`;
-        contentStr += `▪️ Bono Promocional: $1/m² aplicado al terreno.\n`;
-        contentStr += `▪️ Cuota Inicial (${resultado.inicialPct}%): $us ${resultado.inicial} ([Monto_Cuota] equivalente en Bs)\n`;
-        contentStr += `▪️ Mensualidad Fija: $us ${resultado.mensual}\n`;
-        contentStr += `▪️ ⚠️ Alerta Predictiva: Tasa de crecimiento cambiario proyectada a 1.19 Bs/mes. ¡Asegure su contrato hoy!\n`;
-        contentStr += `▪️ [Tasa_Aprobacion] garantizada a sola firma sin burocracia bancaria.\n\n`;
+        contentStr += `✅ *[FINANCIAMIENTO_ESTRATÉGICO]*\n`;
+        contentStr += `*Valor del Terreno:* $us ${resultado.valorFinal}\n\n`;
+        contentStr += `📊 *Proyección a ${resultado.plazo} años*\n*Inversión Inicial:* ${resultado.inicialPct}% ($us ${resultado.inicial})\n\n`;
+        contentStr += `⏳ *Periodo de Gracia Activo:*\nAdquiriendo hoy, su primera cuota se programa para *Octubre*.\n*Cuota Fija Mensual:* $us ${resultado.mensual}\n\n`;
     }
-    contentStr += `📲 ¿Procedemos con la asignación en sistema, [Nombre_Cliente]?`;
-    return contentStr;
+    return saludo + ubicacion + precioLista + contentStr + `¿Desea que agendemos una visita ejecutiva al proyecto? 🤝`;
   };
 
   const enviarWhatsApp = () => { 
@@ -795,7 +922,7 @@ export default function App() {
     if (!resultado) return;
     const mensaje = getTextToCopy();
     if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(mensaje).then(() => showNotification("¡Copiado al portapapeles con éxito!"));
+        navigator.clipboard.writeText(mensaje).then(() => showNotification("¡Extracción de datos copiada al portapapeles!"));
     } else {
         let textArea = document.createElement("textarea"); 
         textArea.value = mensaje;
@@ -804,86 +931,9 @@ export default function App() {
         document.body.appendChild(textArea);
         textArea.focus(); 
         textArea.select();
-        try { document.execCommand('copy'); showNotification("¡Copiado al portapapeles con éxito!"); } catch (error) {}
+        try { document.execCommand('copy'); showNotification("¡Extracción de datos copiada al portapapeles!"); } catch (error) {}
         textArea.remove();
     }
-  };
-
-  const handleProcesar = (e) => {
-    e.preventDefault();
-    setIsCalculating(true);
-    setTimeout(() => {
-      try { calcular(); } catch(err) { showNotification("Error en los datos de entrada. Verifica."); } 
-      finally { 
-        setIsCalculating(false); 
-        if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
-      }
-    }, 500);
-  };
-
-  const EscenarioCard = ({ data, isGuardado, otherData }) => {
-    let bestAhorro = false; let bestCuota = false;
-    if (otherData && data) {
-      if (data.ahorroTotalRaw > otherData.ahorroTotalRaw) bestAhorro = true;
-      if (data.tipoCotizacion === 'credito' && otherData.tipoCotizacion === 'credito') { 
-        if (data.mensualRaw < otherData.mensualRaw) bestCuota = true; 
-      }
-    }
-    return (
-      <div className={`bg-white border rounded-3xl p-6 relative overflow-hidden flex flex-col h-full shadow-md transition-all duration-300 ${isGuardado ? 'border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'border-cyan-400 bg-cyan-50/20' : 'border-emerald-400 bg-emerald-50/20')}`}>
-        <div className={`absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl ${isGuardado ? 'bg-slate-200/50' : (data?.tipoCotizacion === 'contado' ? 'bg-cyan-200/50' : 'bg-emerald-200/50')}`}></div>
-        <div className="flex justify-between items-start mb-6 relative z-10">
-          <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${isGuardado ? 'bg-slate-100 text-slate-600 border-slate-200' : (data?.tipoCotizacion === 'contado' ? 'bg-cyan-100 text-cyan-700 border-cyan-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200')}`}>
-            {isGuardado ? 'Escenario A (Guardado)' : 'Escenario B (Actual)'}
-          </div>
-          {bestAhorro && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded border border-amber-200 flex items-center gap-1 shadow-sm"><TrendingUp className="w-3 h-3"/> Mayor Ahorro</span>}
-        </div>
-        <div className="text-center mb-8 relative z-10">
-          <div className="text-4xl font-black text-slate-900 mb-1">
-            {data?.tipoCotizacion === 'contado' ? 'Al Contado' : `${data?.plazo} Años`}
-          </div>
-          {data?.tipoCotizacion === 'credito' && ( 
-            <div className="text-emerald-600 font-bold tracking-wide bg-emerald-50 w-fit mx-auto px-4 py-1 rounded-full border border-emerald-100">
-              Inicial: {data?.inicialPct}% (${data?.inicial})
-            </div> 
-          )}
-        </div>
-        <div className="space-y-4 relative z-10 flex-1">
-          <div className="flex justify-between items-center py-2 border-b border-slate-100">
-            <span className="text-slate-500 text-sm">Superficie:</span>
-            <span className="text-slate-900 font-bold text-sm">{data?.superficie} m²</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-100">
-            <span className="text-slate-500 text-sm">{data?.tipoCotizacion === 'contado' ? 'Inversión Final:' : 'Total a Financiar:'}</span>
-            <span className="text-slate-900 font-bold text-sm">${data?.valorFinal}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-100">
-            <span className="text-slate-500 text-sm font-bold">Ahorro Promocional:</span>
-            <span className={`font-black text-base ${data?.ahorroTotalRaw > 0 ? (data?.tipoCotizacion === 'contado' ? 'text-cyan-600' : 'text-emerald-600') : 'text-slate-400'}`}>
-              {data?.ahorroTotalRaw > 0 ? `$${data?.ahorroTotal}` : "$0.00"}
-            </span>
-          </div>
-        </div>
-        {data?.tipoCotizacion === 'credito' && (
-          <div className={`mt-8 border rounded-2xl p-5 flex justify-between items-center relative z-10 shadow-sm ${isGuardado ? 'bg-slate-50 border-slate-200' : 'bg-emerald-500 border-emerald-600'}`}>
-            <div className={`text-[10px] font-black uppercase tracking-widest leading-tight ${isGuardado ? 'text-slate-500' : 'text-emerald-100'}`}>
-              Cuota<br/>Mensual
-            </div>
-            <div className="text-right flex items-center gap-3">
-              {bestCuota && (
-                <div className={`text-[9px] font-black uppercase px-2 py-1 rounded ${isGuardado ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-400 text-white'}`}>
-                  Mejor Cuota
-                </div>
-              )}
-              <div>
-                <div className={`text-3xl font-black leading-none mb-1 ${isGuardado ? 'text-slate-900' : 'text-white'}`}>${data?.mensual}</div>
-                <div className={`text-[10px] font-bold ${isGuardado ? 'text-slate-500' : 'text-emerald-200'}`}>Bs. {data?.mensualBs}</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -924,33 +974,14 @@ export default function App() {
           </div>
         </div>
       )}
-      
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-cyan-950/90 text-cyan-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(6,182,212,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-cyan-500/50 backdrop-blur-md w-max">
            {toast.includes('🛡️') || toast.includes('⚠️') ? <AlertCircle className="w-5 h-5 text-amber-400" /> : <CheckCircle2 className="w-5 h-5 text-cyan-400" />}
            {toast}
         </div>
       )}
-      
-      {mostrarComparativa && escenarioGuardado && resultado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-300 no-print">
-          <div className="bg-white border border-slate-200 rounded-[2.5rem] w-full max-w-5xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh]">
-            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 shrink-0 bg-slate-50/50">
-              <h3 className="flex items-center gap-3 text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
-                <div className="bg-cyan-100 p-2 rounded-xl text-cyan-600"><Scale className="w-5 h-5 sm:w-6 sm:h-6" /></div> Comparativa Estratégica
-              </h3>
-              <button onClick={() => setMostrarComparativa(false)} className="text-slate-400 hover:text-slate-700 transition-colors bg-white border border-slate-200 hover:bg-slate-100 p-2.5 rounded-full shadow-sm">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 sm:p-8 grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-8 bg-slate-50/50 overflow-y-auto">
-              <EscenarioCard data={escenarioGuardado} isGuardado={true} otherData={resultado} />
-              <EscenarioCard data={resultado} isGuardado={false} otherData={escenarioGuardado} />
-            </div>
-          </div>
-        </div>
-      )}
-      
+
       {/* EFECTO DE FONDO CYBERTECH */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen animate-float no-print">
         <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
@@ -960,15 +991,17 @@ export default function App() {
           </g>
         </svg>
       </div>
+
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none no-print">
         <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-cyan-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob"></div>
         <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-emerald-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-2000"></div>
         <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/10 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000"></div>
       </div>
+
       <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0 no-print">
         <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
       </div>
-      
+
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
@@ -982,33 +1015,12 @@ export default function App() {
                 </div>
              )}
           </div>
-          
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-cyan-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(6,182,212,0.15)] w-full sm:w-auto hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] transition-shadow">
-             <div className="flex items-center gap-2">
-               <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
-               <div>
-                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC Mercado</div>
-                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
-               </div>
-             </div>
-             <div className="relative shrink-0 flex-1 sm:flex-none">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={tcFlexible} 
-                  onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
-                />
-             </div>
-          </div>
         </div>
-        
+
         <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative no-print min-w-0">
           <div className="hidden md:block w-32"></div>
           <div className="text-center flex-1 flex flex-col items-center max-w-full relative">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32 bg-cyan-500/20 blur-[80px] pointer-events-none z-0"></div>
-            
             <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] mb-4 sm:mb-5 backdrop-blur-md relative z-10">
               <Sparkles className="w-4 h-4 text-cyan-400" />
               <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Plataforma Fintech de Alta Precisión</span>
@@ -1020,7 +1032,8 @@ export default function App() {
           </div>
           <div className="hidden md:block w-32"></div>
         </div>
-        
+
+        {/* COMPONENTE WEBGIS INTEGRADO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivo={lote}
@@ -1029,7 +1042,7 @@ export default function App() {
              onLoteClick={handleMapClickSelection}
            />
         </div>
-        
+
         <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
           <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
@@ -1076,7 +1089,7 @@ export default function App() {
                     <Wallet className="w-4 h-4"/> Al Contado
                   </button>
                 </div>
-                
+
                 <div className="space-y-2.5">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> Regional
@@ -1085,7 +1098,7 @@ export default function App() {
                     <select 
                       value={regional} 
                       onChange={e => setRegional(e.target.value)} 
-                      className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]'}`}
+                      className={`w-full bg-[#060b13]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]'}`}
                     >
                       {Object.keys(proyectosPorRegional)?.map(reg => <option key={reg} value={reg}>{reg}</option>)}
                     </select>
@@ -1118,7 +1131,7 @@ export default function App() {
                     <select 
                       value={proyecto} 
                       onChange={e => setProyecto(e.target.value)} 
-                      className={`w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]'}`}
+                      className={`w-full bg-[#060b13]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]'}`}
                     >
                       {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
                       <option value="OTRO">OTRO...</option>
@@ -1132,12 +1145,12 @@ export default function App() {
                       type="text" 
                       value={proyectoPersonalizado} 
                       onChange={e => setProyectoPersonalizado(e.target.value)} 
-                      className="w-full glass-input rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(34,211,238,0.15)] focus:border-cyan-500" 
+                      className="w-full bg-[#060b13]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(34,211,238,0.15)] focus:border-cyan-500" 
                       placeholder="Escribe el nombre del proyecto..." 
                     />
                   )}
                 </div>
-                
+
                 <div className="pt-2 sm:pt-3">
                   <div className="bg-[#0b111a] border border-slate-700 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
                     <div className="flex items-center justify-between mb-1">
@@ -1233,7 +1246,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2.5 relative mt-4">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <LayoutTemplate className={`w-3 h-3 shrink-0 ${tipoCotizacion === 'contado' ? 'text-cyan-500' : 'text-emerald-500'}`} /> 
@@ -1244,10 +1257,10 @@ export default function App() {
                       value={categoria} 
                       onChange={e => setCategoria(e.target.value)} 
                       placeholder="Ej. LOTE S/CALLE ESQ. A" 
-                      className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 shadow-[inset_0_0_15px_rgba(34,211,238,0.1)] focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]' : 'bg-emerald-950/30 border border-emerald-500/40 text-emerald-100 shadow-[inset_0_0_15px_rgba(52,211,153,0.1)] focus:border-emerald-400 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)]') : 'glass-input'}`} 
+                      className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 shadow-[inset_0_0_15px_rgba(34,211,238,0.1)] focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]' : 'bg-emerald-950/30 border border-emerald-500/40 text-emerald-100 shadow-[inset_0_0_15px_rgba(52,211,153,0.1)] focus:border-emerald-400 focus:shadow-[0_0_15px_rgba(52,211,153,0.2)]') : 'bg-[#060b13] border border-slate-700 text-white'}`} 
                     />
                 </div>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mt-4">
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
@@ -1262,7 +1275,7 @@ export default function App() {
                       value={superficie} 
                       onChange={e => setSuperficie(e.target.value)} 
                       placeholder="Ej. 240" 
-                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none ${modoBD ? `bg-[#060b13] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'text-emerald-400 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(52,211,153,0.15)]'}` : 'glass-input'}`} 
+                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#060b13] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'text-emerald-400 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(52,211,153,0.15)]'}`} 
                     />
                   </div>
                   <div className="space-y-2.5 relative">
@@ -1278,48 +1291,55 @@ export default function App() {
                       value={precio} 
                       onChange={e => setPrecio(e.target.value)} 
                       placeholder="Ej. 145" 
-                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none ${modoBD ? `bg-[#060b13] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'text-emerald-400 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(52,211,153,0.15)]'}` : 'glass-input'}`} 
+                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#060b13] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'text-emerald-400 focus:border-emerald-500 focus:shadow-[0_0_20px_rgba(52,211,153,0.15)]'}`} 
                     />
                   </div>
                 </div>
 
-                {tipoCotizacion === 'contado' && (
-                  <div className={`bg-[#060b13]/50 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 border-cyan-500/40 transition-colors`}>
-                    <div className="text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]">
-                      <div className="p-1.5 rounded-lg border shadow-sm shrink-0 bg-cyan-900/50 border-cyan-500/50">
-                        <Gift className="w-4 h-4 text-cyan-300" />
-                      </div>
-                      Esquema de Liquidación Rápida
+                <div className={`bg-[#060b13]/50 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 ${tipoCotizacion === 'contado' ? 'border-cyan-500/40 hover:border-cyan-500/60' : 'border-emerald-500/40 hover:border-emerald-500/60'} transition-colors`}>
+                  <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl transition-colors ${tipoCotizacion === 'contado' ? 'bg-cyan-500/10 group-hover:bg-cyan-400/20' : 'bg-emerald-500/10 group-hover:bg-emerald-400/20'}`}></div>
+                  <div className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 ${tipoCotizacion === 'contado' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`}>
+                    <div className={`p-1.5 rounded-lg border shadow-sm shrink-0 ${tipoCotizacion === 'contado' ? 'bg-cyan-900/50 border-cyan-500/50' : 'bg-emerald-900/50 border-emerald-500/50'}`}>
+                      <Gift className={`w-4 h-4 ${tipoCotizacion === 'contado' ? 'text-cyan-300' : 'text-emerald-300'}`} />
                     </div>
-                    <div className="space-y-1.5 relative z-10">
-                      <select 
-                        value={plazoLiquidacion} 
-                        onChange={e => setPlazoLiquidacion(Number(e.target.value))} 
-                        className="w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)] appearance-none cursor-pointer"
-                      >
-                        <option value={30}>Liquidación a 30 Días (30% DESC.)</option>
-                        <option value={60}>Liquidación a 60 Días (20% DESC.)</option>
-                        <option value={90}>Liquidación a 90 Días (10% DESC.)</option>
-                      </select>
-                    </div>
+                    Descuentos Exclusivos
                   </div>
-                )}
-                
-                {tipoCotizacion === 'credito' && (
-                  <div className={`bg-[#060b13]/50 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 border-emerald-500/40 transition-colors`}>
-                    <div className="text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]">
-                      <div className="p-1.5 rounded-lg border shadow-sm shrink-0 bg-emerald-900/50 border-emerald-500/50">
-                        <Gift className="w-4 h-4 text-emerald-300" />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10">
+                    {tipoCotizacion === 'contado' && (
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
+                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
+                        </label>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          disabled={!aplicarDescContadoM2} 
+                          value={descuentoContadoM2} 
+                          onChange={handleDescContadoM2Change} 
+                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-[#060b13] border border-cyan-500 text-white focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                        />
                       </div>
-                      Bonificación Estructural
-                    </div>
-                    <div className="space-y-1.5 relative z-10">
-                      <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                        <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500 shrink-0" /> Descuento Directo: $1 / m²
-                      </label>
-                    </div>
+                    )}
+                    {tipoCotizacion === 'credito' && (
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
+                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500 shrink-0" /> Crédito x m² ($us)
+                        </label>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          disabled={!aplicarDescM2} 
+                          value={descuentoM2} 
+                          onChange={handleDescM2Change} 
+                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#060b13] border border-emerald-500 text-white focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
@@ -1372,7 +1392,7 @@ export default function App() {
                         required 
                         value={años} 
                         onChange={e => setAños(e.target.value)} 
-                        className="w-full glass-input rounded-2xl p-3.5 outline-none transition-all font-bold text-white text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                        className="w-full bg-[#060b13]/50 border border-slate-700 text-white rounded-2xl p-3.5 outline-none transition-all font-bold text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
                       >
                         <option value="" disabled hidden>Selec.</option>
                         {[...Array(14)]?.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
@@ -1384,7 +1404,6 @@ export default function App() {
                   </div>
                 </div>
                 )}
-                
                 <button 
                   type="submit" 
                   disabled={isCalculating} 
@@ -1466,27 +1485,36 @@ export default function App() {
                       </div>
                   </div>
 
+                  {/* BLOQUE AL CONTADO REDISEÑADO */}
                   {resultado.tipoCotizacion === 'contado' && (
-                    <div className="animate-in zoom-in-95 duration-500 mt-8 space-y-6">
+                    <div className="animate-in zoom-in-95 duration-500 space-y-6">
                        <div className="relative overflow-hidden bg-gradient-to-br from-cyan-950 via-[#04070b] to-[#04070b] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(6,182,212,0.15)] border border-cyan-500/50 group text-center">
                           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
                           <div className="absolute -bottom-20 -right-20 opacity-10"><Wallet className="w-64 h-64 text-cyan-400" /></div>
                           <div className="relative z-10 flex flex-col items-center justify-center">
                              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 text-[10px] sm:text-xs font-black uppercase tracking-widest mb-6 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-                               <Tag className="w-3.5 h-3.5"/> Precio Final al Contado
+                               <Tag className="w-3.5 h-3.5"/> Inversión Final al Contado
                              </div>
                              <div className="text-[3.5rem] sm:text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] leading-none mb-3">
-                               $ {resultado.valorFinal}
-                             </div>
-                             <div className="text-xl sm:text-2xl font-bold text-cyan-200">
-                               Bs. {formatMoney(resultado.montoBsOpcionA)}
+                               $us {resultado.valorFinal}
                              </div>
                              
+                             {resultado.ahorroTotalRaw > 0 && (
+                               <div className="mt-8 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-center gap-4 shadow-[0_0_20px_rgba(52,211,153,0.15)] max-w-xl mx-auto w-full">
+                                 <div className="bg-emerald-500/20 p-3 rounded-full shrink-0 border border-emerald-500/40">
+                                   <Gift className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/>
+                                 </div>
+                                 <div className="text-center sm:text-left">
+                                   <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">Ahorro Promocional Aplicado</div>
+                                   <div className="text-2xl font-black text-white">$us {resultado.ahorroTotal}</div>
+                                 </div>
+                               </div>
+                             )}
                              <div className="mt-8 flex justify-between w-full max-w-xl mx-auto border-t border-cyan-500/30 pt-6">
                                <div className="text-center">
                                  <div className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mb-1">Precio de Lista</div>
-                                 <div className="text-slate-300 font-bold text-lg line-through decoration-rose-500/50 decoration-2">$ {resultado.valorOriginal}</div>
+                                 <div className="text-slate-300 font-bold text-lg line-through decoration-rose-500/50 decoration-2">$us {resultado.valorOriginal}</div>
                                </div>
                                <div className="text-center">
                                  <div className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mb-1">Superficie</div>
@@ -1495,166 +1523,93 @@ export default function App() {
                              </div>
                           </div>
                        </div>
-                       
-                       <div className="bg-[#0b111a] border border-slate-700 rounded-3xl p-6 relative overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-                         <div className="absolute -left-20 -top-20 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl"></div>
-                         <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 mb-6 relative z-10 border-b border-slate-700 pb-3">
-                           <Scale className="text-cyan-400 w-5 h-5"/> Prueba de Simetría Matemática
-                         </h3>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center relative z-10">
-                           <div className="p-5 bg-slate-900/60 rounded-2xl border border-slate-700 hover:border-cyan-500/40 transition-colors shadow-inner">
-                             <div className="text-[10px] text-cyan-400 uppercase font-black mb-3 tracking-widest bg-cyan-950/30 py-1.5 rounded-lg border border-cyan-500/20">Opción A: Desc. al Precio</div>
-                             <div className="text-slate-400 text-xs font-bold font-mono">$ {resultado.valorOriginal} - {resultado.descContadoPct*100}% = $ {resultado.valorFinal}</div>
-                             <div className="text-slate-500 text-[10px] mt-1 font-mono">$ {resultado.valorFinal} × TC {tcFlexible}</div>
-                             <div className="text-2xl text-white font-black mt-3">Bs. {formatMoney(resultado.montoBsOpcionA)}</div>
+                       <div className="grid grid-cols-1 gap-4">
+                         <div className="bg-gradient-to-br from-amber-900/20 to-[#04070b] border border-amber-500/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-lg group hover:border-amber-500/50 transition-colors">
+                           <div className="text-xs font-black text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                             <TrendingUp className="w-5 h-5" /> Plusvalía Inmediata Asegurada
                            </div>
-                           <div className="p-5 bg-slate-900/60 rounded-2xl border border-slate-700 hover:border-cyan-500/40 transition-colors shadow-inner">
-                             <div className="text-[10px] text-cyan-400 uppercase font-black mb-3 tracking-widest bg-cyan-950/30 py-1.5 rounded-lg border border-cyan-500/20">Opción B: Desc. al TC</div>
-                             <div className="text-slate-400 text-xs font-bold font-mono">TC {tcFlexible} - {resultado.descContadoPct*100}% = TC {Number(tcFlexible * (1 - resultado.descContadoPct)).toFixed(2)}</div>
-                             <div className="text-slate-500 text-[10px] mt-1 font-mono">$ {resultado.valorOriginal} × TC {Number(tcFlexible * (1 - resultado.descContadoPct)).toFixed(2)}</div>
-                             <div className="text-2xl text-white font-black mt-3">Bs. {formatMoney(resultado.montoBsOpcionB)}</div>
+                           <div className="text-sm text-slate-300 font-bold max-w-lg">
+                             Gracias a nuestro modelo de gestión integral, su capital absorbe inmediatamente un crecimiento orgánico frente al valor base de mercado.
                            </div>
-                         </div>
-                         <div className="mt-5 text-center text-[10px] uppercase font-black text-emerald-400 bg-emerald-950/30 p-3 rounded-xl border border-emerald-500/30 flex justify-center items-center gap-2 tracking-widest shadow-sm relative z-10">
-                           <CheckCircle2 className="w-4 h-4"/> Demostración verificada: El monto final en Bolivianos es idéntico.
                          </div>
                        </div>
                     </div>
                   )}
 
+                  {/* BLOQUE A CRÉDITO REDISEÑADO */}
                   {resultado.tipoCotizacion === 'credito' && (
                     <div className="animate-in fade-in duration-500 space-y-6">
-                      <div className="bg-gradient-to-br from-[#0b111a] to-[#04070b] p-5 sm:p-6 rounded-2xl border border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 relative overflow-hidden shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
-                        <div className="text-center sm:text-left">
-                          <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1 block">Valor Original del Lote</span>
-                          <div className="text-2xl sm:text-3xl font-black text-white">$ {resultado.valorOriginal}</div>
-                        </div>
-                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                        <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative overflow-hidden shadow-[0_0_25px_rgba(0,0,0,0.4)]">
-                          <div className="text-emerald-500 text-[10px] font-extrabold uppercase tracking-widest">Total a Financiar</div>
-                          <div className="text-2xl font-black text-white mt-1 truncate drop-shadow-sm">$ {resultado.valorFinal}</div>
+                        <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
+                          <div className="text-emerald-500 text-[10px] font-extrabold uppercase tracking-widest">Inversión Total</div>
+                          <div className="text-3xl font-black text-white mt-1">$us {resultado.valorFinal}</div>
                           {resultado.ahorroTotalRaw > 0 && (
-                            <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase truncate max-w-full shadow-sm">
-                              Bonificación Aplicada: $ {resultado.ahorroTotal}
+                            <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase shadow-sm">
+                              Ahorro Incluido: $us {resultado.ahorroTotal}
                             </div>
                           )}
                         </div>
-                        <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-[0_0_25px_rgba(0,0,0,0.4)]">
-                          <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest truncate">Cuota Inicial ({resultado.inicialPct}%)</div>
-                          <div className="text-2xl font-black text-white mt-1 truncate drop-shadow-sm">$ {resultado.inicial}</div>
-                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.inicialBs}</div>
+                        <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
+                          <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest">Cuota Inicial ({resultado.inicialPct}%)</div>
+                          <div className="text-3xl font-black text-white mt-1">$us {resultado.inicial}</div>
                         </div>
-                      </div>
-                      
-                      <div className="bg-[#04070b] border border-rose-500/30 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(244,63,94,0.1)] mt-8 relative w-full group hover:border-rose-500/50 transition-colors">
-                          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-gradient-to-r from-rose-950/20 to-transparent">
-                              <div>
-                                <h3 className="text-white font-black text-base sm:text-lg flex items-center gap-2 drop-shadow-sm">
-                                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-rose-500 drop-shadow-[0_0_5px_rgba(244,63,94,0.6)]"/> 
-                                  Riesgo Cambiario y Costo de Postergación
-                                </h3>
-                                <p className="text-slate-400 text-[9px] sm:text-[10px] mt-1 font-medium">Proyección a 6 meses. Tasa de crecimiento estimada: +1.19 Bs/mes.</p>
-                              </div>
-                          </div>
-                          <div className="overflow-x-auto relative w-full">
-                            <table className="w-full text-left text-xs whitespace-nowrap min-w-[700px]">
-                              <thead className="bg-[#090e17] z-30 border-b border-slate-700">
-                                <tr className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                  <th className="p-4 text-center">Proyección</th>
-                                  <th className="p-4 text-center">TC Estimado</th>
-                                  <th className="p-4 text-center">Mensualidad Fija ($)</th>
-                                  <th className="p-4 text-center text-white">Cuota Real (Bs)</th>
-                                  <th className="p-4 text-center text-rose-400">Pérdida por Inflación</th>
-                                </tr>
-                              </thead>
-                              <tbody className="font-semibold relative z-10">
-                                {resultado.proyeccionTC?.map((row, i) => (
-                                  <tr key={i} className="border-b border-slate-800/50 text-center hover:bg-slate-800/60 transition-colors">
-                                    <td className="p-4 font-bold text-slate-300">Mes {row.mes}</td>
-                                    <td className="p-4 text-slate-400 font-mono">{row.tc}</td>
-                                    <td className="p-4 text-slate-300 font-mono">$ {resultado.mensual}</td>
-                                    <td className="p-4 font-black text-white font-mono">Bs. {row.cuotaBs}</td>
-                                    <td className="p-4 font-bold text-rose-400 font-mono">+ Bs. {row.incremento}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                          <div className="p-3 bg-[#060b13] text-[8px] sm:text-[9px] text-slate-500 text-center border-t border-slate-800 font-bold">
-                            *Simulación algorítmica de riesgo. El costo de oportunidad por postergar la inversión incrementa significativamente el valor real a pagar.
-                          </div>
                       </div>
 
-                      <div className="mt-8 border border-emerald-500/40 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-[#0b111a] w-full">
-                        <div className="bg-[#060b13] p-4 border-b border-emerald-500/30 flex justify-between items-center">
-                          <h3 className="text-slate-200 font-bold text-sm tracking-wide flex items-center gap-2 drop-shadow-sm">
-                            <Calendar className="w-4 h-4 text-emerald-500 shrink-0 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/> Resumen de Plazos Alternativos
-                          </h3>
-                        </div>
-                        <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0b111a] z-10">
-                              <div>Plazo</div>
-                              <div className="text-emerald-400">Cuota ($us)</div>
-                              <div className="text-emerald-400">Cuota (Bs.)</div>
+                      {/* ACORDEÓN DE PAGOS */}
+                      <div className="mt-8 border border-emerald-500/40 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(16,185,129,0.15)] bg-[#04070b] w-full">
+                          <div className="p-5 border-b border-slate-800 flex flex-col justify-between items-start bg-gradient-to-r from-emerald-950/40 to-transparent">
+                                <h3 className="text-white font-black text-lg flex items-center gap-2">
+                                  <Calendar className="w-5 h-5 text-emerald-400"/> Proyección Financiera Estructural
+                                </h3>
+                                <p className="text-slate-400 text-xs mt-2">
+                                  Periodo de gracia activado. Sus obligaciones inician en <strong className="text-emerald-400">Octubre 2026</strong>.
+                                </p>
+                          </div>
+                          
+                          <button onClick={() => setExpandedPlan(!expandedPlan)} className="w-full bg-[#0b111a] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800">
+                             <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase">Desplegar Cuadros de Cuota Fija ($us)</span>
+                             <ChevronDown className={`w-5 h-5 text-emerald-400 transition-transform duration-300 ${expandedPlan ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {expandedPlan && (
+                            <div className="overflow-y-auto max-h-[350px] custom-scrollbar p-0 bg-[#060b13]">
+                              <table className="w-full text-left text-xs whitespace-nowrap">
+                                <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-700">
+                                  <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">
+                                    <th className="p-4">Nro.</th>
+                                    <th className="p-4">Mes de Pago</th>
+                                    <th className="p-4 text-emerald-400">Cuota Fija ($us)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="font-semibold relative z-10">
+                                  {resultado.planPagosDetallado?.map((row, i) => (
+                                    <tr key={i} className="border-b border-slate-800/50 text-center hover:bg-slate-800/60 transition-colors">
+                                      <td className="p-4 text-slate-600 font-bold">{row.nro}</td>
+                                      <td className="p-4 text-slate-300">{row.mesLabel}</td>
+                                      <td className="p-4 font-black text-emerald-400 text-sm">$ {Number(row.cuotaUsd).toFixed(2)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
-                            <div className="pt-2">
-                              {resultado.planPagos?.map((plan, i) => (
-                                <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-950/80 border border-emerald-500/60 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
-                                  <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-                                    {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block shrink-0 shadow-[0_0_8px_rgba(52,211,153,1)]"></span>} 
-                                    <span className="truncate">{plan.año} {plan.año === 1 ? 'Año' : 'Años'}</span>
-                                  </div>
-                                  <div className={`font-black truncate ${plan.isCurrent ? 'text-white' : 'text-emerald-50'}`}>$ {plan.cuotaUsd}</div>
-                                  <div className={`truncate ${plan.isCurrent ? 'text-emerald-400' : 'text-slate-400'}`}>Bs. {plan.cuotaBs}</div>
-                                </div>
-                              ))}
-                            </div>
-                        </div>
+                          )}
                       </div>
                     </div>
                   )}
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 no-print">
-                    <button 
-                      onClick={() => setEscenarioGuardado(resultado)} 
-                      className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md"
-                    >
-                       <Scale className="w-4 h-4"/>
-                       {escenarioGuardado ? "Actualizar Escenario A" : "Guardar como Escenario A"}
-                    </button>
-                    {escenarioGuardado && (
-                      <button 
-                        onClick={() => setMostrarComparativa(true)} 
-                        className={`w-full hover:bg-opacity-90 border text-white font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-lg ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-600 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-emerald-600 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'}`}
-                      >
-                         <Scale className="w-4 h-4"/> Comparar Escenarios
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="mt-8 pt-6 border-t border-slate-800 no-print">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <button 
-                          onClick={() => window.print()} 
-                          className="w-full sm:w-1/4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold py-3 sm:py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm hover:shadow-md"
-                        >
-                          <Printer className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                        </button>
+
+                  <div className="mt-8 pt-6 border-t border-slate-800 flex flex-col sm:flex-row gap-3">
                         <button 
                           onClick={copiarTexto} 
-                          className={`w-full sm:w-1/3 bg-[#060b13] border font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm uppercase tracking-wider relative overflow-hidden ${resultado.tipoCotizacion === 'contado' ? 'hover:bg-cyan-950/60 border-cyan-500/60 text-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'hover:bg-emerald-950/60 border-emerald-500/60 text-emerald-400 hover:shadow-[0_0_20px_rgba(52,211,153,0.3)]'}`}
+                          className={`flex-1 bg-[#060b13] border font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-inner ${resultado.tipoCotizacion === 'contado' ? 'border-cyan-500/60 text-cyan-400 hover:bg-cyan-900/30' : 'border-emerald-500/60 text-emerald-400 hover:bg-emerald-900/30'}`}
                         >
-                          {copiado ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /> : <FileText className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />}
-                          <span className="truncate">{copiado ? 'COPIADO' : 'COPIAR TEXTO'}</span>
+                          {copiado ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />} {copiado ? 'COPIADO' : 'COPIAR TEXTO'}
                         </button>
                         <button 
                           onClick={enviarWhatsApp} 
-                          className="w-full sm:w-2/3 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#020617] font-black py-4 sm:py-5 px-4 sm:px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:shadow-[0_0_40px_rgba(37,211,102,0.6)] hover:-translate-y-1 text-xs sm:text-sm uppercase tracking-wider"
+                          className="flex-1 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#020617] font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:-translate-y-1 text-sm uppercase tracking-wider"
                         >
-                          <Send className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /> <span className="truncate">Enviar por WhatsApp</span>
+                          <Send className="w-5 h-5" /> WhatsApp
                         </button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1664,15 +1619,12 @@ export default function App() {
         
         <div className="mt-20 sm:mt-32 pt-12 sm:pt-16 border-t border-slate-800/60 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 no-print relative w-full">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
-          
           <div className="text-slate-500 text-[8px] sm:text-[10px] md:text-xs font-black tracking-[0.3em] sm:tracking-[0.5em] uppercase mb-6 sm:mb-8 px-4 drop-shadow-sm">
             Concepto, Arquitectura y Desarrollo Web
           </div>
-          
           <div className="text-4xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-300 to-cyan-400 tracking-tighter mb-6 sm:mb-8 drop-shadow-[0_0_50px_rgba(34,211,238,0.4)] select-none w-full break-words px-4">
             OSCAR SARAVIA
           </div>
-          
           <p className="text-slate-400 text-[8px] sm:text-[10px] md:text-xs max-w-3xl font-bold tracking-[0.1em] sm:tracking-[0.2em] leading-relaxed uppercase px-4">
             Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
           </p>
