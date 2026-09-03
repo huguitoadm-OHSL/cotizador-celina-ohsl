@@ -79,14 +79,14 @@ const ciudadesRegionales = [
 // ============================================================================
 const baseAnclasUrbanas = {
   "MUYURINA": [
-    { id: 'edu-salesiana', nombre: 'Cdad. Educativa Salesiana', tipo: 'educacion', lat: -17.3685, lng: -63.2450 },
-    { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.3710, lng: -63.2580 },
-    { id: 'parque-lineal-2', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.3735, lng: -63.2620 },
-    { id: 'centro-comercial', nombre: 'Centro Comercial', tipo: 'comercio', lat: -17.3750, lng: -63.2650 },
-    { id: 'carretera-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.3640, lng: -63.2420 },
-    { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.3770, lng: -63.2600 },
-    { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.3695, lng: -63.2500 },
-    { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.3725, lng: -63.2680 }
+    { id: 'edu-salesiana', nombre: 'Cdad. Educativa Salesiana', tipo: 'educacion', lat: -17.361885914835153, lng: -63.24893856868162 },
+    { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.365927510716485, lng: -63.2459298471779 },
+    { id: 'parque-lineal-2', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.369436731162317, lng: -63.256639276667 },
+    { id: 'centro-comercial', nombre: 'Centro Comercial', tipo: 'comercio', lat: -17.370851047268427, lng: -63.25323287462514 },
+    { id: 'carretera-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.36191155922974, lng: -63.24341131066158 },
+    { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.366171150625245, lng: -63.263898823492916 },
+    { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.36532915405663, lng: -63.25521355672914 },
+    { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.371226189082137, lng: -63.26083508618699 }
   ],
   "URUBÓ NORTE": [
     { id: 'puente-foianini', nombre: 'Puente Mario Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
