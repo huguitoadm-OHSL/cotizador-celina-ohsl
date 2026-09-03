@@ -382,7 +382,7 @@ export default function App() {
   const [usarBD, setUsarBD] = useState(true);
 
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.26); // PARAMETRIZACIÓN DETERMINISTA
+  const [tcFlexible, setTcFlexible] = useState(12.32); // PARAMETRIZACIÓN DETERMINISTA
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
