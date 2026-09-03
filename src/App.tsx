@@ -348,7 +348,7 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSTODOPODEROSO") { setIsAuthenticated(true); setIsAdmin(false); setLoginError(false); } 
+    if (passwordInput === "SALMO23") { setIsAuthenticated(true); setIsAdmin(false); setLoginError(false); } 
     else if (passwordInput === "OHSARAVIA") { setIsAuthenticated(true); setIsAdmin(true); setLoginError(false); } 
     else { setLoginError(true); setTimeout(() => setLoginError(false), 2000); }
   };
