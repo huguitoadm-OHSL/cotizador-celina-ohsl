@@ -5,7 +5,7 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer
+  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer, Equal
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -79,13 +79,13 @@ const ciudadesRegionales = [
 // ============================================================================
 const baseAnclasUrbanas = {
   "MUYURINA": [
-    { id: 'edu-salesiana', nombre: 'Ciudad Educativa Salesiana Muyurina', tipo: 'educacion', lat: -17.3685, lng: -63.2450 },
-    { id: 'parque-lineal-1', nombre: 'Parque Lineal Principal', tipo: 'recreacion', lat: -17.3710, lng: -63.2580 },
-    { id: 'parque-lineal-2', nombre: 'Parque Lineal Conector', tipo: 'recreacion', lat: -17.3735, lng: -63.2620 },
-    { id: 'centro-comercial', nombre: 'Futuro Centro Comercial', tipo: 'comercio', lat: -17.3750, lng: -63.2650 },
+    { id: 'edu-salesiana', nombre: 'Cdad. Educativa Salesiana', tipo: 'educacion', lat: -17.3685, lng: -63.2450 },
+    { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.3710, lng: -63.2580 },
+    { id: 'parque-lineal-2', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.3735, lng: -63.2620 },
+    { id: 'centro-comercial', nombre: 'Centro Comercial', tipo: 'comercio', lat: -17.3750, lng: -63.2650 },
     { id: 'carretera-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.3640, lng: -63.2420 },
     { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.3770, lng: -63.2600 },
-    { id: 'primera-radial', nombre: 'Primera Radial', tipo: 'landmark', lat: -17.3695, lng: -63.2500 },
+    { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.3695, lng: -63.2500 },
     { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.3725, lng: -63.2680 }
   ],
   "URUBÓ NORTE": [
@@ -289,6 +289,7 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               <Layer {...labelLayer as any} />
             </Source>
             
+            {/* BALIZAS REGIONALES CIUDADES */}
             {ciudadesRegionales.map((ciudad) => (
               <Marker key={ciudad.id} longitude={ciudad.lng} latitude={ciudad.lat} anchor="center">
                 <div className="flex items-center gap-1.5 bg-[#020617]/85 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] pointer-events-none">
@@ -298,22 +299,36 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
               </Marker>
             ))}
             
+            {/* SISTEMA DE BALIZAS TELEMÉTRICAS (ALTIMÉTRICAS) */}
             {anclasActivas.map((nodo) => (
               <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
                 <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
-                  <div className="relative">
-                    <div className="absolute -inset-2 bg-cyan-500/40 rounded-full blur-md group-hover:bg-cyan-400/60 group-hover:blur-xl transition-all duration-300 animate-ping"></div>
-                    <div className="relative bg-[#020617]/90 backdrop-blur-xl border border-cyan-400 p-2 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.7)] group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300">
-                      {nodo.tipo === 'educacion' && <GraduationCap className="w-4 h-4 text-cyan-300" />}
-                      {nodo.tipo === 'recreacion' && <TreePine className="w-4 h-4 text-emerald-400" />}
-                      {nodo.tipo === 'salud' && <Hospital className="w-4 h-4 text-rose-400" />}
-                      {nodo.tipo === 'comercio' && <ShoppingBag className="w-4 h-4 text-amber-400" />}
-                      {nodo.tipo === 'landmark' && <Landmark className="w-4 h-4 text-indigo-400" />}
+                  
+                  {/* Cabezal de Lectura Constante (Opacidad 100%) */}
+                  <div className="flex items-center gap-2 bg-[#020617]/95 backdrop-blur-xl border border-cyan-500/50 p-1.5 pr-3 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.5)] transform transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1 relative z-20">
+                    <div className="bg-cyan-950/80 p-1.5 rounded-full border border-cyan-400/50 flex items-center justify-center shrink-0">
+                      {nodo.tipo === 'educacion' && <GraduationCap className="w-3.5 h-3.5 text-cyan-300" />}
+                      {nodo.tipo === 'recreacion' && <TreePine className="w-3.5 h-3.5 text-emerald-400" />}
+                      {nodo.tipo === 'salud' && <Hospital className="w-3.5 h-3.5 text-rose-400" />}
+                      {nodo.tipo === 'comercio' && <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />}
+                      {nodo.tipo === 'landmark' && <Landmark className="w-3.5 h-3.5 text-indigo-400" />}
                     </div>
+                    <span className="text-[9px] sm:text-[10px] font-black text-white whitespace-nowrap uppercase tracking-widest drop-shadow-md">
+                      {nodo.nombre}
+                    </span>
                   </div>
-                  <div className="mt-1.5 bg-[#020617]/95 backdrop-blur-md border border-slate-700 px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_10px_25px_rgba(0,0,0,0.8)] pointer-events-none">
-                    <span className="text-[9px] font-black text-cyan-50 whitespace-nowrap uppercase tracking-widest">{nodo.nombre}</span>
+                  
+                  {/* Mástil Vertical */}
+                  <div className="w-[1.5px] h-10 sm:h-14 bg-gradient-to-b from-cyan-400/80 to-cyan-500/10 shadow-[0_0_5px_rgba(34,211,238,0.5)] relative z-10 -my-1">
+                     <div className="absolute top-0 left-0 w-full h-1/3 bg-cyan-300 animate-pulse"></div>
                   </div>
+                  
+                  {/* Elipse Topográfica Suelo */}
+                  <div className="relative flex items-center justify-center z-0">
+                     <div className="absolute w-8 h-2.5 bg-cyan-500/30 rounded-[100%] blur-sm animate-ping"></div>
+                     <div className="w-3 h-[3px] bg-cyan-400 rounded-[100%] shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
+                  </div>
+
                 </div>
               </Marker>
             ))}
