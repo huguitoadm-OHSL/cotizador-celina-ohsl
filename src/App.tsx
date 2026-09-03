@@ -5,7 +5,7 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer, Equal
+  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -74,11 +74,36 @@ const ciudadesRegionales = [
   { id: 'pailon', nombre: 'Pailón', lat: -17.6597, lng: -62.7194 }
 ];
 
+// ============================================================================
+// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS LOCALES)
+// ============================================================================
 const baseAnclasUrbanas = {
   "MUYURINA": [
-    { id: 'plaza-montero', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
-    { id: 'hospital', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 },
-    { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 }
+    { id: 'edu-salesiana', nombre: 'Ciudad Educativa Salesiana Muyurina', tipo: 'educacion', lat: -17.3685, lng: -63.2450 },
+    { id: 'parque-lineal-1', nombre: 'Parque Lineal Principal', tipo: 'recreacion', lat: -17.3710, lng: -63.2580 },
+    { id: 'parque-lineal-2', nombre: 'Parque Lineal Conector', tipo: 'recreacion', lat: -17.3735, lng: -63.2620 },
+    { id: 'centro-comercial', nombre: 'Futuro Centro Comercial', tipo: 'comercio', lat: -17.3750, lng: -63.2650 },
+    { id: 'carretera-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.3640, lng: -63.2420 },
+    { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.3770, lng: -63.2600 },
+    { id: 'primera-radial', nombre: 'Primera Radial', tipo: 'landmark', lat: -17.3695, lng: -63.2500 },
+    { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.3725, lng: -63.2680 }
+  ],
+  "URUBÓ NORTE": [
+    { id: 'puente-foianini', nombre: 'Puente Mario Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
+    { id: 'urubo-business', nombre: 'Centro Empresarial Urubó', tipo: 'comercio', lat: -17.7450, lng: -63.2100 },
+    { id: 'country-club', nombre: 'Urubó Golf Country Club', tipo: 'recreacion', lat: -17.7380, lng: -63.2150 },
+    { id: 'parque-ecologico', nombre: 'Reserva Ecológica Urubó', tipo: 'recreacion', lat: -17.7300, lng: -63.2200 }
+  ],
+  "CELINA 7 FASE 3": [
+    { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
+    { id: 'mercado-satelite', nombre: 'Mercado Mayorista Satélite', tipo: 'comercio', lat: -17.5850, lng: -63.1510 },
+    { id: 'avenida-g77', nombre: 'Avenida G77', tipo: 'landmark', lat: -17.6200, lng: -63.1400 },
+    { id: 'parque-industrial', nombre: 'Parque Industrial Norte', tipo: 'comercio', lat: -17.5900, lng: -63.1450 }
+  ],
+  "EL ENCANTO": [
+    { id: 'nueva-autopista', nombre: 'Autopista Santa Cruz - Warnes', tipo: 'landmark', lat: -17.6900, lng: -63.0900 },
+    { id: 'zona-franca', nombre: 'Zona Franca Comercial', tipo: 'comercio', lat: -17.6850, lng: -63.0950 },
+    { id: 'parque-urbano', nombre: 'Parque Urbano El Encanto', tipo: 'recreacion', lat: -17.6980, lng: -63.0800 }
   ]
 };
 
@@ -321,7 +346,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.32); // ACTUALIZACIÓN: TC BASE ANCLADO SEGÚN IMAGEN
+  const [tcFlexible, setTcFlexible] = useState(12.32); 
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
@@ -333,7 +358,6 @@ export default function App() {
   const [descuentoM2, setDescuentoM2] = useState(1); 
   const [aplicarDescM2, setAplicarDescM2] = useState(true); 
   
-  // ESTADO: Segmentación Liquidación
   const [plazoLiquidacion, setPlazoLiquidacion] = useState("30"); 
 
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
@@ -605,7 +629,7 @@ export default function App() {
   const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 4000); };
 
   // ============================================================================
-  // MOTOR DE CÁLCULO REFACTORIZADO (SEPTIEMBRE 2026 - DEMOSTRADOR MATEMÁTICO)
+  // MOTOR DE CÁLCULO REFACTORIZADO 
   // ============================================================================
   const calcular = () => {
     const sup = Number(superficie) || 0; 
@@ -619,12 +643,13 @@ export default function App() {
     
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosDetallado = [];
+    let planPlazosAlternativos = [];
+    
     const TC_FLEX_NUMBER = Number(tcFlexible) || 12.32;
     
     let tcEfectivoAplicado = TC_FLEX_NUMBER;
     let descPctMapeo = 0;
     
-    // Variables para el demostrador (Option A y Option B)
     let totalBs_OpcionA = 0;
     let totalBs_OpcionB = 0;
 
@@ -637,10 +662,7 @@ export default function App() {
         valor_final = valor_original - ahorro_total;
         tcEfectivoAplicado = TC_FLEX_NUMBER * (1 - descPctMapeo);
 
-        // DEMOSTRACIÓN A: Descuento sobre Precio de Lista
         totalBs_OpcionA = valor_final * TC_FLEX_NUMBER;
-
-        // DEMOSTRACIÓN B: Descuento sobre Tipo de Cambio
         totalBs_OpcionB = valor_original * tcEfectivoAplicado;
         
     } else {
@@ -684,6 +706,22 @@ export default function App() {
                 cuotaUsd: cuota_final
             });
         }
+
+        // MOTOR: PLAN DE PLAZOS ALTERNATIVOS (1 A 14 AÑOS)
+        for (let i = 14; i >= 1; i--) {
+          const m_i = i * 12;
+          let pp_i = tasa === 0 ? saldo / m_i : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
+          if(isNaN(pp_i) || !isFinite(pp_i)) pp_i = 0;
+          const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1.3) / refSaldo;
+          const c_final_i = pp_i + (saldo * fS_i) + cbdi;
+
+          planPlazosAlternativos.push({
+            año: i,
+            cuotaUsd: formatMoney(c_final_i),
+            cuotaBs: formatMoney(c_final_i * TC_FLEX_NUMBER),
+            isCurrent: i === ans
+          });
+        }
     }
     
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
@@ -692,16 +730,20 @@ export default function App() {
       valorOriginalRaw: valor_original, 
       valorOriginal: formatMoney(valor_original), 
       valorFinal: formatMoney(valor_final), 
+      valorFinalBs: formatMoney(valor_final * TC_FLEX_NUMBER), // NUEVO
       ahorroTotalRaw: ahorro_total, 
       ahorroTotal: formatMoney(ahorro_total),
       inicialRaw: cuota_inicial, 
       inicial: formatMoney(cuota_inicial), 
+      inicialBs: formatMoney(cuota_inicial * TC_FLEX_NUMBER), // NUEVO
       inicialPct: formatPct,
       saldoRaw: tipoCotizacion === 'credito' ? valor_final - cuota_inicial : 0, 
       mensualRaw: cuota_final, 
       mensual: formatMoney(cuota_final), 
+      mensualBs: formatMoney(cuota_final * TC_FLEX_NUMBER), // NUEVO
       plazo: ans, 
       planPagosDetallado: planPagosDetallado,
+      planPlazosAlternativos: planPlazosAlternativos, // NUEVO
       descPctAplicado: descPctMapeo,
       tcOriginal: TC_FLEX_NUMBER,
       tcEfectivo: tcEfectivoAplicado,
@@ -739,15 +781,15 @@ export default function App() {
     if (resultado.tipoCotizacion === 'contado') {
         contentStr += `💰 *[LIQUIDACIÓN / AL CONTADO]*\n`;
         contentStr += `⏱️ *Plazo de Pago:* Hasta ${resultado.plazoLiquidacionVisual}\n`;
-        contentStr += `🔥 *Descuento Aplicado:* ${resultado.descPctAplicado * 100}%\n`;
+        contentStr += `🔥 *Descuento Aplicado:* ${(resultado.descPctAplicado * 100).toFixed(0)}%\n`;
         contentStr += `💵 *T.C. Efectivo Equivalente:* Bs. ${resultado.tcEfectivo.toFixed(3)}\n`;
         contentStr += `*Inversión Final:* $us ${resultado.valorFinal} (Equivalente a Bs. ${resultado.totalBsA})\n\n`;
     } else {
         contentStr += `✅ *[FINANCIAMIENTO_ESTRATÉGICO]*\n`;
         if (resultado.descuentoM2Aplicado > 0) contentStr += `🎁 *Bono Promocional:* Descuento de $us ${resultado.descuentoM2Aplicado} x m²\n`;
-        contentStr += `*Valor del Terreno:* $us ${resultado.valorFinal}\n\n`;
-        contentStr += `📊 *Proyección a ${resultado.plazo} años*\n*Inversión Inicial:* ${resultado.inicialPct}% ($us ${resultado.inicial})\n\n`;
-        contentStr += `⏳ *Periodo de Gracia Activo:*\nAdquiriendo hoy, su primera cuota se programa para *Octubre*.\n*Cuota Fija Mensual:* $us ${resultado.mensual}\n\n`;
+        contentStr += `*Valor del Terreno:* $us ${resultado.valorFinal} (Bs. ${resultado.valorFinalBs})\n\n`;
+        contentStr += `📊 *Proyección a ${resultado.plazo} años*\n*Inversión Inicial:* ${resultado.inicialPct}% ($us ${resultado.inicial} | Bs. ${resultado.inicialBs})\n\n`;
+        contentStr += `⏳ *Periodo de Gracia Activo:*\nAdquiriendo hoy, su primera cuota se programa para *Octubre*.\n*Cuota Fija Mensual:* $us ${resultado.mensual} (Bs. ${resultado.mensualBs})\n\n`;
     }
     return saludo + ubicacion + precioLista + contentStr + `¿Desea que agendemos una visita ejecutiva al proyecto? 🤝`;
   };
@@ -885,7 +927,6 @@ export default function App() {
           <div className="hidden md:block w-32"></div>
         </div>
 
-        {/* COMPONENTE WEBGIS INTEGRADO */}
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
            <MapaEspacial 
              loteActivo={lote}
@@ -1351,7 +1392,7 @@ export default function App() {
                              {/* DEMOSTRADOR DE PROPIEDAD CONMUTATIVA */}
                              <div className="mt-8 w-full max-w-3xl">
                                <div className="flex items-center justify-center gap-3 text-cyan-400 text-xs font-black uppercase tracking-widest mb-4">
-                                 <Equals className="w-4 h-4" /> Demostración de Equivalencia
+                                 <Scale className="w-4 h-4" /> Demostración de Equivalencia
                                </div>
                                
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1362,7 +1403,7 @@ export default function App() {
                                      Opción A: Descuento al Precio
                                    </div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">$us {resultado.valorOriginal}</span></div>
-                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({resultado.descPctAplicado * 100}%)</span> <span className="text-emerald-400 font-bold">-$us {resultado.ahorroTotal}</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-emerald-400 font-bold">-$us {resultado.ahorroTotal}</span></div>
                                    <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Precio Final</span> <span className="font-black text-white">$us {resultado.valorFinal}</span></div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">x {resultado.tcOriginal}</span></div>
                                    <div className="flex justify-between text-lg border-t border-cyan-500/50 pt-2 mt-2 bg-cyan-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
@@ -1377,7 +1418,7 @@ export default function App() {
                                      Opción B: Descuento al T.C.
                                    </div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">{resultado.tcOriginal}</span></div>
-                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({resultado.descPctAplicado * 100}%)</span> <span className="text-emerald-400 font-bold">-{resultado.descPctAplicado * 100}%</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-emerald-400 font-bold">-{resultado.descPctAplicado * 100}%</span></div>
                                    <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Nuevo T.C. (Hoy)</span> <span className="font-black text-white">{resultado.tcEfectivo.toFixed(3)}</span></div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">x $us {resultado.valorOriginal}</span></div>
                                    <div className="flex justify-between text-lg border-t border-emerald-500/50 pt-2 mt-2 bg-emerald-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
@@ -1404,13 +1445,14 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* BLOQUE A CRÉDITO REDISEÑADO */}
+                  {/* BLOQUE A CRÉDITO REDISEÑADO CON Bs. */}
                   {resultado.tipoCotizacion === 'credito' && (
                     <div className="animate-in fade-in duration-500 space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                         <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
                           <div className="text-emerald-500 text-[10px] font-extrabold uppercase tracking-widest">Inversión Total</div>
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.valorFinal}</div>
+                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.valorFinalBs}</div>
                           {resultado.ahorroTotalRaw > 0 && (
                             <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase shadow-sm">
                               Bono Promocional Incluido: $us {resultado.ahorroTotal}
@@ -1420,6 +1462,7 @@ export default function App() {
                         <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
                           <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest">Cuota Inicial ({resultado.inicialPct}%)</div>
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.inicial}</div>
+                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.inicialBs}</div>
                         </div>
                       </div>
 
@@ -1435,7 +1478,7 @@ export default function App() {
                           </div>
                           
                           <button onClick={() => setExpandedPlan(!expandedPlan)} className="w-full bg-[#0b111a] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800">
-                             <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase">Desplegar Cuadros de Cuota Fija ($us)</span>
+                             <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase">Desplegar Cuadros de Cuota Fija ($us / Bs.)</span>
                              <ChevronDown className={`w-5 h-5 text-emerald-400 transition-transform duration-300 ${expandedPlan ? 'rotate-180' : ''}`} />
                           </button>
 
@@ -1462,6 +1505,35 @@ export default function App() {
                             </div>
                           )}
                       </div>
+
+                      {/* MOTOR DE PLAZOS ALTERNATIVOS 1 A 14 AÑOS */}
+                      <div className="mt-8 border border-emerald-500/40 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-[#0b111a] w-full">
+                        <div className="bg-[#060b13] p-4 border-b border-emerald-500/30 flex justify-between items-center">
+                          <h3 className="text-slate-200 font-bold text-sm tracking-wide flex items-center gap-2 drop-shadow-sm">
+                            <Activity className="w-4 h-4 text-emerald-500 shrink-0 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/> Resumen de Plazos Alternativos
+                          </h3>
+                        </div>
+                        <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0b111a] z-10">
+                              <div>Plazo</div>
+                              <div className="text-emerald-400">Cuota ($us)</div>
+                              <div className="text-emerald-400">Cuota (Bs.)</div>
+                            </div>
+                            <div className="pt-2">
+                              {resultado.planPlazosAlternativos?.map((plan, i) => (
+                                <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-emerald-950/80 border border-emerald-500/60 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
+                                  <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                                    {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block shrink-0 shadow-[0_0_8px_rgba(52,211,153,1)]"></span>} 
+                                    <span className="truncate">{plan.año} {plan.año === 1 ? 'Año' : 'Años'}</span>
+                                  </div>
+                                  <div className={`font-black truncate ${plan.isCurrent ? 'text-white' : 'text-emerald-50'}`}>$ {plan.cuotaUsd}</div>
+                                  <div className={`truncate ${plan.isCurrent ? 'text-emerald-400' : 'text-slate-400'}`}>Bs. {plan.cuotaBs}</div>
+                                </div>
+                              ))}
+                            </div>
+                        </div>
+                      </div>
+
                     </div>
                   )}
 
