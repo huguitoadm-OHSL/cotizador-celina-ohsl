@@ -5,7 +5,7 @@ import {
   MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark
+  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer
 } from "lucide-react";
 import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -30,9 +30,6 @@ const proyectosPorRegional = {
   ]
 };
 
-// ============================================================================
-// DICCIONARIO SATELITAL: COORDENADAS EXACTAS DE PROYECTOS
-// ============================================================================
 const coordenadasProyectos = {
   "MUYURINA": { lat: -17.3710, lng: -63.2550, zoom: 15.5 },
   "LOS JARDINES": { lat: -17.3524, lng: -63.2718, zoom: 15.5 },
@@ -68,56 +65,25 @@ const coordenadasProyectos = {
   "EL PORVENIR FASE 2": { lat: -17.7082, lng: -63.0622, zoom: 15.2 }
 };
 
-// ============================================================================
-// RED DE CIUDADES PRINCIPALES
-// ============================================================================
 const ciudadesRegionales = [
   { id: 'scz', nombre: 'Santa Cruz de la Sierra', lat: -17.7833, lng: -63.1821 },
   { id: 'montero', nombre: 'Montero', lat: -17.3386, lng: -63.2553 },
   { id: 'warnes', nombre: 'Warnes', lat: -17.5147, lng: -63.1672 },
   { id: 'cotoca', nombre: 'Cotoca', lat: -17.7544, lng: -62.9975 },
   { id: 'satelite', nombre: 'Satélite Norte', lat: -17.5833, lng: -63.1500 },
-  { id: 'pailon', nombre: 'Pailón', lat: -17.6597, lng: -62.7194 },
-  { id: 'yapacani', nombre: 'Yapacaní', lat: -17.4047, lng: -63.8828 },
-  { id: 'mineros', nombre: 'Mineros', lat: -17.1197, lng: -63.2325 },
-  { id: 'saavedra', nombre: 'Gral. Saavedra', lat: -17.2289, lng: -63.2167 }
+  { id: 'pailon', nombre: 'Pailón', lat: -17.6597, lng: -62.7194 }
 ];
 
-// ============================================================================
-// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS LOCALES)
-// ============================================================================
 const baseAnclasUrbanas = {
   "MUYURINA": [
     { id: 'plaza-montero', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
     { id: 'hospital', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 },
-    { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 },
-    { id: 'comercio-norte', nombre: 'Zona Comercial Norte', tipo: 'comercio', lat: -17.3550, lng: -63.2510 }
-  ],
-  "URUBÓ NORTE": [
-    { id: 'puente-foianini', nombre: 'Puente Mario Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
-    { id: 'urubo-business', nombre: 'Centro Empresarial Urubó', tipo: 'comercio', lat: -17.7450, lng: -63.2100 },
-    { id: 'country-club', nombre: 'Urubó Golf Country Club', tipo: 'recreacion', lat: -17.7380, lng: -63.2150 }
-  ],
-  "CELINA PAILÓN": [
-    { id: 'plaza-pailon', nombre: 'Plaza Principal Pailón', tipo: 'landmark', lat: -17.6543, lng: -62.7231 },
-    { id: 'mercado-pailon', nombre: 'Mercado Municipal', tipo: 'comercio', lat: -17.6560, lng: -62.7250 }
-  ],
-  "ROSA RODALI": [
-    { id: 'surtidor-norte', nombre: 'Estación de Servicio Biocéanica', tipo: 'comercio', lat: -17.6890, lng: -63.1210 },
-    { id: 'parque-industrial', nombre: 'Parque Industrial Latinoamericano', tipo: 'landmark', lat: -17.6700, lng: -63.1400 }
-  ],
-  "CELINA 7 FASE 3": [
-    { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
-    { id: 'mercado-satelite', nombre: 'Mercado Satélite Norte', tipo: 'comercio', lat: -17.5850, lng: -63.1510 }
-  ],
-  "LOS JARDINES": [
-    { id: 'plaza-montero-jard', nombre: 'Plaza Principal Montero', tipo: 'landmark', lat: -17.3392, lng: -63.2562 },
-    { id: 'hospital-jard', nombre: 'Hospital de Tercer Nivel', tipo: 'salud', lat: -17.3485, lng: -63.2620 }
+    { id: 'colegio-muyurina', nombre: 'Colegio Muyurina', tipo: 'educacion', lat: -17.3620, lng: -63.2450 }
   ]
 };
 
 // ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS (MASTERPLAN 360 - HD SATELLITE)
+// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS 
 // ============================================================================
 const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -129,13 +95,10 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
   
   useEffect(() => {
     setIsMapReady(false);
-    const safetyTimer = setTimeout(() => {
-      setIsMapReady(true);
-    }, 2500);
+    const safetyTimer = setTimeout(() => setIsMapReady(true), 2500);
     return () => clearTimeout(safetyTimer);
   }, [proyectoActivo]);
 
-  // PILOTO AUTOMÁTICO INTELIGENTE
   useEffect(() => {
     const volarAlProyecto = async () => {
       try {
@@ -146,41 +109,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
             let coordenadas = data.features[0].geometry.coordinates;
             while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
             const [lng, lat] = coordenadas;
-            
             if (mapRef.current && lng && lat) {
-              mapRef.current.getMap().flyTo({ 
-                center: [lng, lat], 
-                zoom: 15.2, 
-                pitch: 50, 
-                speed: 1.5, 
-                essential: true 
-              });
+              mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.2, pitch: 50, speed: 1.5, essential: true });
               return;
             }
           }
         }
-        
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) {
-          mapRef.current.getMap().flyTo({
-            center: [target.lng, target.lat],
-            zoom: target.zoom || 15.0,
-            pitch: 50,
-            speed: 1.5,
-            essential: true
-          });
-        }
+        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
       } catch (error) {
         const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) {
-          mapRef.current.getMap().flyTo({
-            center: [target.lng, target.lat],
-            zoom: target.zoom || 15.0,
-            pitch: 50,
-            speed: 1.5,
-            essential: true
-          });
-        }
+        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
       }
     };
     volarAlProyecto();
@@ -188,30 +127,21 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
-    if (map) {
-      setTimeout(() => map.resize(), 50);
-      setTimeout(() => map.resize(), 300);
-    }
+    if (map) { setTimeout(() => map.resize(), 50); setTimeout(() => map.resize(), 300); }
   }, [isFullscreen]);
 
-  // CLIC TÁCTICO: Polígonos interactivos
   const handleMapClick = useCallback((event) => {
     if (!onLoteClick) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
     
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: ['lotes-fill', 'lotes-labels', 'lotes-points']
-    });
+    const features = map.queryRenderedFeatures(event.point, { layers: ['lotes-fill', 'lotes-labels', 'lotes-points'] });
     if (features && features.length > 0) {
       const prop = features[0].properties;
       const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
       const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
       const uvTocada = prop.UV || prop.uv;
-      
-      if (loteTocado) {
-         onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
-      }
+      if (loteTocado) onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
     }
   }, [onLoteClick]);
 
@@ -222,95 +152,35 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
       const raw = String(l.lote).trim();
       const num = String(parseInt(raw, 10) || raw);
       const variaciones = [raw, num, `${num} `, ` ${num}`, `0${num}`, `LOTE ${num}`];
-      
       const est = String(l.estado).toUpperCase();
       if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variaciones);
       else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variaciones);
       else if (est === 'VENDIDO') a.push(...variaciones);
     });
-    return { 
-      verdes: v.length > 0 ? v : ['__NONE__'], 
-      rojos: r.length > 0 ? r : ['__NONE__'],
-      azules: a.length > 0 ? a : ['__NONE__']
-    };
+    return { verdes: v.length > 0 ? v : ['__NONE__'], rojos: r.length > 0 ? r : ['__NONE__'], azules: a.length > 0 ? a : ['__NONE__'] };
   }, [baseDeDatosLotes, proyectoActivo]);
 
   const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
   const fillLayer = useMemo(() => ({
-    id: 'lotes-fill',
-    type: 'fill',
-    paint: { 
-      'fill-color': [
-        'match', ['to-string', textProperty],
-        verdes, 'rgba(34, 197, 94, 0.35)', 
-        rojos, 'rgba(239, 68, 68, 0.35)',  
-        azules, 'rgba(59, 130, 246, 0.35)', 
-        'transparent'       
-      ],
-      'fill-opacity': 1 
-    }
+    id: 'lotes-fill', type: 'fill',
+    paint: { 'fill-color': ['match', ['to-string', textProperty], verdes, 'rgba(34, 197, 94, 0.35)', rojos, 'rgba(239, 68, 68, 0.35)', azules, 'rgba(59, 130, 246, 0.35)', 'transparent'], 'fill-opacity': 1 }
   }), [verdes, rojos, azules]);
 
-  const lineGlowLayer = useMemo(() => ({
-    id: 'lotes-line-glow',
-    type: 'line',
-    paint: { 'line-color': '#00e5ff', 'line-width': 8, 'line-opacity': 0.35, 'line-blur': 4 }
-  }), []);
-
-  const lineLayer = useMemo(() => ({
-    id: 'lotes-line',
-    type: 'line',
-    paint: { 'line-color': '#00e5ff', 'line-width': 1.5, 'line-opacity': 0.9 }
-  }), []);
-
-  const highlightLayer = useMemo(() => ({
-    id: 'lotes-highlight',
-    type: 'line',
-    paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 },
-    filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] 
-  }), [loteActivo]);
+  const lineGlowLayer = useMemo(() => ({ id: 'lotes-line-glow', type: 'line', paint: { 'line-color': '#00e5ff', 'line-width': 8, 'line-opacity': 0.35, 'line-blur': 4 } }), []);
+  const lineLayer = useMemo(() => ({ id: 'lotes-line', type: 'line', paint: { 'line-color': '#00e5ff', 'line-width': 1.5, 'line-opacity': 0.9 } }), []);
+  const highlightLayer = useMemo(() => ({ id: 'lotes-highlight', type: 'line', paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 }, filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] }), [loteActivo]);
 
   const pointLayer = useMemo(() => ({
-    id: 'lotes-points',
-    type: 'circle',
-    minzoom: 16.2, 
-    paint: {
-      'circle-radius': 9, 
-      'circle-color': [
-        'match', ['to-string', textProperty],
-        verdes, '#22c55e', 
-        rojos, '#ef4444',  
-        azules, '#3b82f6', 
-        'rgba(255, 255, 255, 0.25)' 
-      ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#020617' 
-    },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    id: 'lotes-points', type: 'circle', minzoom: 16.2, 
+    paint: { 'circle-radius': 9, 'circle-color': ['match', ['to-string', textProperty], verdes, '#22c55e', rojos, '#ef4444', azules, '#3b82f6', 'rgba(255, 255, 255, 0.25)'], 'circle-stroke-width': 1.5, 'circle-stroke-color': '#020617' },
+    filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['to-string', textProperty], '']]
   }), [verdes, rojos, azules]);
 
   const labelLayer = useMemo(() => ({
-    id: 'lotes-labels',
-    type: 'symbol',
-    minzoom: 16.2, 
-    layout: {
-      'text-field': textProperty,
-      'text-size': 11,
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 
-      'text-anchor': 'center',
-      'text-allow-overlap': true,
-      'text-ignore-placement': true
-    },
-    paint: {
-      'text-color': '#ffffff' 
-    },
-    filter: ['all',
-      ['==', ['geometry-type'], 'Point'],
-      ['!=', ['to-string', textProperty], '']
-    ]
+    id: 'lotes-labels', type: 'symbol', minzoom: 16.2, 
+    layout: { 'text-field': textProperty, 'text-size': 11, 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-anchor': 'center', 'text-allow-overlap': true, 'text-ignore-placement': true },
+    paint: { 'text-color': '#ffffff' },
+    filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['to-string', textProperty], '']]
   }), []);
 
   const containerClasses = isFullscreen 
@@ -344,10 +214,8 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
                TRACKER ACTIVO
              </span>
              <button 
-               type="button"
-               onClick={() => setIsFullscreen(true)} 
+               type="button" onClick={() => setIsFullscreen(true)} 
                className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-               title="Pantalla Completa"
              >
                <Maximize className="w-5 h-5"/>
              </button>
@@ -375,25 +243,17 @@ const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClic
         )}
         <div className="absolute inset-0 z-10 w-full h-full">
           <Map
-            ref={mapRef}
-            mapLib={maplibregl}
+            ref={mapRef} mapLib={maplibregl}
             initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
             mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            maxZoom={20} 
-            onLoad={() => setIsMapReady(true)}
-            onClick={handleMapClick}
+            maxZoom={20} onLoad={() => setIsMapReady(true)} onClick={handleMapClick}
             interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']}
             style={{ width: '100%', height: '100%' }}
           >
             <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
             <NavigationControl position="bottom-right" visualizePitch={true} />
-            
             <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20}>
-              <Layer id="satellite-layer" type="raster" paint={{ 
-                'raster-opacity': 1.0,
-                'raster-brightness-max': 1.0,
-                'raster-saturation': 0.1
-              }} />
+              <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 1.0, 'raster-brightness-max': 1.0, 'raster-saturation': 0.1 }} />
             </Source>
             <Source id="dynamic-data" type="geojson" data={geojsonPath}>
               <Layer {...fillLayer as any} />
@@ -448,28 +308,20 @@ export default function App() {
   
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === "DIOSTODOPODEROSO") { 
-      setIsAuthenticated(true); setIsAdmin(false); setLoginError(false);
-    } else if (passwordInput === "OHSARAVIA") { 
-      setIsAuthenticated(true); setIsAdmin(true); setLoginError(false);
-    } else {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 2000);
-    }
+    if (passwordInput === "DIOSTODOPODEROSO") { setIsAuthenticated(true); setIsAdmin(false); setLoginError(false); } 
+    else if (passwordInput === "OHSARAVIA") { setIsAuthenticated(true); setIsAdmin(true); setLoginError(false); } 
+    else { setLoginError(true); setTimeout(() => setLoginError(false), 2000); }
   };
 
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
-  
   const [usarAPI, setUsarAPI] = useState(true); 
-  
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.12); 
-  const TC_PROMOCIONAL = 6.97;
+  const [tcFlexible, setTcFlexible] = useState(12.32); // ACTUALIZACIÓN: TC BASE ANCLADO
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
@@ -478,17 +330,12 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoCredito, setDescuentoCredito] = useState(0);
-  const [descuentoContado, setDescuentoContado] = useState(0);
-  const [descuentoM2, setDescuentoM2] = useState(1);
-  const [descuentoContadoM2, setDescuentoContadoM2] = useState(2); 
-  const [descuentoInicial, setDescuentoInicial] = useState(0);
-  const [aplicarDescContadoPct, setAplicarDescContadoPct] = useState(false);
-  const [aplicarDescCreditoPct, setAplicarDescCreditoPct] = useState(false);
-  const [aplicarDescM2, setAplicarDescM2] = useState(false);
-  const [aplicarDescContadoM2, setAplicarDescContadoM2] = useState(false);
-  const [aplicarBonoInicialOtro, setAplicarBonoInicialOtro] = useState(false);
+  const [descuentoM2, setDescuentoM2] = useState(1); // ACTUALIZACIÓN: Default paramétrico Crédito
+  const [aplicarDescM2, setAplicarDescM2] = useState(true); // ACTUALIZACIÓN: Default activo Crédito
   
+  // NUEVO ESTADO: Segmentación Liquidación
+  const [plazoLiquidacion, setPlazoLiquidacion] = useState("30"); 
+
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
   const [inicialMonto, setInicialMonto] = useState(""); 
@@ -517,14 +364,9 @@ export default function App() {
           if (typeof val === 'number') return val;
           let s = String(val).trim();
           if (s.includes('.') && s.includes(',')) {
-              if (s.indexOf('.') < s.indexOf(',')) {
-                  s = s.replace(/\./g, '').replace(',', '.');
-              } else {
-                  s = s.replace(/,/g, '');
-              }
-          } else if (s.includes(',')) {
-              s = s.replace(',', '.');
-          }
+              if (s.indexOf('.') < s.indexOf(',')) s = s.replace(/\./g, '').replace(',', '.');
+              else s = s.replace(/,/g, '');
+          } else if (s.includes(',')) s = s.replace(',', '.');
           s = s.replace(/[^0-9.-]/g, '');
           const n = Number(s);
           return isNaN(n) ? 0 : n;
@@ -607,9 +449,7 @@ export default function App() {
             }
           }
           throw new Error("Proyecto no encontrado en API");
-        } catch (error) {
-          setUsarAPI(false); 
-        }
+        } catch (error) { setUsarAPI(false); }
       } else {
         try {
           let rawData;
@@ -644,10 +484,7 @@ export default function App() {
           
           setBaseDeDatosLotes(lotesPermitidos);
           setCargandoBD(false);
-        } catch (error) {
-          setCargandoBD(false);
-          setUsarBD(false); 
-        }
+        } catch (error) { setCargandoBD(false); setUsarBD(false); }
       }
     };
     cargarDatos();
@@ -681,9 +518,6 @@ export default function App() {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
     setResultado(null); setProyectoPersonalizado(""); 
-    setAplicarDescContadoPct(false); setAplicarDescCreditoPct(false); setAplicarDescM2(false);
-    setAplicarDescContadoM2(false); setAplicarBonoInicialOtro(false);
-    setDescuentoContado(0); setDescuentoCredito(0); setDescuentoM2(1); setDescuentoContadoM2(2); setDescuentoInicial(0);
     setExpandedPlan(false);
   }, [proyecto, tipoCotizacion]);
 
@@ -748,9 +582,8 @@ export default function App() {
         } else if (loteEncontrado.api_initial_tipo === '1' && loteEncontrado.api_initial_valor > 0) {
             iniCalculada = Math.round(loteEncontrado.api_initial_valor);
         }
-        if (iniCalculada === 0 && loteEncontrado.api_cuota_inicial > 0) {
-            iniCalculada = loteEncontrado.api_cuota_inicial;
-        }
+        if (iniCalculada === 0 && loteEncontrado.api_cuota_inicial > 0) iniCalculada = loteEncontrado.api_cuota_inicial;
+        
         if (iniCalculada > 0) {
             setModoInicial("monto");
             setInicialMonto(iniCalculada.toString());
@@ -763,17 +596,6 @@ export default function App() {
       }
     }
   }, [uv, mzn, lote, lotesDelProyecto]); 
-
-  const calcularLimitesMaximos = () => { return { maxCreditoPct: 0, maxContadoPct: 0, maxDescM2: 100, maxContadoM2: 100, maxBonoInicial: 500 }; };
-  
-  useEffect(() => {
-    const limites = calcularLimitesMaximos();
-    setDescuentoCredito(limites.maxCreditoPct);
-    setDescuentoContado(limites.maxContadoPct);
-  }, [modoInicial, inicialPorcentaje, inicialMonto, superficie, precio, proyecto, categoria, aplicarDescM2, aplicarDescCreditoPct]);
-
-  const handleDescContadoM2Change = (e) => { setDescuentoContadoM2(Number(e.target.value)); };
-  const handleDescM2Change = (e) => { setDescuentoM2(Number(e.target.value)); };
   
   const formatMoney = (amount) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
@@ -783,7 +605,7 @@ export default function App() {
   const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 4000); };
 
   // ============================================================================
-  // MOTOR DE CÁLCULO REFACTORIZADO
+  // MOTOR DE CÁLCULO REFACTORIZADO (SEPTIEMBRE 2026 - MATRIZ DE DESCUENTOS)
   // ============================================================================
   const calcular = () => {
     const sup = Number(superficie) || 0; 
@@ -797,28 +619,29 @@ export default function App() {
     
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
     let planPagosDetallado = [];
+    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.32;
+    
+    let tcEfectivoAplicado = TC_FLEX_NUMBER;
+    let descPctMapeo = 0;
 
     if (tipoCotizacion === 'contado') {
-        const descContadoM2Val = aplicarDescContadoM2 ? (Number(descuentoContadoM2) || 0) : 0;
-        const descContadoPct = aplicarDescContadoPct ? ((Number(descuentoContado) || 0) / 100) : 0; 
-        
-        let monto_desc_contado_m2 = sup * descContadoM2Val;
-        let base_post_m2 = valor_original - monto_desc_contado_m2;
-        ahorro_total = monto_desc_contado_m2 + (base_post_m2 * descContadoPct);
+        // MATRIZ CONTADO-LIQUIDACION
+        if (plazoLiquidacion === '30') descPctMapeo = 0.30;
+        else if (plazoLiquidacion === '60') descPctMapeo = 0.20;
+        else if (plazoLiquidacion === '90') descPctMapeo = 0.10;
+
+        ahorro_total = valor_original * descPctMapeo;
         valor_final = valor_original - ahorro_total;
+        tcEfectivoAplicado = TC_FLEX_NUMBER * (1 - descPctMapeo);
         
     } else {
-        const descCreditoPct = aplicarDescCreditoPct ? ((Number(descuentoCredito) || 0) / 100) : 0;
-        const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 0) : 0;
-        let descIniVal = (proyecto === "OTRO" && aplicarBonoInicialOtro) ? Math.min((Number(descuentoInicial) || 0), 500) : 0;
-        
+        // MATRIZ CRÉDITO
+        const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 1) : 0;
         let monto_descuento_m2 = sup * descM2Val;
-        const valor_post_desc_m2 = valor_original - monto_descuento_m2;
-        const monto_desc_credito_pct = valor_post_desc_m2 * descCreditoPct;
         
-        ahorro_total = monto_descuento_m2 + monto_desc_credito_pct + descIniVal; 
+        ahorro_total = monto_descuento_m2; 
         valor_final = valor_original - ahorro_total; 
-        const base_para_inicial = valor_post_desc_m2 - monto_desc_credito_pct;
+        const base_para_inicial = valor_final; // Base post descuento m2
 
         if (modoInicial === 'porcentaje') {
            pct_efectivo = Number(inicialPorcentaje) || 0;
@@ -842,13 +665,12 @@ export default function App() {
 
         // INFERENCIA DETERMINISTA: Inicio de pagos diferido (Octubre 2026)
         const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        let mesInicioIndex = 9; // Octubre (Índice 9)
+        let mesInicioIndex = 9; 
         let añoInicio = 2026; 
 
         for(let m=1; m<=meses; m++) {
             let currentMIndex = (mesInicioIndex + (m - 1)) % 12;
             let currentY = añoInicio + Math.floor((mesInicioIndex + (m - 1)) / 12);
-            
             planPagosDetallado.push({
                 nro: m, 
                 mesLabel: `${mesesNombres[currentMIndex]} ${currentY}`,
@@ -872,7 +694,11 @@ export default function App() {
       mensualRaw: cuota_final, 
       mensual: formatMoney(cuota_final), 
       plazo: ans, 
-      planPagosDetallado: planPagosDetallado, 
+      planPagosDetallado: planPagosDetallado,
+      descPctAplicado: descPctMapeo,
+      tcEfectivo: tcEfectivoAplicado,
+      plazoLiquidacionVisual: plazoLiquidacion === '30' ? '30 Días' : plazoLiquidacion === '60' ? '60 Días' : '90 Días',
+      descuentoM2Aplicado: tipoCotizacion === 'credito' && aplicarDescM2 ? descuentoM2 : 0,
       timestampId: new Date().getTime()
     });
     setCopiado(false); 
@@ -901,11 +727,14 @@ export default function App() {
     
     let contentStr = "";
     if (resultado.tipoCotizacion === 'contado') {
-        contentStr += `💰 *[PLAN_AL_CONTADO]*\n`;
-        contentStr += `🔥 *Plusvalía Inmediata:* Su lote adquiere una rentabilidad instantánea gracias a nuestro modelo paramétrico.\n`;
+        contentStr += `💰 *[LIQUIDACIÓN / AL CONTADO]*\n`;
+        contentStr += `⏱️ *Plazo de Pago:* Hasta ${resultado.plazoLiquidacionVisual}\n`;
+        contentStr += `🔥 *Descuento Aplicado:* ${resultado.descPctAplicado * 100}%\n`;
+        contentStr += `💵 *T.C. Efectivo Equivalente:* Bs. ${resultado.tcEfectivo.toFixed(3)}\n`;
         contentStr += `*Inversión Final:* $us ${resultado.valorFinal}\n\n`;
     } else {
         contentStr += `✅ *[FINANCIAMIENTO_ESTRATÉGICO]*\n`;
+        if (resultado.descuentoM2Aplicado > 0) contentStr += `🎁 *Bono Promocional:* Descuento de $us ${resultado.descuentoM2Aplicado} x m²\n`;
         contentStr += `*Valor del Terreno:* $us ${resultado.valorFinal}\n\n`;
         contentStr += `📊 *Proyección a ${resultado.plazo} años*\n*Inversión Inicial:* ${resultado.inicialPct}% ($us ${resultado.inicial})\n\n`;
         contentStr += `⏳ *Periodo de Gracia Activo:*\nAdquiriendo hoy, su primera cuota se programa para *Octubre*.\n*Cuota Fija Mensual:* $us ${resultado.mensual}\n\n`;
@@ -939,9 +768,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
-      {/* ==============================================================================
-          PANTALLA DE LOGIN CON EFECTO CYBERTECH
-      ============================================================================== */}
       {!isAuthenticated && (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#020617]/80 backdrop-blur-xl animate-in fade-in duration-500">
           <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-cyan-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_0_80px_rgba(6,182,212,0.15)] flex flex-col items-center text-center overflow-hidden">
@@ -1084,9 +910,9 @@ export default function App() {
                   <button 
                     type="button" 
                     onClick={() => { setTipoCotizacion('contado'); }} 
-                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-900 shadow-[0_0_20px_rgba(6,182,212,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-[11px] font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-900 shadow-[0_0_20px_rgba(6,182,212,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
                   >
-                    <Wallet className="w-4 h-4"/> Al Contado
+                    <Wallet className="w-4 h-4 shrink-0"/> Contado / Liquidación
                   </button>
                 </div>
 
@@ -1302,40 +1128,47 @@ export default function App() {
                     <div className={`p-1.5 rounded-lg border shadow-sm shrink-0 ${tipoCotizacion === 'contado' ? 'bg-cyan-900/50 border-cyan-500/50' : 'bg-emerald-900/50 border-emerald-500/50'}`}>
                       <Gift className={`w-4 h-4 ${tipoCotizacion === 'contado' ? 'text-cyan-300' : 'text-emerald-300'}`} />
                     </div>
-                    Descuentos Exclusivos
+                    {tipoCotizacion === 'contado' ? 'Esquema de Descuento Promocional' : 'Descuentos Exclusivos (Crédito)'}
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10">
+                  <div className="relative z-10">
                     {tipoCotizacion === 'contado' && (
-                      <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                          <input type="checkbox" checked={aplicarDescContadoM2} onChange={e => setAplicarDescContadoM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Contado x m² ($us)
+                      <div className="space-y-3">
+                        <label className="text-[10px] sm:text-[11px] font-bold text-slate-300 w-max uppercase tracking-widest flex items-center gap-2">
+                          <Timer className="w-4 h-4 text-cyan-400"/> Plazo de Pago o Liquidación
                         </label>
-                        <input 
-                          type="number" 
-                          step="0.01" 
-                          min="0" 
-                          disabled={!aplicarDescContadoM2} 
-                          value={descuentoContadoM2} 
-                          onChange={handleDescContadoM2Change} 
-                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescContadoM2 ? 'bg-[#060b13] border border-cyan-500 text-white focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
-                        />
+                        <div className="relative">
+                          <select 
+                            value={plazoLiquidacion} 
+                            onChange={(e) => setPlazoLiquidacion(e.target.value)} 
+                            className="w-full bg-[#060b13] border border-cyan-500/50 text-cyan-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(34,211,238,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-cyan-500 focus:border-cyan-400" 
+                          >
+                            <option value="30">En los primeros 30 días (-30% | TC Ref: 8.62)</option>
+                            <option value="60">Entre 31 y 60 días (-20% | TC Ref: 9.85)</option>
+                            <option value="90">Entre 61 y 90 días (-10% | TC Ref: 11.08)</option>
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
+                            <ChevronDown className="w-5 h-5" />
+                          </div>
+                        </div>
                       </div>
                     )}
                     {tipoCotizacion === 'credito' && (
-                      <div className="space-y-1.5">
-                        <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                          <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500 shrink-0" /> Crédito x m² ($us)
-                        </label>
-                        <input 
-                          type="number" 
-                          step="0.01" 
-                          min="0" 
-                          disabled={!aplicarDescM2} 
-                          value={descuentoM2} 
-                          onChange={handleDescM2Change} 
-                          className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#060b13] border border-emerald-500 text-white focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
-                        />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="space-y-1.5">
+                          <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
+                            <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-emerald-500 shrink-0" /> Crédito x m² ($us)
+                          </label>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            min="0" 
+                            disabled={!aplicarDescM2} 
+                            value={descuentoM2} 
+                            onChange={(e) => setDescuentoM2(Number(e.target.value))} 
+                            className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#060b13] border border-emerald-500 text-white focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1344,21 +1177,14 @@ export default function App() {
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
-                    
                     <div className="space-y-2">
                       <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-emerald-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                       </label>
                       <input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        value={inicialPorcentaje} 
+                        type="number" step="0.01" min="0" value={inicialPorcentaje} 
                         onFocus={() => setModoInicial('porcentaje')}
-                        onChange={(e) => { 
-                          setModoInicial('porcentaje'); 
-                          setInicialPorcentaje(e.target.value); 
-                        }} 
+                        onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
                         className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
                       />
@@ -1368,15 +1194,9 @@ export default function App() {
                         <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                       </label>
                       <input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        value={inicialMonto} 
+                        type="number" step="0.01" min="0" value={inicialMonto} 
                         onFocus={() => setModoInicial('monto')}
-                        onChange={(e) => { 
-                          setModoInicial('monto'); 
-                          setInicialMonto(e.target.value); 
-                        }} 
+                        onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
                         className={`w-full bg-[#060b13] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] text-amber-400' : 'border-slate-700 text-slate-500'}`} 
                       />
@@ -1389,9 +1209,7 @@ export default function App() {
                     </label>
                     <div className="relative h-[calc(100%-1.5rem)]">
                       <select 
-                        required 
-                        value={años} 
-                        onChange={e => setAños(e.target.value)} 
+                        required value={años} onChange={e => setAños(e.target.value)} 
                         className="w-full bg-[#060b13]/50 border border-slate-700 text-white rounded-2xl p-3.5 outline-none transition-all font-bold text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.15)]"
                       >
                         <option value="" disabled hidden>Selec.</option>
@@ -1404,9 +1222,9 @@ export default function App() {
                   </div>
                 </div>
                 )}
+
                 <button 
-                  type="submit" 
-                  disabled={isCalculating} 
+                  type="submit" disabled={isCalculating} 
                   className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-cyan-500 via-blue-500 to-cyan-400 hover:from-cyan-400 hover:via-blue-400 hover:to-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:shadow-[0_0_45px_rgba(34,211,238,0.6)]' : 'from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:via-teal-400 hover:to-emerald-300 shadow-[0_0_30px_rgba(52,211,153,0.4)] hover:shadow-[0_0_45px_rgba(52,211,153,0.6)]'} text-[#020617] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
                 >
                   <div className="absolute inset-0 bg-white/40 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
@@ -1450,7 +1268,7 @@ export default function App() {
                   </h2>
                   <span className={`border text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 w-full sm:w-auto ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-950/60 text-cyan-400 border-cyan-500/50' : 'bg-emerald-950/60 text-emerald-400 border-emerald-500/50'}`}>
                     <span className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${resultado.tipoCotizacion === 'contado' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]' : 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,1)]'}`}></span> 
-                    {resultado.tipoCotizacion === 'contado' ? 'Al Contado' : 'A Crédito'}
+                    {resultado.tipoCotizacion === 'contado' ? 'Liquidación / Contado' : 'A Crédito'}
                   </span>
                 </div>
                 
@@ -1493,9 +1311,16 @@ export default function App() {
                           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
                           <div className="absolute -bottom-20 -right-20 opacity-10"><Wallet className="w-64 h-64 text-cyan-400" /></div>
                           <div className="relative z-10 flex flex-col items-center justify-center">
-                             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 text-[10px] sm:text-xs font-black uppercase tracking-widest mb-6 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-                               <Tag className="w-3.5 h-3.5"/> Inversión Final al Contado
+                             
+                             <div className="inline-flex flex-col items-center gap-1 px-6 py-3 rounded-2xl bg-cyan-950/80 border border-cyan-500/50 shadow-[0_0_20px_rgba(34,211,238,0.2)] mb-6">
+                               <span className="text-cyan-200 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                 <Timer className="w-4 h-4 text-cyan-400"/> Liquidación en {resultado.plazoLiquidacionVisual}
+                               </span>
+                               <span className="text-cyan-400 text-sm font-black tracking-wider">
+                                 T.C. Efectivo Congelado: {resultado.tcEfectivo.toFixed(3)}
+                               </span>
                              </div>
+
                              <div className="text-[3.5rem] sm:text-7xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] leading-none mb-3">
                                $us {resultado.valorFinal}
                              </div>
@@ -1506,7 +1331,9 @@ export default function App() {
                                    <Gift className="w-6 h-6 text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"/>
                                  </div>
                                  <div className="text-center sm:text-left">
-                                   <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">Ahorro Promocional Aplicado</div>
+                                   <div className="text-emerald-400 font-bold text-xs uppercase tracking-widest mb-1">
+                                     Descuento Aplicado ({resultado.descPctAplicado * 100}%)
+                                   </div>
                                    <div className="text-2xl font-black text-white">$us {resultado.ahorroTotal}</div>
                                  </div>
                                </div>
@@ -1523,16 +1350,6 @@ export default function App() {
                              </div>
                           </div>
                        </div>
-                       <div className="grid grid-cols-1 gap-4">
-                         <div className="bg-gradient-to-br from-amber-900/20 to-[#04070b] border border-amber-500/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-lg group hover:border-amber-500/50 transition-colors">
-                           <div className="text-xs font-black text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                             <TrendingUp className="w-5 h-5" /> Plusvalía Inmediata Asegurada
-                           </div>
-                           <div className="text-sm text-slate-300 font-bold max-w-lg">
-                             Gracias a nuestro modelo de gestión integral, su capital absorbe inmediatamente un crecimiento orgánico frente al valor base de mercado.
-                           </div>
-                         </div>
-                       </div>
                     </div>
                   )}
 
@@ -1545,7 +1362,7 @@ export default function App() {
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.valorFinal}</div>
                           {resultado.ahorroTotalRaw > 0 && (
                             <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase shadow-sm">
-                              Ahorro Incluido: $us {resultado.ahorroTotal}
+                              Bono Promocional Incluido: $us {resultado.ahorroTotal}
                             </div>
                           )}
                         </div>
