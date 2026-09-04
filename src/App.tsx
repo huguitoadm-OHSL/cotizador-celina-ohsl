@@ -86,7 +86,7 @@ const baseAnclasUrbanas = {
     { id: 'carretera-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.36191155922974, lng: -63.24341131066158 },
     { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.366171150625245, lng: -63.263898823492916 },
     { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.36532915405663, lng: -63.25521355672914 },
-    { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.371226189082137, lng: -63.26083508618699 }
+    { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.371226189082137, lng: -63.26083508618699 },
     { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
     { id: 'mercado-germán-moreno', nombre: 'Mercado Germán Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
     { id: 'plaza-principal-montero', nombre: 'Plaza Principal de Montero', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
