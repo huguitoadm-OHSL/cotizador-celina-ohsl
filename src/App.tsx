@@ -87,6 +87,9 @@ const baseAnclasUrbanas = {
     { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.366171150625245, lng: -63.263898823492916 },
     { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.36532915405663, lng: -63.25521355672914 },
     { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.371226189082137, lng: -63.26083508618699 }
+    { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
+    { id: 'mercado-germán-moreno', nombre: 'Mercado Germán Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
+    { id: 'plaza-principal-montero', nombre: 'Plaza Principal de Montero', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
   ],
    "LOS JARDINES": [
     { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.36207108741039, lng: -63.29566682124099 },
@@ -370,7 +373,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.32); 
+  const [tcFlexible, setTcFlexible] = useState(12.45); 
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
