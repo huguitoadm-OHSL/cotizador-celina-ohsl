@@ -90,6 +90,7 @@ const baseAnclasUrbanas = {
     { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
     { id: 'mercado-germán-moreno', nombre: 'Mercado Germán Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
     { id: 'plaza-principal-montero', nombre: 'Plaza Principal de Montero', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
+    { id: 'nueva-terminal-montero', nombre: 'Nueva Terminal de Montero', tipo: 'landmark', lat: -17.36639941396931, lng: -63.23750823012103 },
           
   ],
    "LOS JARDINES": [
