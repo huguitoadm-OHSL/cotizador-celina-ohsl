@@ -102,7 +102,7 @@ const baseAnclasUrbanas = {
     { id: 'equipamiento-M56', nombre: 'Equipamiento Público', tipo: 'comercio', lat: -17.366662848620702, lng: -63.29006107676353 },
     { id: 'equipamiento-M64', nombre: 'Equipamiento Público', tipo: 'comercio', lat: -17.369702946712444, lng: -63.29470631145279 },
     { id: 'mercado-germán-moreno', nombre: 'Mercado Germán Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
-    { id: 'plaza-principal-montero', nombre: 'Plaza Principal de Montero', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
+    { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
   ],
   "URUBÓ NORTE": [
     { id: 'puente-foianini', nombre: 'Puente Mario Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
