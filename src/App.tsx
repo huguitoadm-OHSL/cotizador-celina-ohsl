@@ -83,25 +83,25 @@ const baseAnclasUrbanas = {
     { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.365927510716485, lng: -63.2459298471779 },
     { id: 'parque-lineal-2', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.369436731162317, lng: -63.256639276667 },
     { id: 'centro-comercial', nombre: 'Centro Comercial', tipo: 'comercio', lat: -17.370851047268427, lng: -63.25323287462514 },
-    { id: 'carretera-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.36191155922974, lng: -63.24341131066158 },
+    { id: 'carretera-al-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.36191155922974, lng: -63.24341131066158 },
     { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.366171150625245, lng: -63.263898823492916 },
     { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.36532915405663, lng: -63.25521355672914 },
     { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.371226189082137, lng: -63.26083508618699 },
     { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
-    { id: 'mercado-germán-moreno', nombre: 'Mercado Germán Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
-    { id: 'plaza-principal-montero', nombre: 'Plaza Principal de Montero', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
-    { id: 'nueva-terminal-montero', nombre: 'Nueva Terminal de Montero', tipo: 'landmark', lat: -17.36639941396931, lng: -63.23750823012103 },
+    { id: 'mercado-g-moreno', nombre: 'Mercado G. Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
+    { id: 'plaza-principal', nombre: 'Plaza Principal', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
+    { id: 'terminal-montero', nombre: 'Terminal de Montero', tipo: 'landmark', lat: -17.36639941396931, lng: -63.23750823012103 },
           
   ],
    "LOS JARDINES": [
-    { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.36207108741039, lng: -63.29566682124099 },
+    { id: 'area-verde', nombre: 'Area Verde', tipo: 'recreacion', lat: -17.36207108741039, lng: -63.29566682124099 },
     { id: 'area-verde', nombre: 'Areá Verde', tipo: 'recreacion', lat: -17.36403700544263, lng: -63.28703121278422 },
-    { id: 'equipamiento-M23', nombre: 'Equipamiento Público', tipo: 'comercio', lat: -17.359385816842973, lng: -63.29021170539729 },
+    { id: 'equipamiento-M23', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.359385816842973, lng: -63.29021170539729 },
     { id: 'balneario-el-dorado', nombre: 'Balneario El Dorado', tipo: 'recreacion', lat: -17.365632330502038, lng: -63.28247486199522 },
-    { id: 'equipamiento-M47', nombre: 'Equipamiento Público', tipo: 'comercio', lat: -17.36589498764944, lng: -63.29634648611603 },
-    { id: 'equipamiento-M56', nombre: 'Equipamiento Público', tipo: 'comercio', lat: -17.366662848620702, lng: -63.29006107676353 },
-    { id: 'equipamiento-M64', nombre: 'Equipamiento Público', tipo: 'comercio', lat: -17.369702946712444, lng: -63.29470631145279 },
-    { id: 'mercado-germán-moreno', nombre: 'Mercado Germán Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
+    { id: 'equipamiento-M47', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.36589498764944, lng: -63.29634648611603 },
+    { id: 'equipamiento-M56', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.366662848620702, lng: -63.29006107676353 },
+    { id: 'equipamiento-M64', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.369702946712444, lng: -63.29470631145279 },
+    { id: 'mercado-g-moreno', nombre: 'Mercado G. Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
     { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
   ],
   "URUBÓ NORTE": [
@@ -377,7 +377,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.42); 
+  const [tcFlexible, setTcFlexible] = useState(12.02); 
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
