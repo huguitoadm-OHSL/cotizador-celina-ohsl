@@ -377,7 +377,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.53); 
+  const [tcFlexible, setTcFlexible] = useState(10.99); 
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
