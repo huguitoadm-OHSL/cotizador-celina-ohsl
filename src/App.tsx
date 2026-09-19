@@ -377,7 +377,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(10.01); 
+  const [tcFlexible, setTcFlexible] = useState(11.00); 
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
@@ -685,8 +685,8 @@ export default function App() {
     let totalBs_OpcionB = 0;
 
     if (tipoCotizacion === 'contado') {
-        if (plazoLiquidacion === '30') descPctMapeo = 0.30;
-        else if (plazoLiquidacion === '60') descPctMapeo = 0.20;
+        if (plazoLiquidacion === '30') descPctMapeo = 0.20;
+        else if (plazoLiquidacion === '60') descPctMapeo = 0.15;
         else if (plazoLiquidacion === '90') descPctMapeo = 0.10;
 
         ahorro_total = valor_original * descPctMapeo;
