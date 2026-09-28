@@ -1241,9 +1241,9 @@ export default function App() {
                             onChange={(e) => setPlazoLiquidacion(e.target.value)} 
                             className="w-full bg-[#060b13] border border-cyan-500/50 text-cyan-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(34,211,238,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-cyan-500 focus:border-cyan-400" 
                           >
-                            <option value="30">En los primeros 30 días (-30% | TC Ref: 8.62)</option>
-                            <option value="60">Entre 31 y 60 días (-20% | TC Ref: 9.85)</option>
-                            <option value="90">Entre 61 y 90 días (-10% | TC Ref: 11.08)</option>
+                            <option value="30">En los primeros 30 días (-20% | TC Ref: 9.64)</option>
+                            <option value="60">Entre 31 y 60 días (-15% | TC Ref: 10.25)</option>
+                            <option value="90">Entre 61 y 90 días (-10% | TC Ref: 10.85)</option>
                           </select>
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
                             <ChevronDown className="w-5 h-5" />
