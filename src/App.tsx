@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
-  CheckCircle2, Building2, ChevronRight, FileText, MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
+  CheckCircle2, Building2, ChevronRight, FileText, MapPin, Gift, TrendingUp, ShieldCheck, ChevronDown, 
   Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
   Timer
@@ -648,18 +648,44 @@ export default function App() {
     } catch { showNotification('No se pudo copiar. Puedes abrir la cotización con el botón WhatsApp.'); }
   };
   return (
-    <div className="min-h-screen bg-[#090b19] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-violet-500/30 selection:text-violet-200 pb-20 w-full max-w-[100vw]">
+    <div className="quantum-command min-h-screen bg-[#06090f] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-sky-500/30 selection:text-sky-200 pb-20 w-full max-w-[100vw]">
+      <style>{`
+        .quantum-command { background: #06090f !important; color-scheme: dark; }
+        .quantum-command .glass-panel { background: linear-gradient(145deg,#111c29,#080e16) !important; border-color:#253648 !important; box-shadow:0 18px 50px #0005 !important; }
+        .quantum-command input,.quantum-command select { border-radius:8px; }
+        .quantum-command input:focus-visible,.quantum-command select:focus-visible,.quantum-command button:focus-visible { outline:2px solid #38bdf8; outline-offset:3px; }
+        .quantum-command .quantum-grid { background-image:linear-gradient(#1e3a501f 1px,transparent 1px),linear-gradient(90deg,#1e3a501f 1px,transparent 1px);background-size:64px 64px;mask-image:linear-gradient(#000,transparent 75%); }
+        .quantum-hero { position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:30px 34px;margin-bottom:24px;border:1px solid #253b50;border-left:3px solid #22d3ee;border-radius:12px;background:linear-gradient(110deg,#0d1825 0%,#09111b 65%,#0a1c2b 100%); }
+        .quantum-hero:after { content:'';position:absolute;right:0;top:0;height:2px;width:40%;background:linear-gradient(90deg,transparent,#38bdf8); }
+        .quantum-hero-content { position:relative;z-index:1; }
+        .quantum-eyebrow { display:flex;align-items:center;gap:9px;font-size:9px;letter-spacing:2px;font-weight:800;color:#8ca9bf; }
+        .quantum-eyebrow>span { width:6px;height:6px;background:#22d3ee;box-shadow:0 0 12px #22d3ee88; }
+        .quantum-hero h1 { margin:18px 0 12px;line-height:.95;letter-spacing:-2px; }
+        .quantum-hero h1>span { display:block;font-size:17px;letter-spacing:8px;font-weight:600;color:#94aabd;margin-bottom:10px; }
+        .quantum-hero h1>strong { display:block;font-size:clamp(36px,5.5vw,70px);font-weight:900;color:#f2f7fc; }
+        .quantum-dot { color:#22d3ee; }
+        .quantum-hero p { margin:16px 0 22px;color:#8ea5b9;font-size:14px;line-height:1.65; }
+        .quantum-modules { display:flex;flex-wrap:wrap;gap:18px; }
+        .quantum-modules>span { display:flex;gap:7px;align-items:center;color:#7dd3fc;font-size:9px;font-weight:800;letter-spacing:1.2px; }
+        .quantum-orbit { width:310px;flex-shrink:0;opacity:.9; }
+        .quantum-orbit svg { width:100%;height:auto; }
+        .quantum-footer { margin-top:42px;padding:22px 0;border-top:1px solid #203042;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:10px;letter-spacing:1px;color:#698296; }
+        .quantum-footer strong { color:#adbfce; }
+        @media(max-width:640px) { .quantum-hero {padding:25px 20px;min-height:255px;} .quantum-orbit {position:absolute;right:-100px;width:280px;opacity:.2;} .quantum-eyebrow {font-size:8px;letter-spacing:1px;} .quantum-hero h1>strong {font-size:42px;} .quantum-modules {gap:12px;} }
+        @media(prefers-reduced-motion:reduce) { .quantum-command * {animation:none !important;transition:none !important;scroll-behavior:auto !important;} }
+      `}</style>
+
       
       {!isAuthenticated && (
-        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#090b19]/80 backdrop-blur-xl animate-in fade-in duration-500">
-          <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-violet-500/20 p-8 sm:p-12 rounded-[2.5rem] w-full max-w-md relative shadow-[0_24px_80px_rgba(0,0,0,0.4)] flex flex-col items-center text-center overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-amber-500"></div>
-            <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-amber-500 rounded-full flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(139,92,246,0.5)] relative">
-               <div className="absolute inset-0 bg-violet-400/30 rounded-full blur-xl animate-pulse"></div>
-               <Lock className="w-10 h-10 text-[#090b19] relative z-10" />
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-[#06090f]/80 backdrop-blur-xl animate-in fade-in duration-500">
+          <div className="bg-[#0f172a]/90 backdrop-blur-3xl border border-sky-500/20 p-8 sm:p-12 rounded-2xl w-full max-w-md relative shadow-[0_24px_80px_rgba(0,0,0,0.4)] flex flex-col items-center text-center overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-cyan-500"></div>
+            <div className="w-20 h-20 bg-gradient-to-br from-sky-500 to-cyan-500 rounded-xl flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(14,165,233,0.5)] relative">
+               <div className="absolute inset-0 bg-sky-400/30 rounded-full blur-xl "></div>
+               <Lock className="w-10 h-10 text-[#06090f] relative z-10" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-amber-400 drop-shadow-[0_0_15px_rgba(167,139,250,0.4)]">Quantum</span></h1>
-            <p className="text-violet-500/80 text-xs uppercase tracking-[0.2em] font-black mb-8 border border-violet-500/20 px-4 py-1 rounded-full">Asesores · Edición Octubre</p>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-sky-400 drop-shadow-[0_0_15px_rgba(56,189,248,0.4)]">Quantum</span></h1>
+            <p className="text-sky-500/80 text-xs uppercase tracking-[0.2em] font-black mb-8 border border-sky-500/20 px-4 py-1 rounded-full">Asesores · Edición Octubre</p>
             <form onSubmit={handleLogin} className="w-full space-y-6 relative z-10">
               <div className="relative">
                 <input 
@@ -667,11 +693,11 @@ export default function App() {
                   value={passwordInput} 
                   onChange={(e) => setPasswordInput(e.target.value)} 
                   placeholder="Tu clave de acceso" 
-                  className={`w-full bg-[#0e1224] border ${loginError ? 'border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-slate-700 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(139,92,246,0.2)]'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none transition-all shadow-inner`} 
+                  className={`w-full bg-[#0b111b] border ${loginError ? 'border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-slate-700 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(14,165,233,0.2)]'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none transition-all shadow-inner`} 
                 />
                 {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
               </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-amber-600 hover:from-violet-500 hover:to-amber-500 text-[#090b19] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_40px_rgba(139,92,246,0.6)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm hover:-translate-y-1">
+              <button type="submit" className="w-full bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-[#06090f] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(14,165,233,0.3)] hover:shadow-[0_0_40px_rgba(14,165,233,0.6)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm hover:-translate-y-1">
                 <Unlock className="w-5 h-5"/> Ingresar a mi espacio
               </button>
             </form>
@@ -684,31 +710,13 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-violet-950/90 text-violet-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(139,92,246,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-violet-500/50 backdrop-blur-md w-max">
-           {toast.includes('🛡️') || toast.includes('⚠️') ? <AlertCircle className="w-5 h-5 text-amber-400" /> : <CheckCircle2 className="w-5 h-5 text-violet-400" />}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-sky-950/90 text-sky-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(14,165,233,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide animate-toast border border-sky-500/50 backdrop-blur-md w-max">
+           {toast.includes('🛡️') || toast.includes('⚠️') ? <AlertCircle className="w-5 h-5 text-cyan-400" /> : <CheckCircle2 className="w-5 h-5 text-sky-400" />}
            {toast}
         </div>
       )}
 
-      {/* EFECTO DE FONDO CYBERTECH */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.08] flex items-center justify-center mix-blend-screen no-print">
-        <svg viewBox="0 0 1000 1000" className="w-full h-full max-w-[1600px] absolute right-[-20%] bottom-[-10%]">
-          <g transform="translate(500, 400) scale(1.6)">
-            {[...Array(15)]?.map((_, i) => <path key={`grid-v-${i}`} d={`M${-450 + i*60} ${225 + i*30} L${450 + i*60} ${-225 + i*30}`} stroke="rgba(167, 139, 250, 0.5)" strokeWidth="1" strokeDasharray="4 4" />)}
-            {[...Array(15)]?.map((_, i) => <path key={`grid-h-${i}`} d={`M${-450 + i*60} ${-225 + i*30} L${450 + i*60} ${225 + i*30}`} stroke="rgba(167, 139, 250, 0.5)" strokeWidth="1" strokeDasharray="4 4" />)}
-          </g>
-        </svg>
-      </div>
-
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none no-print">
-        <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-violet-900/10 rounded-full mix-blend-screen filter blur-[120px]"></div>
-        <div className="absolute top-[20%] right-[-10%] w-[45rem] h-[45rem] bg-amber-900/10 rounded-full mix-blend-screen filter blur-[120px] animation-delay-2000"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[55rem] h-[55rem] bg-indigo-900/10 rounded-full mix-blend-screen filter blur-[120px] animation-delay-4000"></div>
-      </div>
-
-      <div className="hidden xl:flex fixed left-0 top-0 h-full w-20 items-center justify-center z-0 no-print">
-        <div className="transform -rotate-90 whitespace-nowrap text-slate-800 font-black tracking-[0.5em] text-3xl select-none">CELINA QUANTUM</div>
-      </div>
+      <div className="quantum-grid fixed inset-0 pointer-events-none no-print" aria-hidden="true" />
 
       <div className={`max-w-[1280px] mx-auto py-8 px-4 sm:px-6 lg:px-12 xl:pl-24 relative z-10 w-full min-w-0 transition-opacity duration-700 ${!isAuthenticated ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}>
         
@@ -718,47 +726,54 @@ export default function App() {
                <Lock className="w-4 h-4"/> Salir
              </button>
              {isAdmin && (
-                <div className="bg-amber-500/10 border border-amber-500/50 text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+                <div className="bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.2)] ">
                   <Eye className="w-4 h-4" /> MODO DIRECTOR
                 </div>
              )}
           </div>
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-violet-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(139,92,246,0.15)] w-full sm:w-auto hover:shadow-[0_0_25px_rgba(139,92,246,0.3)] transition-shadow">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-sky-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(14,165,233,0.15)] w-full sm:w-auto hover:shadow-[0_0_25px_rgba(14,165,233,0.3)] transition-shadow">
              <div className="flex items-center gap-2">
-               <div className="bg-violet-500/20 p-2 rounded-xl border border-violet-500/30 shrink-0"><Activity className="w-5 h-5 text-violet-400" /></div>
+               <div className="bg-sky-500/20 p-2 rounded-xl border border-sky-500/30 shrink-0"><Activity className="w-5 h-5 text-sky-400" /></div>
                <div>
                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC de la cotización</div>
-                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"></div> Ingreso manual</div>
+                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-cyan-400  shrink-0"></div> Ingreso manual</div>
                </div>
              </div>
              <div className="relative shrink-0 flex-1 sm:flex-none">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-500 font-bold text-sm">Bs.</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-500 font-bold text-sm">Bs.</span>
                 <input 
                   aria-label="Tipo de cambio de hoy en bolivianos por dólar" type="number" min="0.01" step="0.01" value={tcFlexible || ''} onChange={(e) => setTcFlexible(Number(e.target.value))} 
-                  className="bg-[#0b0e1d] border border-slate-700/80 text-violet-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-violet-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(139,92,246,0.2)]" 
+                  className="bg-[#080d15] border border-slate-700/80 text-sky-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-sky-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(14,165,233,0.2)]" 
                 />
              </div>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-center md:justify-between mb-8 sm:mb-12 gap-6 relative no-print min-w-0">
-          <div className="hidden md:block w-32"></div>
-          <div className="text-center flex-1 flex flex-col items-center max-w-full relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32 bg-violet-500/20 blur-[80px] pointer-events-none z-0"></div>
-            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-violet-500/30 shadow-[0_0_15px_rgba(139,92,246,0.2)] mb-4 sm:mb-5 backdrop-blur-md relative z-10">
-              <Sparkles className="w-4 h-4 text-violet-400" />
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-violet-300 text-center">Tu próxima venta empieza con una buena visita</span>
-            </div>
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full relative z-10">
-              Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-teal-400 to-amber-400 drop-shadow-[0_0_20px_rgba(167,139,250,0.2)]">Quantum</span>
-            </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase relative z-10">Asesores · Cotización y visitas · Octubre 2026</p>
+        <header className="quantum-hero no-print">
+          <div className="quantum-hero-content">
+            <div className="quantum-eyebrow"><span /> PLATAFORMA COMERCIAL / ASESORES</div>
+            <h1><span>CELINA</span><strong>QUANTUM<span className="quantum-dot">.</span></strong></h1>
+            <p>Control de inversión.<br className="sm:hidden" /> Precisión en cada visita.</p>
+            <div className="quantum-modules"><span><MapPin size={14}/> EXPLORA</span><span><Calculator size={14}/> COTIZA</span><span><Send size={14}/> COMPARTE</span></div>
           </div>
-          <div className="hidden md:block w-32"></div>
-        </div>
+          <div className="quantum-orbit" aria-hidden="true">
+            <svg viewBox="0 0 340 260" fill="none">
+              <defs><linearGradient id="quantum-orbit-light" x1="70" y1="30" x2="290" y2="230" gradientUnits="userSpaceOnUse"><stop stopColor="#22d3ee"/><stop offset="1" stopColor="#2563eb"/></linearGradient></defs>
+              <circle cx="176" cy="128" r="97" stroke="#1e3449" strokeWidth="1"/>
+              <circle cx="176" cy="128" r="78" stroke="#1e3449" strokeDasharray="2 9"/>
+              <ellipse cx="176" cy="128" rx="140" ry="39" stroke="url(#quantum-orbit-light)" transform="rotate(-31 176 128)"/>
+              <ellipse cx="176" cy="128" rx="118" ry="50" stroke="#1675ac" transform="rotate(42 176 128)"/>
+              <path d="M176 56 237 92v72l-61 36-61-36V92l61-36Z" fill="#0b2032" stroke="url(#quantum-orbit-light)" strokeWidth="2"/>
+              <path d="m115 92 61 36 61-36M176 128v72M145 74l62 36v72M206 74l-61 36v72M115 128l61 36 61-36" stroke="#2682b5"/>
+              <circle cx="290" cy="64" r="5" fill="#67e8f9"/><circle cx="61" cy="181" r="3" fill="#3b82f6"/>
+              <path d="M24 43h26m-13-13v26M283 218h26m-13-13v26" stroke="#3b6c8d"/>
+              <text x="115" y="241" fill="#5f8fab" fontSize="9" letterSpacing="4">QUANTUM / 2026</text>
+            </svg>
+          </div>
+        </header>
 
-        <div className="mb-6 rounded-2xl border border-violet-500/25 bg-slate-900/70 p-4 flex flex-wrap items-center justify-between gap-3 no-print">
-          <div><p className="text-violet-300 font-bold text-sm">Condiciones comerciales desde el 01/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos diarios · TC variable · Crédito sin escalonado mensual en dólares</p></div>
+        <div className="mb-6 rounded-2xl border border-sky-500/25 bg-slate-900/70 p-4 flex flex-wrap items-center justify-between gap-3 no-print">
+          <div><p className="text-sky-300 font-bold text-sm">Condiciones comerciales desde el 01/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos diarios · TC variable · Crédito sin escalonado mensual en dólares</p></div>
           <label className="text-xs text-slate-300">Fecha del TC <input aria-label="Fecha del tipo de cambio" type="date" value={fechaTC} onChange={e => setFechaTC(e.target.value)} className="ml-2 bg-slate-950 border border-slate-600 rounded-lg p-2 text-white" /></label>
         </div>
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
@@ -767,12 +782,12 @@ export default function App() {
 
         <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
-          <div className="lg:col-span-5 glass-panel rounded-[2.5rem] overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
+          <div className="lg:col-span-5 glass-panel rounded-2xl overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
             <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800 flex-wrap">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
               <div className="flex items-center gap-3 relative z-10">
-                <div className="bg-violet-500/10 p-2.5 rounded-xl border border-violet-500/30 shadow-[inset_0_0_15px_rgba(167,139,250,0.15)]">
-                  <FileText className="w-5 h-5 text-violet-400" />
+                <div className="bg-sky-500/10 p-2.5 rounded-xl border border-sky-500/30 shadow-[inset_0_0_15px_rgba(56,189,248,0.15)]">
+                  <FileText className="w-5 h-5 text-sky-400" />
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white drop-shadow-md">Prepara tu propuesta</h2>
               </div>
@@ -786,7 +801,7 @@ export default function App() {
                 </button>
                 <button 
                     onClick={() => setUsarAPI(true)} 
-                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-amber-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-amber-400'}`}
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-cyan-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
                 >
                     <Server className="w-3 h-3" /> API Server
                 </button>
@@ -795,18 +810,18 @@ export default function App() {
             
             <div className="p-5 sm:p-8 flex-1 bg-[#090e17]/60 backdrop-blur-md">
               <form onSubmit={handleProcesar} className="space-y-5 sm:space-y-6">
-                <div className="flex bg-[#0b0e1d] p-1.5 rounded-2xl border border-slate-800 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] mb-6 relative overflow-hidden">
+                <div className="flex bg-[#080d15] p-1.5 rounded-2xl border border-slate-800 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] mb-6 relative overflow-hidden">
                   <button 
                     type="button" 
                     onClick={() => { setTipoCotizacion('credito'); }} 
-                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'credito' ? 'bg-gradient-to-br from-amber-500 to-teal-600 text-slate-900 shadow-[0_0_20px_rgba(245,158,11,0.5)]' : 'text-slate-500 hover:text-amber-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'credito' ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-900 shadow-[0_0_20px_rgba(6,182,212,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
                   >
                     <CreditCard className="w-4 h-4"/> A Crédito
                   </button>
                   <button 
                     type="button" 
                     onClick={() => { setTipoCotizacion('contado'); }} 
-                    className={`flex-1 py-3 text-xs sm:text-[11px] font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-violet-400 to-blue-500 text-slate-900 shadow-[0_0_20px_rgba(139,92,246,0.5)]' : 'text-slate-500 hover:text-violet-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-[11px] font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-sky-400 to-blue-500 text-slate-900 shadow-[0_0_20px_rgba(14,165,233,0.5)]' : 'text-slate-500 hover:text-sky-400'}`}
                   >
                     <Wallet className="w-4 h-4 shrink-0"/> Contado / Liquidación
                   </button>
@@ -814,17 +829,17 @@ export default function App() {
 
                 <div className="space-y-2.5">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`} /> Regional
+                    <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> Regional
                   </label>
                   <div className="relative">
                     <select 
                       value={regional} 
                       onChange={e => setRegional(e.target.value)} 
-                      className={`w-full bg-[#0e1224]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(139,92,246,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(245,158,11,0.15)]'}`}
+                      className={`w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(14,165,233,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]'}`}
                     >
                       {Object.keys(proyectosPorRegional)?.map(reg => <option key={reg} value={reg}>{reg}</option>)}
                     </select>
-                    <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>
+                    <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                       <ChevronDown className="w-5 h-5" />
                     </div>
                   </div>
@@ -833,19 +848,19 @@ export default function App() {
                 <div className="space-y-2.5 relative">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Building2 className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`} /> Proyecto
+                      <Building2 className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> Proyecto
                     </label>
                     {cargandoBD ? (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 flex items-center gap-1.5 border border-amber-500/30 px-3 py-1.5 rounded-full bg-amber-500/10 shrink-0">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-cyan-400 flex items-center gap-1.5 border border-cyan-500/30 px-3 py-1.5 rounded-full bg-cyan-500/10 shrink-0">
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
                     ) : tieneBD ? (
                       <button 
                         type="button" 
                         onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-violet-900/50 text-violet-300 border border-violet-500/40 hover:bg-violet-800/50 hover:shadow-[0_0_10px_rgba(167,139,250,0.2)]' : 'bg-amber-900/50 text-amber-300 border border-amber-500/40 hover:bg-amber-800/50 hover:shadow-[0_0_10px_rgba(251,191,36,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-sky-900/50 text-sky-300 border border-sky-500/40 hover:bg-sky-800/50 hover:shadow-[0_0_10px_rgba(56,189,248,0.2)]' : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
                       >
-                        {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-violet-400' : 'text-amber-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
+                        {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
                       </button>
                     ) : null}
                   </div>
@@ -853,12 +868,12 @@ export default function App() {
                     <select 
                       value={proyecto} 
                       onChange={e => setProyecto(e.target.value)} 
-                      className={`w-full bg-[#0e1224]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(139,92,246,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(245,158,11,0.15)]'}`}
+                      className={`w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(14,165,233,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]'}`}
                     >
                       {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
                       <option value="OTRO">OTRO...</option>
                     </select>
-                    <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>
+                    <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                       <ChevronDown className="w-5 h-5" />
                     </div>
                   </div>
@@ -867,17 +882,17 @@ export default function App() {
                       type="text" 
                       value={proyectoPersonalizado} 
                       onChange={e => setProyectoPersonalizado(e.target.value)} 
-                      className="w-full bg-[#0e1224]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(167,139,250,0.15)] focus:border-violet-500" 
+                      className="w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(56,189,248,0.15)] focus:border-sky-500" 
                       placeholder="Escribe el nombre del proyecto..." 
                     />
                   )}
                 </div>
 
                 <div className="pt-2 sm:pt-3">
-                  <div className="bg-[#151a30] border border-slate-700 rounded-[1.5rem] p-4 sm:p-5 flex flex-col gap-3 relative shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
+                  <div className="bg-[#101925] border border-slate-700 rounded-xl p-4 sm:p-5 flex flex-col gap-3 relative shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)]">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-violet-400 drop-shadow-[0_0_5px_rgba(167,139,250,0.5)]' : 'text-amber-400 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]'}`} />
+                        <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-400 drop-shadow-[0_0_5px_rgba(56,189,248,0.5)]' : 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
                       {!usarBD && tieneBD && (
@@ -888,18 +903,18 @@ export default function App() {
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>UV</label>
+                        <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>UV</label>
                         {modoBD ? (
                            <div className="relative group">
                              <select 
                                value={uv} 
                                onChange={handleUvChange} 
-                               className={`w-full bg-[#0e1224] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(167,139,250,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(251,191,36,0.15)]'}`}
+                               className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`}
                              >
                                <option value="" disabled hidden>Selec.</option>
                                {uvsDisponibles?.map(u => <option key={u} value={u}>{u}</option>)}
                              </select>
-                             <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>
+                             <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                                <ChevronDown className="w-3 h-3" />
                              </div>
                            </div>
@@ -909,23 +924,23 @@ export default function App() {
                             value={uv} 
                             onChange={handleUvChange} 
                             placeholder="Ej. 49" 
-                            className={`w-full bg-[#0e1224] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(167,139,250,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(251,191,36,0.15)]'}`} 
+                            className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`} 
                           />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>MZN</label>
+                        <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>MZN</label>
                         {modoBD ? (
                            <div className="relative group">
                              <select 
                                value={mzn} 
                                onChange={handleMznChange} 
-                               className={`w-full bg-[#0e1224] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(167,139,250,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(251,191,36,0.15)]'}`}
+                               className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`}
                              >
                                <option value="" disabled hidden>Selec.</option>
                                {mznsDisponibles?.map(m => <option key={m} value={m}>{m}</option>)}
                              </select>
-                             <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>
+                             <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                                <ChevronDown className="w-3 h-3" />
                              </div>
                            </div>
@@ -935,23 +950,23 @@ export default function App() {
                             value={mzn} 
                             onChange={handleMznChange} 
                             placeholder="Ej. 6" 
-                            className={`w-full bg-[#0e1224] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(167,139,250,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(251,191,36,0.15)]'}`} 
+                            className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`} 
                           />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
-                        <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>LOTE</label>
+                        <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>LOTE</label>
                         {modoBD ? (
                            <div className="relative group">
                              <select 
                                value={lote} 
                                onChange={handleLoteChange} 
-                               className={`w-full bg-[#0e1224] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(167,139,250,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(251,191,36,0.15)]'}`}
+                               className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`}
                              >
                                <option value="" disabled hidden>Selec.</option>
                                {lotesDisponibles?.map(l => <option key={l} value={l}>{l}</option>)}
                              </select>
-                             <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`}>
+                             <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                                <ChevronDown className="w-3 h-3" />
                              </div>
                            </div>
@@ -961,7 +976,7 @@ export default function App() {
                             value={lote} 
                             onChange={handleLoteChange} 
                             placeholder="Ej. 9" 
-                            className={`w-full bg-[#0e1224] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-violet-500 focus:shadow-[0_0_15px_rgba(167,139,250,0.15)]' : 'focus:border-amber-500 focus:shadow-[0_0_15px_rgba(251,191,36,0.15)]'}`} 
+                            className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`} 
                           />
                         )}
                       </div>
@@ -971,7 +986,7 @@ export default function App() {
 
                 <div className="space-y-2.5 relative mt-4">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <LayoutTemplate className={`w-3 h-3 shrink-0 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`} /> 
+                      <LayoutTemplate className={`w-3 h-3 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> 
                       Categoría del Lote
                     </label>
                     <input 
@@ -979,7 +994,7 @@ export default function App() {
                       value={categoria} 
                       onChange={e => setCategoria(e.target.value)} 
                       placeholder="Ej. LOTE S/CALLE ESQ. A" 
-                      className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-violet-950/30 border border-violet-500/40 text-violet-100 shadow-[inset_0_0_15px_rgba(167,139,250,0.1)] focus:border-violet-400 focus:shadow-[0_0_15px_rgba(167,139,250,0.2)]' : 'bg-amber-950/30 border border-amber-500/40 text-amber-100 shadow-[inset_0_0_15px_rgba(251,191,36,0.1)] focus:border-amber-400 focus:shadow-[0_0_15px_rgba(251,191,36,0.2)]') : 'bg-[#0e1224] border border-slate-700 text-white'}`} 
+                      className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-sky-950/30 border border-sky-500/40 text-sky-100 shadow-[inset_0_0_15px_rgba(56,189,248,0.1)] focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 shadow-[inset_0_0_15px_rgba(34,211,238,0.1)] focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]') : 'bg-[#0b111b] border border-slate-700 text-white'}`} 
                     />
                 </div>
 
@@ -987,7 +1002,7 @@ export default function App() {
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5">
-                        <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`} /> 
+                        <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> 
                         Superficie <span className="text-slate-600 normal-case">(m²)</span>
                       </span>
                     </label>
@@ -997,13 +1012,13 @@ export default function App() {
                       value={superficie} 
                       onChange={e => setSuperficie(e.target.value)} 
                       placeholder="Ej. 240" 
-                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0e1224] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-violet-400 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(167,139,250,0.15)]' : 'text-amber-400 focus:border-amber-500 focus:shadow-[0_0_20px_rgba(251,191,36,0.15)]'}`} 
+                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0b111b] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-sky-400 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]' : 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]'}`} 
                     />
                   </div>
                   <div className="space-y-2.5 relative">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between gap-1.5">
                       <span className="flex items-center gap-1.5">
-                        <DollarSign className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-violet-500' : 'text-amber-500'}`} /> 
+                        <DollarSign className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> 
                         Precio <span className="text-slate-600 normal-case">/ m²</span>
                       </span>
                     </label>
@@ -1013,16 +1028,16 @@ export default function App() {
                       value={precio} 
                       onChange={e => setPrecio(e.target.value)} 
                       placeholder="Ej. 145" 
-                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0e1224] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-violet-400 focus:border-violet-500 focus:shadow-[0_0_20px_rgba(167,139,250,0.15)]' : 'text-amber-400 focus:border-amber-500 focus:shadow-[0_0_20px_rgba(251,191,36,0.15)]'}`} 
+                      className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0b111b] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-sky-400 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]' : 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]'}`} 
                     />
                   </div>
                 </div>
 
-                <div className={`bg-[#0e1224]/50 border p-4 sm:p-5 rounded-[2rem] shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 ${tipoCotizacion === 'contado' ? 'border-violet-500/40 hover:border-violet-500/60' : 'border-amber-500/40 hover:border-amber-500/60'} transition-colors`}>
-                  <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl transition-colors ${tipoCotizacion === 'contado' ? 'bg-violet-500/10 group-hover:bg-violet-400/20' : 'bg-amber-500/10 group-hover:bg-amber-400/20'}`}></div>
-                  <div className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 ${tipoCotizacion === 'contado' ? 'text-violet-400 drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]' : 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`}>
-                    <div className={`p-1.5 rounded-lg border shadow-sm shrink-0 ${tipoCotizacion === 'contado' ? 'bg-violet-900/50 border-violet-500/50' : 'bg-amber-900/50 border-amber-500/50'}`}>
-                      <Gift className={`w-4 h-4 ${tipoCotizacion === 'contado' ? 'text-violet-300' : 'text-amber-300'}`} />
+                <div className={`bg-[#0b111b]/50 border p-4 sm:p-5 rounded-xl shadow-[inset_0_2px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group backdrop-blur-md mt-4 ${tipoCotizacion === 'contado' ? 'border-sky-500/40 hover:border-sky-500/60' : 'border-cyan-500/40 hover:border-cyan-500/60'} transition-colors`}>
+                  <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl transition-colors ${tipoCotizacion === 'contado' ? 'bg-sky-500/10 group-hover:bg-sky-400/20' : 'bg-cyan-500/10 group-hover:bg-cyan-400/20'}`}></div>
+                  <div className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 ${tipoCotizacion === 'contado' ? 'text-sky-400 drop-shadow-[0_0_8px_rgba(14,165,233,0.5)]' : 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]'}`}>
+                    <div className={`p-1.5 rounded-lg border shadow-sm shrink-0 ${tipoCotizacion === 'contado' ? 'bg-sky-900/50 border-sky-500/50' : 'bg-cyan-900/50 border-cyan-500/50'}`}>
+                      <Gift className={`w-4 h-4 ${tipoCotizacion === 'contado' ? 'text-sky-300' : 'text-cyan-300'}`} />
                     </div>
                     {tipoCotizacion === 'contado' ? 'Esquema de Descuento Promocional' : 'Descuentos Exclusivos (Crédito)'}
                   </div>
@@ -1031,19 +1046,19 @@ export default function App() {
                     {tipoCotizacion === 'contado' && (
                       <div className="space-y-3">
                         <label className="text-[10px] sm:text-[11px] font-bold text-slate-300 w-max uppercase tracking-widest flex items-center gap-2">
-                          <Timer className="w-4 h-4 text-violet-400"/> Plazo de Pago o Liquidación
+                          <Timer className="w-4 h-4 text-sky-400"/> Plazo de Pago o Liquidación
                         </label>
                         <div className="relative">
                           <select 
                             value={plazoLiquidacion} 
                             onChange={(e) => setPlazoLiquidacion(e.target.value)} 
-                            className="w-full bg-[#0e1224] border border-violet-500/50 text-violet-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(167,139,250,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-violet-500 focus:border-violet-400" 
+                            className="w-full bg-[#0b111b] border border-sky-500/50 text-sky-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(56,189,248,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-sky-500 focus:border-sky-400" 
                           >
                             <option value="30">{`Primeros 30 días (-30% | TC equivalente: ${(tcFlexible * 0.70).toFixed(2)})`}</option>
                             <option value="60">{`De 31 a 60 días (-20% | TC equivalente: ${(tcFlexible * 0.80).toFixed(2)})`}</option>
                             <option value="90">{`De 61 a 90 días (-10% | TC equivalente: ${(tcFlexible * 0.90).toFixed(2)})`}</option>
                           </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-violet-500">
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-sky-500">
                             <ChevronDown className="w-5 h-5" />
                           </div>
                         </div>
@@ -1053,7 +1068,7 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-1.5">
                           <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                            <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-amber-500 shrink-0" /> Crédito x m² ($us)
+                            <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Crédito x m² ($us)
                           </label>
                           <input 
                             type="number" 
@@ -1062,7 +1077,7 @@ export default function App() {
                             disabled={!aplicarDescM2} 
                             value={descuentoM2} 
                             readOnly aria-label="Descuento a crédito de un dólar por metro cuadrado" 
-                            className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#0e1224] border border-amber-500 text-white focus:ring-1 focus:ring-amber-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                            className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#0b111b] border border-cyan-500 text-white focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
                           />
                         </div>
                       </div>
@@ -1075,9 +1090,9 @@ export default function App() {
                 </label>}
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
-                  <div className="col-span-12 md:col-span-8 bg-amber-950/30 border border-amber-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(251,191,36,0.1)]">
+                  <div className="col-span-12 md:col-span-8 bg-cyan-950/30 border border-cyan-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(34,211,238,0.1)]">
                     <div className="space-y-2">
-                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-amber-400' : 'text-slate-500'}`}>
+                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'porcentaje' ? 'text-cyan-400' : 'text-slate-500'}`}>
                         <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                       </label>
                       <input 
@@ -1085,11 +1100,11 @@ export default function App() {
                         onFocus={() => setModoInicial('porcentaje')}
                         onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
                         placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 5'} 
-                        className={`w-full bg-[#0e1224] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-amber-500 shadow-[0_0_15px_rgba(251,191,36,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
+                        className={`w-full bg-[#0b111b] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-bold text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'porcentaje' ? 'border-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.2)] text-white' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'monto' ? 'text-amber-400' : 'text-slate-500'}`}>
+                      <label className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 ${modoInicial === 'monto' ? 'text-cyan-400' : 'text-slate-500'}`}>
                         <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                       </label>
                       <input 
@@ -1097,24 +1112,24 @@ export default function App() {
                         onFocus={() => setModoInicial('monto')}
                         onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
                         placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 500'} 
-                        className={`w-full bg-[#0e1224] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-amber-500 shadow-[0_0_15px_rgba(251,191,36,0.2)] text-amber-400' : 'border-slate-700 text-slate-500'}`} 
+                        className={`w-full bg-[#0b111b] border rounded-xl p-3 sm:p-3.5 outline-none transition-all font-black text-sm sm:text-base placeholder-slate-600 shadow-inner ${modoInicial === 'monto' ? 'border-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.2)] text-cyan-400' : 'border-slate-700 text-slate-500'}`} 
                       />
                     </div>
                   </div>
                   
                   <div className="col-span-12 md:col-span-4 space-y-2 mt-2 md:mt-0">
                     <label className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-amber-400 shrink-0" /> Plazo
+                      <Calendar className="w-4 h-4 text-cyan-400 shrink-0" /> Plazo
                     </label>
                     <div className="relative h-[calc(100%-1.5rem)]">
                       <select 
                         required value={años} onChange={e => setAños(e.target.value)} 
-                        className="w-full bg-[#0e1224]/50 border border-slate-700 text-white rounded-2xl p-3.5 outline-none transition-all font-bold text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-amber-500 focus:shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                        className="w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 outline-none transition-all font-bold text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]"
                       >
                         <option value="" disabled hidden>Selec.</option>
                         {[...Array(14)]?.map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-amber-500">
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
                         <ChevronRight className="w-5 h-5 rotate-90" />
                       </div>
                     </div>
@@ -1124,12 +1139,12 @@ export default function App() {
 
                 <button 
                   type="submit" disabled={isCalculating} 
-                  className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-violet-500 via-blue-500 to-violet-400 hover:from-violet-400 hover:via-blue-400 hover:to-violet-300 shadow-[0_0_30px_rgba(167,139,250,0.4)] hover:shadow-[0_0_45px_rgba(167,139,250,0.6)]' : 'from-amber-500 via-teal-500 to-amber-400 hover:from-amber-400 hover:via-teal-400 hover:to-amber-300 shadow-[0_0_30px_rgba(251,191,36,0.4)] hover:shadow-[0_0_45px_rgba(251,191,36,0.6)]'} text-[#090b19] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
+                  className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-sky-500 via-blue-500 to-sky-400 hover:from-sky-400 hover:via-blue-400 hover:to-sky-300 shadow-[0_0_30px_rgba(56,189,248,0.4)] hover:shadow-[0_0_45px_rgba(56,189,248,0.6)]' : 'from-cyan-500 via-blue-500 to-cyan-400 hover:from-cyan-400 hover:via-blue-400 hover:to-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:shadow-[0_0_45px_rgba(34,211,238,0.6)]'} text-[#06090f] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
                 >
                   <div className="absolute inset-0 bg-white/40 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
                   <span className="relative z-10 flex items-center gap-2 sm:gap-3 drop-shadow-sm">
                     {isCalculating ? (
-                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin shrink-0 text-[#090b19]" /> Renderizando...</>
+                      <><Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin shrink-0 text-[#06090f]" /> Renderizando...</>
                     ) : (
                       <>Procesar Inversión <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" /></>
                     )}
@@ -1141,11 +1156,11 @@ export default function App() {
           
           <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6 min-w-0 w-full">
             {!resultado || isCalculating ? (
-              <div className="glass-panel rounded-[2.5rem] h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500 border border-slate-700/50 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-[#0d1420]/60 backdrop-blur-xl">
+              <div className="glass-panel rounded-2xl h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center transition-all duration-500 border border-slate-700/50 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-[#0d1420]/60 backdrop-blur-xl">
                 <div className="relative">
-                  <div className={`absolute inset-0 rounded-full blur-2xl animate-pulse ${tipoCotizacion === 'contado' ? 'bg-violet-500/30' : 'bg-amber-500/30'}`}></div>
-                  <div className={`bg-[#0e1224] p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-[0_0_40px_rgba(139,92,246,0.3)] border relative z-10 ${tipoCotizacion === 'contado' ? 'border-violet-500/50' : 'border-amber-500/50'}`}>
-                    {isCalculating ? <Loader2 className={`w-12 h-12 sm:w-16 sm:h-16 animate-spin ${tipoCotizacion === 'contado' ? 'text-violet-400' : 'text-amber-400'}`} /> : <Calculator className={`w-12 h-12 sm:w-16 sm:h-16 ${tipoCotizacion === 'contado' ? 'text-violet-400 drop-shadow-[0_0_15px_rgba(167,139,250,0.6)]' : 'text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]'}`} />}
+                  <div className={`absolute inset-0 rounded-full blur-2xl  ${tipoCotizacion === 'contado' ? 'bg-sky-500/30' : 'bg-cyan-500/30'}`}></div>
+                  <div className={`bg-[#0b111b] p-6 sm:p-8 rounded-full mb-6 sm:mb-8 shadow-[0_0_40px_rgba(14,165,233,0.3)] border relative z-10 ${tipoCotizacion === 'contado' ? 'border-sky-500/50' : 'border-cyan-500/50'}`}>
+                    {isCalculating ? <Loader2 className={`w-12 h-12 sm:w-16 sm:h-16 animate-spin ${tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'}`} /> : <Calculator className={`w-12 h-12 sm:w-16 sm:h-16 ${tipoCotizacion === 'contado' ? 'text-sky-400 drop-shadow-[0_0_15px_rgba(56,189,248,0.6)]' : 'text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]'}`} />}
                   </div>
                 </div>
                 <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2 sm:mb-3 drop-shadow-md">
@@ -1156,68 +1171,68 @@ export default function App() {
                 </p>
               </div>
             ) : (
-              <div className="glass-panel rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-600/50 bg-[#0d1420]/95 backdrop-blur-2xl">
-                <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[120px] pointer-events-none ${resultado.tipoCotizacion === 'contado' ? 'bg-violet-500/15' : 'bg-amber-500/15'}`}></div>
+              <div className="glass-panel rounded-xl sm:rounded-2xl p-5 sm:p-8 animate-in fade-in slide-in-from-bottom-12 duration-700 ease-out relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-slate-600/50 bg-[#0d1420]/95 backdrop-blur-2xl">
+                <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[120px] pointer-events-none ${resultado.tipoCotizacion === 'contado' ? 'bg-sky-500/15' : 'bg-cyan-500/15'}`}></div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-5 border-b border-slate-700 gap-4 relative z-10">
                   <h2 className="text-2xl font-extrabold text-white flex items-center gap-3 tracking-tight drop-shadow-sm">
-                    <div className={`p-2 rounded-xl text-[#0e1224] shadow-[0_0_15px_rgba(255,255,255,0.2)] shrink-0 bg-gradient-to-br ${resultado.tipoCotizacion === 'contado' ? 'from-violet-400 to-blue-500' : 'from-amber-400 to-teal-500'}`}>
+                    <div className={`p-2 rounded-xl text-[#0b111b] shadow-[0_0_15px_rgba(255,255,255,0.2)] shrink-0 bg-gradient-to-br ${resultado.tipoCotizacion === 'contado' ? 'from-sky-400 to-blue-500' : 'from-cyan-400 to-blue-500'}`}>
                       <ShieldCheck className="w-5 h-5" />
                     </div> 
                     Tu propuesta de inversión
                   </h2>
-                  <span className={`border text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 w-full sm:w-auto ${resultado.tipoCotizacion === 'contado' ? 'bg-violet-950/60 text-violet-400 border-violet-500/50' : 'bg-amber-950/60 text-amber-400 border-amber-500/50'}`}>
-                    <span className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${resultado.tipoCotizacion === 'contado' ? 'bg-violet-400 shadow-[0_0_10px_rgba(167,139,250,1)]' : 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,1)]'}`}></span> 
+                  <span className={`border text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 w-full sm:w-auto ${resultado.tipoCotizacion === 'contado' ? 'bg-sky-950/60 text-sky-400 border-sky-500/50' : 'bg-cyan-950/60 text-cyan-400 border-cyan-500/50'}`}>
+                    <span className={`w-2 h-2 rounded-full  shrink-0 ${resultado.tipoCotizacion === 'contado' ? 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,1)]' : 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,1)]'}`}></span> 
                     {resultado.tipoCotizacion === 'contado' ? 'Liquidación / Contado' : 'A Crédito'}
                   </span>
                 </div>
                 
                 <div className="relative z-10 space-y-6">
                   
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-[#0b0e1d]/80 p-4 rounded-2xl border border-slate-700 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-[#080d15]/80 p-4 rounded-2xl border border-slate-700 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
                       <div className="flex items-center gap-3 w-full sm:w-auto">
                         <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-600 shrink-0 shadow-sm">
-                          <MapPin className={`w-5 h-5 ${resultado.tipoCotizacion === 'contado' ? 'text-violet-400 drop-shadow-[0_0_5px_rgba(167,139,250,0.5)]' : 'text-amber-400 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]'}`} />
+                          <MapPin className={`w-5 h-5 ${resultado.tipoCotizacion === 'contado' ? 'text-sky-400 drop-shadow-[0_0_5px_rgba(56,189,248,0.5)]' : 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]'}`} />
                         </div>
                         <div className="min-w-0">
                           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Proyecto</div>
                           <div className="text-white font-black text-lg uppercase leading-none truncate drop-shadow-sm">{resultado.proyecto}</div>
                           {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && (
-                            <div className="text-[8px] text-amber-400 font-bold mt-1 tracking-wider truncate bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/20 w-max">{resultado.categoria}</div>
+                            <div className="text-[8px] text-cyan-400 font-bold mt-1 tracking-wider truncate bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/20 w-max">{resultado.categoria}</div>
                           )}
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 w-full sm:w-auto">
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">UV</div>
-                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-violet-400' : 'text-amber-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
+                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'} font-black text-base leading-none truncate`}>{resultado.uv || '-'}</div>
                         </div>
                         <div className="text-center px-4 py-2 bg-slate-900/80 rounded-xl border border-slate-700 flex-1 sm:flex-none shadow-inner">
                           <div className="text-[8px] font-extrabold text-slate-500 uppercase mb-1">MZN</div>
-                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-violet-400' : 'text-amber-400'} font-black text-base leading-none truncate`}>{resultado.mzn || '-'}</div>
+                          <div className={`${resultado.tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'} font-black text-base leading-none truncate`}>{resultado.mzn || '-'}</div>
                         </div>
-                        <div className={`text-center px-4 py-2 rounded-xl border flex-1 sm:flex-none shadow-[0_0_15px_rgba(0,0,0,0.5)] ${resultado.tipoCotizacion === 'contado' ? 'bg-violet-950/60 border-violet-500/50' : 'bg-amber-950/60 border-amber-500/50'}`}>
-                          <div className={`text-[8px] font-extrabold uppercase mb-1 ${resultado.tipoCotizacion === 'contado' ? 'text-violet-400' : 'text-amber-400'}`}>LOTE</div>
+                        <div className={`text-center px-4 py-2 rounded-xl border flex-1 sm:flex-none shadow-[0_0_15px_rgba(0,0,0,0.5)] ${resultado.tipoCotizacion === 'contado' ? 'bg-sky-950/60 border-sky-500/50' : 'bg-cyan-950/60 border-cyan-500/50'}`}>
+                          <div className={`text-[8px] font-extrabold uppercase mb-1 ${resultado.tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'}`}>LOTE</div>
                           <div className="text-white font-black text-base leading-none truncate">{resultado.lote || '-'}</div>
                         </div>
                       </div>
                   </div>
 
-                  <div className="mb-5 p-4 rounded-xl border border-violet-500/30 bg-violet-950/20 text-sm text-slate-200 leading-relaxed">
+                  <div className="mb-5 p-4 rounded-xl border border-sky-500/30 bg-sky-950/20 text-sm text-slate-200 leading-relaxed">
                     <strong>TC cotizado el {fechaLegible(resultado.fechaTC)}: Bs {resultado.tcOriginal.toFixed(2)} / US$ 1.</strong>{' '}
                     {resultado.tipoCotizacion === 'credito' ? 'Inicial al TC del día de la venta. Mensualidades fijas en dólares; cada pago en bolivianos se convierte al TC vigente de su fecha. Las equivalencias futuras en Bs son referenciales.' : 'El descuento se aplica una sola vez: al precio o como TC equivalente. Ambas opciones dan el mismo total; no se combinan con el descuento a crédito. El TC de pago debe confirmarse.'}
                   </div>
                   {/* BLOQUE AL CONTADO REDISEÑADO CON COMPARACIÓN CONMUTATIVA */}
                   {resultado.tipoCotizacion === 'contado' && (
                     <div className="animate-in zoom-in-95 duration-500 space-y-6">
-                       <div className="relative overflow-hidden bg-gradient-to-br from-violet-950 via-[#0b0e1d] to-[#0b0e1d] p-8 sm:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(139,92,246,0.15)] border border-violet-500/50 group text-center">
+                       <div className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-[#080d15] to-[#080d15] p-8 sm:p-12 rounded-xl shadow-[0_0_50px_rgba(14,165,233,0.15)] border border-sky-500/50 group text-center">
                           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
-                          <div className="absolute -bottom-20 -right-20 opacity-10"><Wallet className="w-64 h-64 text-violet-400" /></div>
+                          <div className="absolute -bottom-20 -right-20 opacity-10"><Wallet className="w-64 h-64 text-sky-400" /></div>
                           <div className="relative z-10 flex flex-col items-center justify-center">
                              
-                             <div className="inline-flex flex-col items-center gap-1 px-6 py-3 rounded-2xl bg-violet-950/80 border border-violet-500/50 shadow-[0_0_20px_rgba(167,139,250,0.2)] mb-6">
-                               <span className="text-violet-200 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                 <Timer className="w-4 h-4 text-violet-400"/> Liquidación: {resultado.plazoLiquidacionVisual}
+                             <div className="inline-flex flex-col items-center gap-1 px-6 py-3 rounded-2xl bg-sky-950/80 border border-sky-500/50 shadow-[0_0_20px_rgba(56,189,248,0.2)] mb-6">
+                               <span className="text-sky-200 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                 <Timer className="w-4 h-4 text-sky-400"/> Liquidación: {resultado.plazoLiquidacionVisual}
                                </span>
                              </div>
 
@@ -1227,46 +1242,46 @@ export default function App() {
                              
                              {/* DEMOSTRADOR DE PROPIEDAD CONMUTATIVA */}
                              <div className="mt-8 w-full max-w-3xl">
-                               <div className="flex items-center justify-center gap-3 text-violet-400 text-xs font-black uppercase tracking-widest mb-4">
+                               <div className="flex items-center justify-center gap-3 text-sky-400 text-xs font-black uppercase tracking-widest mb-4">
                                  <Scale className="w-4 h-4" /> Un beneficio · Dos formas equivalentes
                                </div>
                                
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  
                                  {/* DEMO A: DESC. AL PRECIO */}
-                                 <div className="bg-[#151a30] border border-violet-500/30 p-5 rounded-2xl relative shadow-[0_0_20px_rgba(139,92,246,0.1)] text-left hover:border-violet-500/50 transition-colors">
-                                   <div className="text-violet-400 font-bold text-[10px] tracking-widest uppercase mb-4 text-center border-b border-violet-500/20 pb-2">
+                                 <div className="bg-[#101925] border border-sky-500/30 p-5 rounded-2xl relative shadow-[0_0_20px_rgba(14,165,233,0.1)] text-left hover:border-sky-500/50 transition-colors">
+                                   <div className="text-sky-400 font-bold text-[10px] tracking-widest uppercase mb-4 text-center border-b border-sky-500/20 pb-2">
                                      Opción A: Descuento al Precio
                                    </div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">$us {resultado.valorOriginal}</span></div>
-                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-amber-400 font-bold">-$us {resultado.ahorroTotal}</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-cyan-400 font-bold">-$us {resultado.ahorroTotal}</span></div>
                                    <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Precio Final</span> <span className="font-black text-white">$us {resultado.valorFinal}</span></div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">x {resultado.tcOriginal}</span></div>
-                                   <div className="flex justify-between text-lg border-t border-violet-500/50 pt-2 mt-2 bg-violet-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
-                                     <span className="text-violet-400 font-black mt-2">Total Bs.</span> 
-                                     <span className="font-black text-violet-300 mt-2">Bs. {resultado.totalBsA}</span>
+                                   <div className="flex justify-between text-lg border-t border-sky-500/50 pt-2 mt-2 bg-sky-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
+                                     <span className="text-sky-400 font-black mt-2">Total Bs.</span> 
+                                     <span className="font-black text-sky-300 mt-2">Bs. {resultado.totalBsA}</span>
                                    </div>
                                  </div>
 
                                  {/* DEMO B: DESC. AL TC */}
-                                 <div className="bg-[#151a30] border border-amber-500/30 p-5 rounded-2xl relative shadow-[0_0_20px_rgba(245,158,11,0.1)] text-left hover:border-amber-500/50 transition-colors">
-                                   <div className="text-amber-400 font-bold text-[10px] tracking-widest uppercase mb-4 text-center border-b border-amber-500/20 pb-2">
+                                 <div className="bg-[#101925] border border-cyan-500/30 p-5 rounded-2xl relative shadow-[0_0_20px_rgba(6,182,212,0.1)] text-left hover:border-cyan-500/50 transition-colors">
+                                   <div className="text-cyan-400 font-bold text-[10px] tracking-widest uppercase mb-4 text-center border-b border-cyan-500/20 pb-2">
                                      Opción B: Descuento al T.C.
                                    </div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">{resultado.tcOriginal}</span></div>
-                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-amber-400 font-bold">-{resultado.descPctAplicado * 100}%</span></div>
+                                   <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-cyan-400 font-bold">-{resultado.descPctAplicado * 100}%</span></div>
                                    <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">TC equivalente</span> <span className="font-black text-white">{resultado.tcEfectivo.toFixed(2)}</span></div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">x $us {resultado.valorOriginal}</span></div>
-                                   <div className="flex justify-between text-lg border-t border-amber-500/50 pt-2 mt-2 bg-amber-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
-                                     <span className="text-amber-400 font-black mt-2">Total Bs.</span> 
-                                     <span className="font-black text-amber-300 mt-2">Bs. {resultado.totalBsB}</span>
+                                   <div className="flex justify-between text-lg border-t border-cyan-500/50 pt-2 mt-2 bg-cyan-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
+                                     <span className="text-cyan-400 font-black mt-2">Total Bs.</span> 
+                                     <span className="font-black text-cyan-300 mt-2">Bs. {resultado.totalBsB}</span>
                                    </div>
                                  </div>
 
                                </div>
                              </div>
 
-                             <div className="mt-8 flex justify-between w-full max-w-xl mx-auto border-t border-violet-500/30 pt-6">
+                             <div className="mt-8 flex justify-between w-full max-w-xl mx-auto border-t border-sky-500/30 pt-6">
                                <div className="text-center">
                                  <div className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mb-1">Precio de Lista</div>
                                  <div className="text-slate-300 font-bold text-lg line-through decoration-rose-500/50 decoration-2">$us {resultado.valorOriginal}</div>
@@ -1285,47 +1300,47 @@ export default function App() {
                   {resultado.tipoCotizacion === 'credito' && (
                     <div className="animate-in fade-in duration-500 space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                        <div className="bg-[#151a30] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
-                          <div className="text-amber-500 text-[10px] font-extrabold uppercase tracking-widest">Inversión Total</div>
+                        <div className="bg-[#101925] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
+                          <div className="text-cyan-500 text-[10px] font-extrabold uppercase tracking-widest">Inversión Total</div>
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.valorFinal}</div>
-                          <div className="text-[11px] font-bold text-amber-500 mt-1 truncate">Referencia al TC cotizado: Bs. {resultado.valorFinalBs}</div>
+                          <div className="text-[11px] font-bold text-cyan-500 mt-1 truncate">Referencia al TC cotizado: Bs. {resultado.valorFinalBs}</div>
                           {resultado.ahorroTotalRaw > 0 && (
-                            <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase shadow-sm">
+                            <div className="mt-2 text-[9px] text-cyan-400 font-bold bg-cyan-950/60 px-2 py-1 rounded border border-cyan-500/40 inline-block uppercase shadow-sm">
                               Bono Promocional Incluido: $us {resultado.ahorroTotal}
                             </div>
                           )}
                         </div>
-                        <div className="bg-[#151a30] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
-                          <div className="text-amber-400 text-[10px] font-extrabold uppercase tracking-widest">Cuota Inicial ({resultado.inicialPct}%)</div>
+                        <div className="bg-[#101925] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
+                          <div className="text-cyan-400 text-[10px] font-extrabold uppercase tracking-widest">Cuota Inicial ({resultado.inicialPct}%)</div>
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.inicial}</div>
-                          <div className="text-[11px] font-bold text-amber-500 mt-1 truncate">Al TC de la venta: Bs. {resultado.inicialBs}</div>
+                          <div className="text-[11px] font-bold text-cyan-500 mt-1 truncate">Al TC de la venta: Bs. {resultado.inicialBs}</div>
                         </div>
                       </div>
 
                       {/* ACORDEÓN DE PAGOS */}
-                      <div className="mt-8 border border-amber-500/40 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(245,158,11,0.15)] bg-[#0b0e1d] w-full">
-                          <div className="p-5 border-b border-slate-800 flex flex-col justify-between items-start bg-gradient-to-r from-amber-950/40 to-transparent">
+                      <div className="mt-8 border border-cyan-500/40 rounded-2xl overflow-hidden shadow-[0_15px_40px_rgba(6,182,212,0.15)] bg-[#080d15] w-full">
+                          <div className="p-5 border-b border-slate-800 flex flex-col justify-between items-start bg-gradient-to-r from-cyan-950/40 to-transparent">
                                 <h3 className="text-white font-black text-lg flex items-center gap-2">
-                                  <Calendar className="w-5 h-5 text-amber-400"/> Proyección Financiera Estructural
+                                  <Calendar className="w-5 h-5 text-cyan-400"/> Proyección Financiera Estructural
                                 </h3>
                                 <p className="text-slate-400 text-xs mt-2">
-                                  Primer mes propuesto: <strong className="text-amber-400">{resultado.planPagosDetallado?.[0]?.mesLabel}</strong>. Confirmar al acordar el cronograma.
+                                  Primer mes propuesto: <strong className="text-cyan-400">{resultado.planPagosDetallado?.[0]?.mesLabel}</strong>. Confirmar al acordar el cronograma.
                                 </p>
                           </div>
                           
-                          <button onClick={() => setExpandedPlan(!expandedPlan)} className="w-full bg-[#151a30] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800">
-                             <span className="text-amber-400 font-bold text-sm tracking-widest uppercase">Ver mensualidades fijas en dólares</span>
-                             <ChevronDown className={`w-5 h-5 text-amber-400 transition-transform duration-300 ${expandedPlan ? 'rotate-180' : ''}`} />
+                          <button onClick={() => setExpandedPlan(!expandedPlan)} className="w-full bg-[#101925] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800">
+                             <span className="text-cyan-400 font-bold text-sm tracking-widest uppercase">Ver mensualidades fijas en dólares</span>
+                             <ChevronDown className={`w-5 h-5 text-cyan-400 transition-transform duration-300 ${expandedPlan ? 'rotate-180' : ''}`} />
                           </button>
 
                           {expandedPlan && (
-                            <div className="overflow-y-auto max-h-[350px] custom-scrollbar p-0 bg-[#0e1224]">
+                            <div className="overflow-y-auto max-h-[350px] custom-scrollbar p-0 bg-[#0b111b]">
                               <table className="w-full text-left text-xs whitespace-nowrap">
                                 <thead className="sticky top-0 bg-[#090e17] z-30 border-b border-slate-700">
                                   <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">
                                     <th className="p-4">Nro.</th>
                                     <th className="p-4">Mes de Pago</th>
-                                    <th className="p-4 text-amber-400">Cuota Fija ($us)</th>
+                                    <th className="p-4 text-cyan-400">Cuota Fija ($us)</th>
                                   </tr>
                                 </thead>
                                 <tbody className="font-semibold relative z-10">
@@ -1333,7 +1348,7 @@ export default function App() {
                                     <tr key={i} className="border-b border-slate-800/50 text-center hover:bg-slate-800/60 transition-colors">
                                       <td className="p-4 text-slate-600 font-bold">{row.nro}</td>
                                       <td className="p-4 text-slate-300">{row.mesLabel}</td>
-                                      <td className="p-4 font-black text-amber-400 text-sm">$ {Number(row.cuotaUsd).toFixed(2)}</td>
+                                      <td className="p-4 font-black text-cyan-400 text-sm">$ {Number(row.cuotaUsd).toFixed(2)}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -1343,27 +1358,27 @@ export default function App() {
                       </div>
 
                       {/* MOTOR DE PLAZOS ALTERNATIVOS 1 A 14 AÑOS */}
-                      <div className="mt-8 border border-amber-500/40 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-[#151a30] w-full">
-                        <div className="bg-[#0e1224] p-4 border-b border-amber-500/30 flex justify-between items-center">
+                      <div className="mt-8 border border-cyan-500/40 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-[#101925] w-full">
+                        <div className="bg-[#0b111b] p-4 border-b border-cyan-500/30 flex justify-between items-center">
                           <h3 className="text-slate-200 font-bold text-sm tracking-wide flex items-center gap-2 drop-shadow-sm">
-                            <Activity className="w-4 h-4 text-amber-500 shrink-0 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]"/> Resumen de Plazos Alternativos
+                            <Activity className="w-4 h-4 text-cyan-500 shrink-0 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]"/> Resumen de Plazos Alternativos
                           </h3>
                         </div>
                         <div className="p-3 sm:p-5 max-h-[350px] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#151a30] z-10">
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#101925] z-10">
                               <div>Plazo</div>
-                              <div className="text-amber-400">Cuota ($us)</div>
-                              <div className="text-amber-400">Bs. referenciales</div>
+                              <div className="text-cyan-400">Cuota ($us)</div>
+                              <div className="text-cyan-400">Bs. referenciales</div>
                             </div>
                             <div className="pt-2">
                               {resultado.planPlazosAlternativos?.map((plan, i) => (
-                                <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-amber-950/80 border border-amber-500/60 text-white shadow-[0_0_20px_rgba(245,158,11,0.3)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
+                                <div key={i} className={`grid grid-cols-3 gap-2 sm:gap-4 p-2 sm:p-3 rounded-xl text-center text-xs sm:text-sm font-bold transition-all duration-300 ${plan.isCurrent ? 'bg-cyan-950/80 border border-cyan-500/60 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] scale-[1.02] transform my-2' : 'text-slate-300 hover:bg-slate-800/60 border border-transparent'}`}>
                                   <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-                                    {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse hidden sm:inline-block shrink-0 shadow-[0_0_8px_rgba(251,191,36,1)]"></span>} 
+                                    {plan.isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400  hidden sm:inline-block shrink-0 shadow-[0_0_8px_rgba(34,211,238,1)]"></span>} 
                                     <span className="truncate">{plan.año} {plan.año === 1 ? 'Año' : 'Años'}</span>
                                   </div>
-                                  <div className={`font-black truncate ${plan.isCurrent ? 'text-white' : 'text-amber-50'}`}>$ {plan.cuotaUsd}</div>
-                                  <div className={`truncate ${plan.isCurrent ? 'text-amber-400' : 'text-slate-400'}`}>Bs. {plan.cuotaBs}</div>
+                                  <div className={`font-black truncate ${plan.isCurrent ? 'text-white' : 'text-cyan-50'}`}>$ {plan.cuotaUsd}</div>
+                                  <div className={`truncate ${plan.isCurrent ? 'text-cyan-400' : 'text-slate-400'}`}>Bs. {plan.cuotaBs}</div>
                                 </div>
                               ))}
                             </div>
@@ -1376,13 +1391,13 @@ export default function App() {
                   <div className="mt-8 pt-6 border-t border-slate-800 flex flex-col sm:flex-row gap-3">
                         <button 
                           onClick={copiarTexto} 
-                          className={`flex-1 bg-[#0e1224] border font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-inner ${resultado.tipoCotizacion === 'contado' ? 'border-violet-500/60 text-violet-400 hover:bg-violet-900/30' : 'border-amber-500/60 text-amber-400 hover:bg-amber-900/30'}`}
+                          className={`flex-1 bg-[#0b111b] border font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-inner ${resultado.tipoCotizacion === 'contado' ? 'border-sky-500/60 text-sky-400 hover:bg-sky-900/30' : 'border-cyan-500/60 text-cyan-400 hover:bg-cyan-900/30'}`}
                         >
                           {copiado ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />} {copiado ? 'COPIADO' : 'COPIAR TEXTO'}
                         </button>
                         <button 
                           onClick={enviarWhatsApp} 
-                          className="flex-1 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#090b19] font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:-translate-y-1 text-sm uppercase tracking-wider"
+                          className="flex-1 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#06090f] font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:-translate-y-1 text-sm uppercase tracking-wider"
                         >
                           <Send className="w-5 h-5" /> WhatsApp
                         </button>
@@ -1393,18 +1408,7 @@ export default function App() {
           </div>
         </div>
         
-        <div className="mt-20 sm:mt-32 pt-12 sm:pt-16 border-t border-slate-800/60 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 no-print relative w-full">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent"></div>
-          <div className="text-slate-500 text-[8px] sm:text-[10px] md:text-xs font-black tracking-[0.3em] sm:tracking-[0.5em] uppercase mb-6 sm:mb-8 px-4 drop-shadow-sm">
-            Concepto, Arquitectura y Desarrollo Web
-          </div>
-          <div className="text-4xl sm:text-7xl md:text-[6rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-300 to-violet-400 tracking-tighter mb-6 sm:mb-8 drop-shadow-[0_0_50px_rgba(167,139,250,0.4)] select-none w-full break-words px-4">
-            OSCAR SARAVIA
-          </div>
-          <p className="text-slate-400 text-[8px] sm:text-[10px] md:text-xs max-w-3xl font-bold tracking-[0.1em] sm:tracking-[0.2em] leading-relaxed uppercase px-4">
-            Esta plataforma de clase mundial fue inventada y programada de forma exclusiva para elevar el estándar de ventas y la experiencia del cliente.
-          </p>
-        </div>
+        <footer className="quantum-footer no-print"><span>CELINA <strong>QUANTUM</strong></span><span>Diseño y desarrollo · <strong>OSCAR SARAVIA ®</strong></span></footer>
       </div>
     </div>
   );
