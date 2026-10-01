@@ -1,20 +1,25 @@
+// Celina Quantum · Versión para asesores · Condiciones desde 01/10/2026.
+// Reemplazar src/App.tsx. Conserva las fuentes API/lotes.json y los GeoJSON de public/.
+// Compatible con react-map-gl 7 (entrada /maplibre) y maplibre-gl 4.
+// El TC se ingresa manualmente: Bs 12 es la referencia proporcionada para 01/10/2026.
+// GPS: requiere HTTPS/localhost y autorización de ubicación del dispositivo.
+// El acceso por contraseña del prototipo es solo una barrera de interfaz, no autenticación de servidor.
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
-  CheckCircle2, Building2, ChevronRight, FileText, Tag, 
-  MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, X, Printer, Activity, Wallet, CreditCard, Lock, Unlock,
+  CheckCircle2, Building2, ChevronRight, FileText, MapPin, Gift, Sparkles, TrendingUp, ShieldCheck, ChevronDown, 
+  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
-  TreePine, GraduationCap, Hospital, ShoppingBag, Landmark, Timer, Equal
+  Timer
 } from "lucide-react";
-import Map, { Source, Layer, GeolocateControl, NavigationControl, Marker } from 'react-map-gl';
+import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl/maplibre';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // ============================================================================
 // BASE DE DATOS DE REGIONALES Y PROYECTOS
 // ============================================================================
-const proyectosPorRegional = {
+const proyectosPorRegional: Record<string, string[]> = {
   "SANTA CRUZ": [
     "URUBÓ NORTE", "ROSA RODALI", "CELINA PAILÓN", "EL ENCANTO", "EL ENCANTO FASE 2",
     "SANTA ROSA - FASE 1", "SANTA ROSA - FASE 2", "SANTA ROSA - FASE 3", "TAMARINDO",
@@ -30,330 +35,134 @@ const proyectosPorRegional = {
   ]
 };
 
-const coordenadasProyectos = {
-  "MUYURINA": { lat: -17.3710, lng: -63.2550, zoom: 15.5 },
-  "LOS JARDINES": { lat: -17.3524, lng: -63.2718, zoom: 15.5 },
-  "EL RENACER": { lat: -17.3615, lng: -63.2652, zoom: 15.5 },
-  "CAÑAVERAL": { lat: -17.3255, lng: -63.2625, zoom: 15.5 },
-  "SANTA FE": { lat: -17.3150, lng: -63.2755, zoom: 15.5 },
-  "CELINA 3": { lat: -17.3452, lng: -63.2425, zoom: 15.5 },
-  "CELINA 4": { lat: -17.3485, lng: -63.2385, zoom: 15.5 },
-  "CELINA 5": { lat: -17.3518, lng: -63.2345, zoom: 15.5 },
-  "CELINA X": { lat: -17.3325, lng: -63.2515, zoom: 15.5 },
-  "RANCHO NUEVO": { lat: -17.3582, lng: -63.2482, zoom: 15.5 },
-  "VILLA BELLA VIVIENDAS": { lat: -17.3382, lng: -63.2412, zoom: 15.5 },
-  "CELINA 7 FASE 3": { lat: -17.5752, lng: -63.1425, zoom: 15.5 },
-  "CELINA VII FASE 1": { lat: -17.5785, lng: -63.1455, zoom: 15.5 },
-  "CELINA VII FASE 2": { lat: -17.5765, lng: -63.1435, zoom: 15.5 },
-  "CELINA 8": { lat: -17.5685, lng: -63.1352, zoom: 15.5 },
-  "CLARA CHUCHIO": { lat: -17.5925, lng: -63.1552, zoom: 15.5 },
-  "SAN JORGE": { lat: -17.5852, lng: -63.1482, zoom: 15.5 },
-  "PRADERAS DEL NORTE": { lat: -17.5625, lng: -63.1512, zoom: 15.5 },
-  "NARANJAL III": { lat: -17.5452, lng: -63.1625, zoom: 15.5 },
-  "CELINA II": { lat: -17.5815, lng: -63.1395, zoom: 15.5 },
-  "URUBÓ NORTE": { lat: -17.7215, lng: -63.2385, zoom: 15.2 },
-  "ROSA RODALI": { lat: -17.6852, lng: -63.1252, zoom: 15.2 },
-  "CELINA PAILÓN": { lat: -17.6552, lng: -62.7225, zoom: 15.2 },
-  "EL ENCANTO": { lat: -17.6952, lng: -63.0852, zoom: 15.2 },
-  "EL ENCANTO FASE 2": { lat: -17.6982, lng: -63.0825, zoom: 15.2 },
-  "SANTA ROSA - FASE 1": { lat: -17.7125, lng: -63.0752, zoom: 15.2 },
-  "SANTA ROSA - FASE 2": { lat: -17.7155, lng: -63.0722, zoom: 15.2 },
-  "SANTA ROSA - FASE 3": { lat: -17.7185, lng: -63.0692, zoom: 15.2 },
-  "TAMARINDO": { lat: -17.7352, lng: -63.0952, zoom: 15.2 },
-  "JARDINES DEL BOSQUE": { lat: -17.7652, lng: -63.0452, zoom: 15.2 },
-  "EL PORVENIR": { lat: -17.7052, lng: -63.0652, zoom: 15.2 },
-  "EL PORVENIR FASE 2": { lat: -17.7082, lng: -63.0622, zoom: 15.2 }
+// Fecha comercial en Bolivia, independiente de la zona horaria del dispositivo.
+const fechaBolivia = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const fechaLegible = (iso: string) => iso.split('-').reverse().join('/');
+const PROMOCION = { desde: '2026-10-01', descuentoM2: 1, contado: { '30': 0.30, '60': 0.20, '90': 0.10 } as Record<string, number> };
+const siguienteMes = () => {
+  const [y, m] = fechaBolivia().split('-').map(Number);
+  return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`;
+};
+const archivoPlano = (proyecto: string) => {
+  const especiales: Record<string, string> = { 'URUBÓ NORTE': 'urubó_norte.geojson', 'SANTA ROSA - FASE 1': 'santa_rosa_-_fase_1.geojson', 'SANTA ROSA - FASE 2': 'santa_rosa_-_fase_2.geojson', 'SANTA ROSA - FASE 3': 'santa_rosa_-_fase_3.geojson' };
+  return '/' + encodeURIComponent(especiales[proyecto] || `${proyecto.toLowerCase().replace(/\s+/g, '_')}.geojson`);
 };
 
-const ciudadesRegionales = [
-  { id: 'scz', nombre: 'Santa Cruz de la Sierra', lat: -17.7833, lng: -63.1821 },
-  { id: 'montero', nombre: 'Montero', lat: -17.3386, lng: -63.2553 },
-  { id: 'warnes', nombre: 'Warnes', lat: -17.5147, lng: -63.1672 },
-  { id: 'cotoca', nombre: 'Cotoca', lat: -17.7544, lng: -62.9975 },
-  { id: 'satelite', nombre: 'Satélite Norte', lat: -17.5833, lng: -63.1500 },
-  { id: 'pailon', nombre: 'Pailón', lat: -17.6597, lng: -62.7194 }
-];
-
-// ============================================================================
-// MATRIZ DINÁMICA DE PLUSVALÍA (URBAN ANCHORS LOCALES)
-// ============================================================================
-const baseAnclasUrbanas = {
-  "MUYURINA": [
-    { id: 'edu-salesiana', nombre: 'Cdad. Educativa Salesiana', tipo: 'educacion', lat: -17.361885914835153, lng: -63.24893856868162 },
-    { id: 'parque-lineal-1', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.365927510716485, lng: -63.2459298471779 },
-    { id: 'parque-lineal-2', nombre: 'Parque Lineal', tipo: 'recreacion', lat: -17.369436731162317, lng: -63.256639276667 },
-    { id: 'centro-comercial', nombre: 'Centro Comercial', tipo: 'comercio', lat: -17.370851047268427, lng: -63.25323287462514 },
-    { id: 'carretera-al-norte', nombre: 'Carretera al Norte', tipo: 'landmark', lat: -17.36191155922974, lng: -63.24341131066158 },
-    { id: 'segundo-anillo', nombre: 'Segundo Anillo', tipo: 'landmark', lat: -17.366171150625245, lng: -63.263898823492916 },
-    { id: 'primera-radial', nombre: '1ra Radial', tipo: 'landmark', lat: -17.36532915405663, lng: -63.25521355672914 },
-    { id: 'segunda-radial', nombre: '2da Radial', tipo: 'landmark', lat: -17.371226189082137, lng: -63.26083508618699 },
-    { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
-    { id: 'mercado-g-moreno', nombre: 'Mercado G. Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
-    { id: 'plaza-principal', nombre: 'Plaza Principal', tipo: 'recreacion', lat: -17.341993229014623, lng: -63.25572464742824 },
-    { id: 'terminal-montero', nombre: 'Terminal de Montero', tipo: 'landmark', lat: -17.36639941396931, lng: -63.23750823012103 },
-          
-  ],
-   "LOS JARDINES": [
-    { id: 'area-verde', nombre: 'Area Verde', tipo: 'recreacion', lat: -17.36207108741039, lng: -63.29566682124099 },
-    { id: 'area-verde', nombre: 'Areá Verde', tipo: 'recreacion', lat: -17.36403700544263, lng: -63.28703121278422 },
-    { id: 'equipamiento-M23', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.359385816842973, lng: -63.29021170539729 },
-    { id: 'balneario-el-dorado', nombre: 'Balneario El Dorado', tipo: 'recreacion', lat: -17.365632330502038, lng: -63.28247486199522 },
-    { id: 'equipamiento-M47', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.36589498764944, lng: -63.29634648611603 },
-    { id: 'equipamiento-M56', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.366662848620702, lng: -63.29006107676353 },
-    { id: 'equipamiento-M64', nombre: 'Equipamiento', tipo: 'comercio', lat: -17.369702946712444, lng: -63.29470631145279 },
-    { id: 'mercado-g-moreno', nombre: 'Mercado G. Moreno', tipo: 'comercio', lat: -17.343231912647827, lng: -63.248839462598916 },
-    { id: 'mercado-popular', nombre: 'Mercado Popular', tipo: 'comercio', lat: -17.3492171421236, lng: -63.24607320338435 },
-  ],
-  "URUBÓ NORTE": [
-    { id: 'puente-foianini', nombre: 'Puente Mario Foianini', tipo: 'landmark', lat: -17.7551, lng: -63.2045 },
-    { id: 'urubo-business', nombre: 'Centro Empresarial Urubó', tipo: 'comercio', lat: -17.7450, lng: -63.2100 },
-    { id: 'country-club', nombre: 'Urubó Golf Country Club', tipo: 'recreacion', lat: -17.7380, lng: -63.2150 },
-    { id: 'parque-ecologico', nombre: 'Reserva Ecológica Urubó', tipo: 'recreacion', lat: -17.7300, lng: -63.2200 }
-  ],
-  "CELINA 7 FASE 3": [
-    { id: 'aeropuerto-viru', nombre: 'Aeropuerto Int. Viru Viru', tipo: 'landmark', lat: -17.6444, lng: -63.1350 },
-    { id: 'mercado-satelite', nombre: 'Mercado Mayorista Satélite', tipo: 'comercio', lat: -17.5850, lng: -63.1510 },
-    { id: 'avenida-g77', nombre: 'Avenida G77', tipo: 'landmark', lat: -17.6200, lng: -63.1400 },
-    { id: 'parque-industrial', nombre: 'Parque Industrial Norte', tipo: 'comercio', lat: -17.5900, lng: -63.1450 }
-  ],
-  "EL ENCANTO": [
-    { id: 'nueva-autopista', nombre: 'Autopista Santa Cruz - Warnes', tipo: 'landmark', lat: -17.6900, lng: -63.0900 },
-    { id: 'zona-franca', nombre: 'Zona Franca Comercial', tipo: 'comercio', lat: -17.6850, lng: -63.0950 },
-    { id: 'parque-urbano', nombre: 'Parque Urbano El Encanto', tipo: 'recreacion', lat: -17.6980, lng: -63.0800 }
-  ]
-};
-
-// ============================================================================
-// COMPONENTE: NAVEGADOR ESPACIAL WEBGIS 
-// ============================================================================
-const MapaEspacial = ({ loteActivo, proyectoActivo, baseDeDatosLotes, onLoteClick }) => {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMapReady, setIsMapReady] = useState(false); 
-  const mapRef = useRef(null);
-  
-  const geojsonPath = `/${proyectoActivo.toLowerCase().replace(/\s+/g, '_')}.geojson`;
-  const anclasActivas = baseAnclasUrbanas[proyectoActivo] || [];
-  
+// Visor de referencia: nunca selecciona lotes ni representa disponibilidad comercial.
+const MapaEspacial = ({ proyectoActivo }: { proyectoActivo: string }) => {
+  const mapRef = useRef<any>(null);
+  const geoRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [plano, setPlano] = useState<any>(null);
+  const [cargando, setCargando] = useState(true);
+  const [errorPlano, setErrorPlano] = useState('');
+  const [errorMapa, setErrorMapa] = useState('');
+  const [gps, setGps] = useState('GPS sin activar');
+  const [siguiendo, setSiguiendo] = useState(false);
+  const [precision, setPrecision] = useState<number | null>(null);
+  const boundsRef = useRef<any>(null);
+  const verProyecto = useCallback(() => {
+    if (boundsRef.current && mapRef.current) mapRef.current.fitBounds(boundsRef.current, { padding: 45, maxZoom: 17, pitch: 0, duration: 900 });
+  }, []);
   useEffect(() => {
-    setIsMapReady(false);
-    const safetyTimer = setTimeout(() => setIsMapReady(true), 2500);
-    return () => clearTimeout(safetyTimer);
-  }, [proyectoActivo]);
-
-  useEffect(() => {
-    const volarAlProyecto = async () => {
+    const abort = new AbortController();
+    setCargando(true); setPlano(null); setErrorPlano(''); boundsRef.current = null;
+    (async () => {
       try {
-        const response = await fetch(geojsonPath);
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.features && data.features.length > 0) {
-            let coordenadas = data.features[0].geometry.coordinates;
-            while (Array.isArray(coordenadas[0])) coordenadas = coordenadas[0];
-            const [lng, lat] = coordenadas;
-            if (mapRef.current && lng && lat) {
-              mapRef.current.getMap().flyTo({ center: [lng, lat], zoom: 15.2, pitch: 50, speed: 1.5, essential: true });
-              return;
-            }
-          }
-        }
-        const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
-      } catch (error) {
-        const target = coordenadasProyectos[proyectoActivo] || { lat: -17.3710, lng: -63.2550, zoom: 15.0 };
-        if (mapRef.current) mapRef.current.getMap().flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 15.0, pitch: 50, speed: 1.5, essential: true });
-      }
-    };
-    volarAlProyecto();
-  }, [geojsonPath, proyectoActivo]);
-
+        const res = await fetch(archivoPlano(proyectoActivo), { signal: abort.signal });
+        if (!res.ok) throw new Error('No se encontró el archivo del plano.');
+        const data = await res.json();
+        if (data.type !== 'FeatureCollection' || !Array.isArray(data.features)) throw new Error('El archivo no es una colección GeoJSON válida.');
+        let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+        const visit = (coords: any) => {
+          if (!Array.isArray(coords)) return;
+          if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+            const [lng, lat] = coords;
+            if (!Number.isFinite(lng) || !Number.isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90) throw new Error('El plano debe usar coordenadas WGS84 en longitud y latitud.');
+            west = Math.min(west, lng); east = Math.max(east, lng); south = Math.min(south, lat); north = Math.max(north, lat);
+          } else coords.forEach(visit);
+        };
+        const geometry = (g: any) => { if (g?.type === 'GeometryCollection') g.geometries.forEach(geometry); else visit(g?.coordinates); };
+        data.features.forEach((f: any) => geometry(f.geometry));
+        if (!Number.isFinite(west)) throw new Error('El plano no contiene geometrías visibles.');
+        if (abort.signal.aborted) return;
+        boundsRef.current = [[west, south], [east, north]];
+        setPlano(data);
+      } catch (err: any) {
+        if (!abort.signal.aborted) setErrorPlano(err.message || 'No se pudo cargar el plano.');
+      } finally { if (!abort.signal.aborted) setCargando(false); }
+    })();
+    return () => abort.abort();
+  }, [proyectoActivo]);
+  useEffect(() => { if (ready && plano) verProyecto(); }, [ready, plano, verProyecto]);
   useEffect(() => {
-    const map = mapRef.current?.getMap();
-    if (map) { setTimeout(() => map.resize(), 50); setTimeout(() => map.resize(), 300); }
-  }, [isFullscreen]);
-
-  const handleMapClick = useCallback((event) => {
-    if (!onLoteClick) return;
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    
-    const features = map.queryRenderedFeatures(event.point, { layers: ['lotes-fill', 'lotes-labels', 'lotes-points'] });
-    if (features && features.length > 0) {
-      const prop = features[0].properties;
-      const loteTocado = prop.Lote || prop.lote || prop.name || prop.Text || prop.text;
-      const mznTocada = prop.MZN || prop.mzn || prop.Manzano || prop.manzano;
-      const uvTocada = prop.UV || prop.uv;
-      if (loteTocado) onLoteClick(uvTocada || "", mznTocada || "", loteTocado);
-    }
-  }, [onLoteClick]);
-
-  const { verdes, rojos, azules } = useMemo(() => {
-    let v = []; let r = []; let a = [];
-    const lotesFiltrados = baseDeDatosLotes.filter(l => l.proyecto.includes(proyectoActivo));
-    lotesFiltrados.forEach(l => {
-      const raw = String(l.lote).trim();
-      const num = String(parseInt(raw, 10) || raw);
-      const variaciones = [raw, num, `${num} `, ` ${num}`, `0${num}`, `LOTE ${num}`];
-      const est = String(l.estado).toUpperCase();
-      if (est === 'LIBRE' || est === 'DISPONIBLE' || est === '') v.push(...variaciones);
-      else if (est === 'BLOQUEADO' || est === 'RESERVADO') r.push(...variaciones);
-      else if (est === 'VENDIDO') a.push(...variaciones);
-    });
-    return { verdes: v.length > 0 ? v : ['__NONE__'], rojos: r.length > 0 ? r : ['__NONE__'], azules: a.length > 0 ? a : ['__NONE__'] };
-  }, [baseDeDatosLotes, proyectoActivo]);
-
-  const textProperty = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
-  const fillLayer = useMemo(() => ({
-    id: 'lotes-fill', type: 'fill',
-    paint: { 'fill-color': ['match', ['to-string', textProperty], verdes, 'rgba(34, 197, 94, 0.35)', rojos, 'rgba(239, 68, 68, 0.35)', azules, 'rgba(59, 130, 246, 0.35)', 'transparent'], 'fill-opacity': 1 }
-  }), [verdes, rojos, azules]);
-
-  const lineGlowLayer = useMemo(() => ({ id: 'lotes-line-glow', type: 'line', paint: { 'line-color': '#00e5ff', 'line-width': 8, 'line-opacity': 0.35, 'line-blur': 4 } }), []);
-  const lineLayer = useMemo(() => ({ id: 'lotes-line', type: 'line', paint: { 'line-color': '#00e5ff', 'line-width': 1.5, 'line-opacity': 0.9 } }), []);
-  const highlightLayer = useMemo(() => ({ id: 'lotes-highlight', type: 'line', paint: { 'line-color': '#fbbf24', 'line-width': 5, 'line-opacity': 1 }, filter: ['==', ['to-string', textProperty], String(parseInt(loteActivo, 10) || '')] }), [loteActivo]);
-
-  const pointLayer = useMemo(() => ({
-    id: 'lotes-points', type: 'circle', minzoom: 16.2, 
-    paint: { 'circle-radius': 9, 'circle-color': ['match', ['to-string', textProperty], verdes, '#22c55e', rojos, '#ef4444', azules, '#3b82f6', 'rgba(255, 255, 255, 0.25)'], 'circle-stroke-width': 1.5, 'circle-stroke-color': '#020617' },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['to-string', textProperty], '']]
-  }), [verdes, rojos, azules]);
-
-  const labelLayer = useMemo(() => ({
-    id: 'lotes-labels', type: 'symbol', minzoom: 16.2, 
-    layout: { 'text-field': textProperty, 'text-size': 11, 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-anchor': 'center', 'text-allow-overlap': true, 'text-ignore-placement': true },
-    paint: { 'text-color': '#ffffff' },
-    filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['to-string', textProperty], '']]
-  }), []);
-
-  const containerClasses = isFullscreen 
-    ? "fixed top-0 left-0 right-0 bottom-0 z-[99999] bg-[#020617] w-full h-[100dvh] flex flex-col m-0 p-0 rounded-none animate-in fade-in duration-300 cursor-crosshair" 
-    : "relative w-full h-[450px] sm:h-[500px] rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-cyan-500/40 bg-[#060b13] transition-all duration-500 cursor-crosshair";
-
+    const timer = setTimeout(() => mapRef.current?.resize(), 100);
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    window.addEventListener('keydown', escape);
+    const previous = document.body.style.overflow;
+    if (fullscreen) document.body.style.overflow = 'hidden';
+    return () => { clearTimeout(timer); window.removeEventListener('keydown', escape); document.body.style.overflow = previous; };
+  }, [fullscreen]);
+  const localizar = () => {
+    if (!window.isSecureContext) { setGps('La ubicación requiere HTTPS o localhost.'); return; }
+    if (!navigator.geolocation) { setGps('Este dispositivo no permite geolocalización.'); return; }
+    if (!ready) { setGps('Espera a que cargue el mapa.'); return; }
+    setGps(siguiendo ? 'GPS pausado' : 'Buscando tu ubicación…');
+    geoRef.current?.trigger();
+  };
+  const textProperty: any = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
   return (
-    <div className={containerClasses}>
-      {!isFullscreen && (
-        <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 z-20 border-b border-cyan-500/30 flex justify-between items-center shadow-lg relative shrink-0">
-           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-cyan-900/20 to-transparent pointer-events-none"></div>
-           <div className="flex items-center gap-3 relative z-10">
-             <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/40 shadow-[inset_0_0_10px_rgba(34,211,238,0.2)]">
-               <MapPin className="w-5 h-5 text-cyan-400" />
-             </div>
-             <div>
-               <h3 className="text-white font-black tracking-widest uppercase text-xs sm:text-sm">Navegador Espacial <span className="text-cyan-400">{proyectoActivo}</span></h3>
-               <p className="text-slate-400 text-[9px] uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                 <span className="w-2 h-2 rounded-full bg-green-500 inline-block shadow-[0_0_5px_rgba(34,197,94,0.8)]"></span> Disponible 
-                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block ml-1 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span> Bloqueado 
-                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></span> Vendido
-               </p>
-             </div>
-           </div>
-           <div className="flex gap-3 relative z-10">
-             <span className="hidden sm:flex text-[10px] font-black bg-slate-900 text-cyan-400 px-4 py-2 rounded-xl border border-cyan-500/40 items-center gap-2 shadow-[0_0_15px_rgba(34,211,238,0.15)]">
-               <div className="relative flex h-2.5 w-2.5">
-                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
-               </div>
-               TRACKER ACTIVO
-             </span>
-             <button 
-               type="button" onClick={() => setIsFullscreen(true)} 
-               className="bg-[#020617] hover:bg-cyan-950 text-cyan-400 p-2.5 rounded-xl border border-cyan-500/40 hover:border-cyan-400 transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-             >
-               <Maximize className="w-5 h-5"/>
-             </button>
-           </div>
-        </div>
-      )}
-      {isFullscreen && (
-        <button 
-          onClick={() => setIsFullscreen(false)}
-          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-[10000] bg-slate-900/90 backdrop-blur-md text-cyan-400 p-3.5 rounded-2xl border border-cyan-500/50 hover:bg-slate-800 hover:text-white transition-all shadow-[0_0_30px_rgba(34,211,238,0.5)] group"
-        >
-          <Minimize className="w-6 h-6 group-hover:scale-110 transition-transform duration-300" />
-        </button>
-      )}
-      <div className="flex-1 relative w-full h-full bg-[#020617] min-h-[300px]">
-        {!isMapReady && (
-          <div className="absolute inset-0 z-50 bg-[#060b13] flex flex-col items-center justify-center pointer-events-none">
-            <div className="relative flex items-center justify-center">
-               <div className="absolute w-24 h-24 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
-               <div className="absolute w-16 h-16 border-4 border-emerald-500/20 border-b-emerald-400 rounded-full animate-spin direction-reverse"></div>
-               <Crosshair className="w-8 h-8 text-cyan-500 animate-pulse" />
-            </div>
-            <div className="text-cyan-500 text-[10px] font-black tracking-[0.3em] uppercase mt-6 animate-pulse">Enlazando Satélite...</div>
-          </div>
-        )}
-        <div className="absolute inset-0 z-10 w-full h-full">
-          <Map
-            ref={mapRef} mapLib={maplibregl}
-            initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 14.3, pitch: 0 }}
-            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            maxZoom={20} onLoad={() => setIsMapReady(true)} onClick={handleMapClick}
-            interactiveLayerIds={['lotes-fill', 'lotes-labels', 'lotes-points']}
-            style={{ width: '100%', height: '100%' }}
-          >
-            <GeolocateControl position="bottom-right" trackUserLocation={true} showUserHeading={true} />
-            <NavigationControl position="bottom-right" visualizePitch={true} />
-            <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20}>
-              <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 1.0, 'raster-brightness-max': 1.0, 'raster-saturation': 0.1 }} />
-            </Source>
-            <Source id="dynamic-data" type="geojson" data={geojsonPath}>
-              <Layer {...fillLayer as any} />
-              <Layer {...lineGlowLayer as any} />
-              <Layer {...lineLayer as any} />
-              <Layer {...highlightLayer as any} />
-              <Layer {...pointLayer as any} />
-              <Layer {...labelLayer as any} />
-            </Source>
-            
-            {/* BALIZAS REGIONALES CIUDADES */}
-            {ciudadesRegionales.map((ciudad) => (
-              <Marker key={ciudad.id} longitude={ciudad.lng} latitude={ciudad.lat} anchor="center">
-                <div className="flex items-center gap-1.5 bg-[#020617]/85 backdrop-blur-md border border-cyan-500/40 px-2.5 py-1 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] pointer-events-none">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-                  <span className="text-[9px] font-extrabold text-cyan-200 uppercase tracking-widest">{ciudad.nombre}</span>
-                </div>
-              </Marker>
-            ))}
-            
-            {/* SISTEMA DE BALIZAS TELEMÉTRICAS (ALTIMÉTRICAS) */}
-            {anclasActivas.map((nodo) => (
-              <Marker key={nodo.id} longitude={nodo.lng} latitude={nodo.lat} anchor="bottom">
-                <div className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in duration-700">
-                  
-                  {/* Cabezal de Lectura Constante (Opacidad 100%) */}
-                  <div className="flex items-center gap-2 bg-[#020617]/95 backdrop-blur-xl border border-cyan-500/50 p-1.5 pr-3 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.5)] transform transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1 relative z-20">
-                    <div className="bg-cyan-950/80 p-1.5 rounded-full border border-cyan-400/50 flex items-center justify-center shrink-0">
-                      {nodo.tipo === 'educacion' && <GraduationCap className="w-3.5 h-3.5 text-cyan-300" />}
-                      {nodo.tipo === 'recreacion' && <TreePine className="w-3.5 h-3.5 text-emerald-400" />}
-                      {nodo.tipo === 'salud' && <Hospital className="w-3.5 h-3.5 text-rose-400" />}
-                      {nodo.tipo === 'comercio' && <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />}
-                      {nodo.tipo === 'landmark' && <Landmark className="w-3.5 h-3.5 text-indigo-400" />}
-                    </div>
-                    <span className="text-[9px] sm:text-[10px] font-black text-white whitespace-nowrap uppercase tracking-widest drop-shadow-md">
-                      {nodo.nombre}
-                    </span>
-                  </div>
-                  
-                  {/* Mástil Vertical */}
-                  <div className="w-[1.5px] h-10 sm:h-14 bg-gradient-to-b from-cyan-400/80 to-cyan-500/10 shadow-[0_0_5px_rgba(34,211,238,0.5)] relative z-10 -my-1">
-                     <div className="absolute top-0 left-0 w-full h-1/3 bg-cyan-300 animate-pulse"></div>
-                  </div>
-                  
-                  {/* Elipse Topográfica Suelo */}
-                  <div className="relative flex items-center justify-center z-0">
-                     <div className="absolute w-8 h-2.5 bg-cyan-500/30 rounded-[100%] blur-sm animate-ping"></div>
-                     <div className="w-3 h-[3px] bg-cyan-400 rounded-[100%] shadow-[0_0_10px_rgba(34,211,238,1)]"></div>
-                  </div>
-
-                </div>
-              </Marker>
-            ))}
-          </Map>
+    <section className={fullscreen ? 'fixed inset-0 z-[99999] bg-slate-950 flex flex-col h-[100dvh]' : 'relative rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950 shadow-2xl flex flex-col h-[540px] sm:h-[620px]'} aria-label="Visor del proyecto">
+      <div className="p-4 bg-slate-900/95 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
+        <div><h3 className="text-white font-bold flex items-center gap-2"><MapPin className="w-5 h-5 text-cyan-400"/>{proyectoActivo}</h3><p className="text-slate-400 text-xs mt-1">Plano de referencia · Vista de terreno</p></div>
+        <div className="flex gap-2 flex-wrap">
+          <button type="button" onClick={localizar} className="px-3 py-2.5 rounded-xl bg-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-2"><Crosshair className="w-4 h-4"/>{siguiendo ? 'Pausar GPS' : 'Mi ubicación'}</button>
+          <button type="button" disabled={!plano} onClick={verProyecto} className="px-3 py-2.5 rounded-xl border border-slate-600 text-white text-xs disabled:opacity-40">Ver plano</button>
+          <button type="button" onClick={() => setFullscreen(!fullscreen)} aria-label={fullscreen ? 'Cerrar pantalla completa' : 'Pantalla completa'} className="p-2.5 rounded-xl border border-slate-600 text-white">{fullscreen ? <Minimize className="w-4 h-4"/> : <Maximize className="w-4 h-4"/>}</button>
         </div>
       </div>
-    </div>
+      <div className="flex-1 relative min-h-0">
+        <Map ref={mapRef} mapLib={maplibregl} initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 12, pitch: 0 }} mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" maxZoom={21} onLoad={() => { setReady(true); setErrorMapa(''); }} onError={() => setErrorMapa('No se pudo cargar parte del mapa. Revisa tu conexión.')} style={{ width: '100%', height: '100%' }}>
+          <GeolocateControl ref={geoRef} position="bottom-right" trackUserLocation showUserLocation showAccuracyCircle positionOptions={{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }} fitBoundsOptions={{ maxZoom: 19 }}
+            onGeolocate={(e) => { setPrecision(e.coords.accuracy); setGps('Ubicación recibida'); }}
+            onTrackUserLocationStart={() => { setSiguiendo(true); setGps('Seguimiento activado'); }}
+            onTrackUserLocationEnd={() => { setSiguiendo(false); setGps('Seguimiento pausado · pulsa Mi ubicación para volver'); }}
+            onError={(e) => { setSiguiendo(false); setPrecision(null); setGps(e.code === 1 ? 'Permite el acceso a tu ubicación en el navegador.' : e.code === 3 ? 'Se agotó la espera del GPS. Intenta de nuevo al aire libre.' : 'No se pudo obtener tu ubicación. Activa el GPS e intenta nuevamente.'); }} />
+          <NavigationControl position="bottom-right" visualizePitch />
+          <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20} attribution="Imágenes © Google">
+            <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 1 }} />
+          </Source>
+          {plano && <Source id="plano-referencia" type="geojson" data={plano}>
+            <Layer id="plano-sombra" type="line" paint={{ 'line-color': '#082f49', 'line-width': 4, 'line-opacity': 0.7 }} />
+            <Layer id="plano-lineas" type="line" paint={{ 'line-color': '#67e8f9', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 18, 1.8], 'line-opacity': 0.95 }} />
+            <Layer id="plano-textos" type="symbol" minzoom={17} filter={['==', ['geometry-type'], 'Point']} layout={{ 'text-field': textProperty, 'text-size': 11, 'text-font': ['Open Sans Regular'], 'text-allow-overlap': false }} paint={{ 'text-color': '#ffffff', 'text-halo-color': '#0f172a', 'text-halo-width': 1.5 }} />
+          </Source>}
+        </Map>
+        {(cargando || errorPlano || errorMapa) && <div role="status" className="absolute top-3 left-3 right-14 bg-slate-950/90 border border-slate-600 rounded-xl p-3 text-xs text-slate-100 pointer-events-none">{errorPlano || errorMapa || 'Cargando plano…'}</div>}
+      </div>
+      <div role="status" aria-live="polite" className="px-4 py-3 text-xs text-slate-300 bg-slate-900 flex flex-wrap justify-between gap-2"><span>{siguiendo ? '● ' : ''}{gps}{precision !== null ? ` · Precisión aproximada ±${Math.ceil(precision)} m` : ''}</span><span className="text-slate-500">Ubicación orientativa · Consulta el lote en el formulario</span></div>
+    </section>
   );
 };
+
+
+interface LoteData {
+  proyecto: string; uv: string; mzn: string; lote: string; superficie: number; precio: number;
+  estado: string; categoria: string; vendedor: string;
+  api_cuota_inicial: number; api_initial_tipo: string; api_initial_pct: number; api_initial_valor: number;
+}
+interface ResultadoData {
+  fechaTC: string; primerMesPago: string; tipoCotizacion: string; regional: string; proyecto: string;
+  uv: string; mzn: string; lote: string; superficie: number; categoria: string;
+  valorOriginalRaw: number; valorOriginal: string; valorFinal: string; valorFinalBs: string;
+  ahorroTotalRaw: number; ahorroTotal: string; inicialRaw: number; inicial: string; inicialBs: string;
+  inicialPct: string; saldoRaw: number; mensualRaw: number; mensual: string; mensualBs: string; plazo: number;
+  planPagosDetallado: { nro: number; mesLabel: string; cuotaUsd: number }[];
+  planPlazosAlternativos: { año: number; cuotaUsd: string; cuotaBs: string; isCurrent: boolean }[];
+  descPctAplicado: number; tcOriginal: number; tcEfectivo: number; totalBsA: string; totalBsB: string;
+  plazoLiquidacionVisual: string; descuentoM2Aplicado: number; timestampId: number;
+}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -362,7 +171,7 @@ export default function App() {
   const [loginError, setLoginError] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState(false); 
   
-  const handleLogin = (e) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordInput === "SALMO23") { setIsAuthenticated(true); setIsAdmin(false); setLoginError(false); } 
     else if (passwordInput === "OHSARAVIA") { setIsAuthenticated(true); setIsAdmin(true); setLoginError(false); } 
@@ -373,11 +182,13 @@ export default function App() {
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
   const [usarAPI, setUsarAPI] = useState(true); 
-  const [baseDeDatosLotes, setBaseDeDatosLotes] = useState([]);
+  const [baseDeDatosLotes, setBaseDeDatosLotes] = useState<LoteData[]>([]);
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(12.00); 
+  const [tcFlexible, setTcFlexible] = useState(fechaBolivia() === '2026-10-01' ? 12 : 0);
+  const [fechaTC, setFechaTC] = useState(fechaBolivia());
+  const [primerMesPago, setPrimerMesPago] = useState(siguienteMes()); 
   
   const [uv, setUv] = useState("");
   const [mzn, setMzn] = useState("");
@@ -386,7 +197,7 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const [descuentoM2, setDescuentoM2] = useState(1); 
+  const descuentoM2 = PROMOCION.descuentoM2; 
   const [aplicarDescM2, setAplicarDescM2] = useState(true); 
   
   const [plazoLiquidacion, setPlazoLiquidacion] = useState("30"); 
@@ -396,12 +207,14 @@ export default function App() {
   const [inicialMonto, setInicialMonto] = useState(""); 
   const [años, setAños] = useState("");
   
-  const [resultado, setResultado] = useState(null);
+  const [resultado, setResultado] = useState<ResultadoData | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [copiado, setCopiado] = useState(false);
-  const [toast, setToast] = useState(null);
-  const formRef = useRef(null);
-  const resultadosRef = useRef(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const resultadosRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => { setResultado(null); setCopiado(false); }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescM2, plazoLiquidacion, proyectoPersonalizado]);
 
   // ============================================================================
   // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
@@ -410,11 +223,11 @@ export default function App() {
     if (!isAuthenticated || !proyecto) return;
     const cargarDatos = async () => {
       setCargandoBD(true);
-      const getSafeVal = (obj, propName) => {
+      const getSafeVal = (obj: Record<string, any>, propName: string) => {
           const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
           return key ? obj[key] : undefined;
       };
-      const extractNumber = (val) => {
+      const extractNumber = (val: unknown) => {
           if (val === undefined || val === null || val === '') return 0;
           if (typeof val === 'number') return val;
           let s = String(val).trim();
@@ -432,10 +245,10 @@ export default function App() {
           const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
           if (!resProj.ok) throw new Error("API Falló");
           const dataProj = await resProj.json();
-          const projAPI = dataProj.proyectos.find(p => {
+          const projAPI = dataProj.proyectos.find((p: { proyecto: string }) => {
              const apiName = String(p.proyecto).trim().toUpperCase();
              const local = proyecto.trim().toUpperCase();
-             const map = {
+             const map: Record<string, string[]> = {
                 "URUBÓ NORTE": ["CELINA URUBO DEL NORTE", "URUBO NORTE"],
                 "ROSA RODALI": ["ROSA RODALI", "CELINA ROSA RODALI"],
                 "CELINA PAILÓN": ["CELINA PAILON", "PAILON"],
@@ -478,7 +291,7 @@ export default function App() {
             if (!resLotes.ok) throw new Error("API Lotes Falló");
             const dataLotes = await resLotes.json();
             if (dataLotes.lotes) {
-              const apiMapped = dataLotes.lotes.map(loteFresco => {
+              const apiMapped = dataLotes.lotes.map((loteFresco: Record<string, any>) => {
                 const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
                 const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
                 
@@ -550,7 +363,7 @@ export default function App() {
     link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
-    return () => document.head.removeChild(link);
+    return () => { document.head.removeChild(link); };
   }, []);
 
   useEffect(() => {
@@ -559,15 +372,11 @@ export default function App() {
     }
   }, [regional]);
 
-  const handleUvChange = (e) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleMznChange = (e) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleLoteChange = (e) => { setLote(e.target.value); };
+  const handleUvChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleMznChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
+  const handleLoteChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => { setLote(e.target.value); };
   
-  const handleMapClickSelection = (uvTocado, mznTocada, loteTocado) => {
-    if (uvTocado) setUv(uvTocado);
-    if (mznTocada) setMzn(mznTocada);
-    if (loteTocado) setLote(loteTocado);
-  };
+
 
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
@@ -576,7 +385,7 @@ export default function App() {
     setExpandedPlan(false);
   }, [proyecto, tipoCotizacion]);
 
-  const getAlias = (p) => {
+  const getAlias = (p: string) => {
     if (!p) return [];
     const aliases = [p, `CELINA ${p}`];
     if (p === "URUBÓ NORTE") aliases.push("CELINA URUBO DEL NORTE", "URUBO NORTE");
@@ -613,7 +422,7 @@ export default function App() {
   const modoBD = usarBD && tieneBD;
   
   const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
-  const sortAlphaNum = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  const sortAlphaNum = (a: string, b: string) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   const uvsDisponibles = [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
@@ -652,12 +461,12 @@ export default function App() {
     }
   }, [uv, mzn, lote, lotesDelProyecto]); 
   
-  const formatMoney = (amount) => {
+  const formatMoney = (amount: number) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
   };
   
-  const showNotification = (message) => { setToast(message); setTimeout(() => setToast(null), 4000); };
+  const showNotification = (message: string) => { setToast(message); setTimeout(() => setToast(null), 4000); };
 
   // ============================================================================
   // MOTOR DE CÁLCULO REFACTORIZADO 
@@ -666,8 +475,10 @@ export default function App() {
     const sup = Number(superficie) || 0; 
     const prec = Number(precio) || 0; 
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
-    if (!sup || !prec) { setResultado(null); return; }
-    if (tipoCotizacion === 'credito' && ans <= 0) { setResultado(null); return; }
+    if (!Number.isFinite(sup) || !Number.isFinite(prec) || sup <= 0 || prec <= 0) { setResultado(null); showNotification('Ingresa superficie y precio mayores que cero.'); return; }
+    if (!Number.isFinite(tcFlexible) || tcFlexible <= 0 || fechaTC !== fechaBolivia()) { setResultado(null); showNotification('Confirma el TC y su fecha para la cotización de hoy.'); return; }
+    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 01/10/2026.'); return; }
+    if (tipoCotizacion === 'credito' && (!Number.isInteger(ans) || ans < 1 || ans > 14)) { setResultado(null); return; }
     
     const valor_original = sup * prec;
     const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
@@ -676,7 +487,7 @@ export default function App() {
     let planPagosDetallado = [];
     let planPlazosAlternativos = [];
     
-    const TC_FLEX_NUMBER = Number(tcFlexible) || 12.32;
+    const TC_FLEX_NUMBER = Number(tcFlexible);
     
     let tcEfectivoAplicado = TC_FLEX_NUMBER;
     let descPctMapeo = 0;
@@ -685,9 +496,7 @@ export default function App() {
     let totalBs_OpcionB = 0;
 
     if (tipoCotizacion === 'contado') {
-        if (plazoLiquidacion === '30') descPctMapeo = 0.30;
-        else if (plazoLiquidacion === '60') descPctMapeo = 0.20;
-        else if (plazoLiquidacion === '90') descPctMapeo = 0.10;
+        descPctMapeo = PROMOCION.contado[plazoLiquidacion];
 
         ahorro_total = valor_original * descPctMapeo;
         valor_final = valor_original - ahorro_total;
@@ -697,7 +506,8 @@ export default function App() {
         totalBs_OpcionB = valor_original * tcEfectivoAplicado;
         
     } else {
-        const descM2Val = aplicarDescM2 ? (Number(descuentoM2) || 1) : 0;
+        const descM2Val = aplicarDescM2 ? descuentoM2 : 0;
+        if (prec <= descM2Val) { setResultado(null); showNotification("El precio por m² debe superar el descuento."); return; }
         let monto_descuento_m2 = sup * descM2Val;
         
         ahorro_total = monto_descuento_m2; 
@@ -712,11 +522,13 @@ export default function App() {
            pct_efectivo = base_para_inicial > 0 ? (cuota_inicial / base_para_inicial) * 100 : 0;
         }
 
+        if (!Number.isFinite(cuota_inicial) || cuota_inicial < 0 || cuota_inicial > valor_final) { setResultado(null); showNotification('La inicial debe estar entre cero y el valor del terreno.'); return; }
+        if (!/^\d{4}-\d{2}$/.test(primerMesPago) || primerMesPago < fechaTC.slice(0, 7)) { setResultado(null); showNotification('Revisa el primer mes de pago.'); return; }
         const saldo = valor_final - cuota_inicial;
         const meses = ans * 12;
         const tasa_anual = 0.121733; const tasa = tasa_anual / 12;
         const refSaldo = 34278.00;
-        const baseSeguro = { 1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38, 11: 27.67, 12: 29.00, 13: 30.36, 14: 31.75 };
+        const baseSeguro: Record<number, number> = { 1: 16.32, 2: 17.30, 3: 18.31, 4: 19.36, 5: 20.44, 6: 21.56, 7: 22.71, 8: 23.90, 9: 25.12, 10: 26.38, 11: 27.67, 12: 29.00, 13: 30.36, 14: 31.75 };
         
         pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
         if(isNaN(pago_puro) || !isFinite(pago_puro)) pago_puro = 0;
@@ -725,8 +537,8 @@ export default function App() {
         cuota_final = pago_puro + seguro + cbdi;
 
         const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        let mesInicioIndex = 9; 
-        let añoInicio = 2026; 
+        const [añoInicio, mesInicio] = primerMesPago.split('-').map(Number);
+        const mesInicioIndex = mesInicio - 1; 
 
         for(let m=1; m<=meses; m++) {
             let currentMIndex = (mesInicioIndex + (m - 1)) % 12;
@@ -757,7 +569,7 @@ export default function App() {
     
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
     setResultado({
-      tipoCotizacion, regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria,
+      fechaTC, primerMesPago, tipoCotizacion, regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria,
       valorOriginalRaw: valor_original, 
       valorOriginal: formatMoney(valor_original), 
       valorFinal: formatMoney(valor_final), 
@@ -780,14 +592,14 @@ export default function App() {
       tcEfectivo: tcEfectivoAplicado,
       totalBsA: formatMoney(totalBs_OpcionA),
       totalBsB: formatMoney(totalBs_OpcionB),
-      plazoLiquidacionVisual: plazoLiquidacion === '30' ? '30 Días' : plazoLiquidacion === '60' ? '60 Días' : '90 Días',
+      plazoLiquidacionVisual: plazoLiquidacion === '30' ? 'los primeros 30 días' : plazoLiquidacion === '60' ? '31 a 60 días' : '61 a 90 días',
       descuentoM2Aplicado: tipoCotizacion === 'credito' && aplicarDescM2 ? descuentoM2 : 0,
       timestampId: new Date().getTime()
     });
     setCopiado(false); 
   };
 
-  const handleProcesar = (e) => {
+  const handleProcesar = (e: React.FormEvent) => {
     e.preventDefault();
     setIsCalculating(true);
     setTimeout(() => {
@@ -803,51 +615,41 @@ export default function App() {
   // EXPORTACIÓN B2C PARA WHATSAPP
   // ============================================================================
   const getTextToCopy = () => {
-    if (!resultado) return "";
-    const saludo = "Estimado cliente, es un gusto saludarle. Le presento su propuesta oficial de inversión estructurada:\n\n";
-    const ubicacion = `📍 *[Proyecto_${resultado.proyecto}]*\nUV ${resultado.uv || '-'} | MZN ${resultado.mzn || '-'} | Lote ${resultado.lote || '-'} (${resultado.superficie} m²)\n\n`;
-    const precioLista = `💎 *Precio de Lista:* $us ${resultado.valorOriginal}\n\n`;
-    
-    let contentStr = "";
-    if (resultado.tipoCotizacion === 'contado') {
-        contentStr += `💰 *[LIQUIDACIÓN / AL CONTADO]*\n`;
-        contentStr += `⏱️ *Plazo de Pago:* Hasta ${resultado.plazoLiquidacionVisual}\n`;
-        contentStr += `🔥 *Descuento Aplicado:* ${(resultado.descPctAplicado * 100).toFixed(0)}%\n`;
-        contentStr += `💵 *T.C. Efectivo Equivalente:* Bs. ${resultado.tcEfectivo.toFixed(3)}\n`;
-        contentStr += `*Inversión Final:* $us ${resultado.valorFinal} (Equivalente a Bs. ${resultado.totalBsA})\n\n`;
+    if (!resultado) return '';
+    const r = resultado;
+    const encabezado = `Hola, le comparto su cotización de *${r.proyecto}*.\n📅 Fecha: ${fechaLegible(r.fechaTC)}\n📍 UV ${r.uv || '-'} · Manzano ${r.mzn || '-'} · Lote ${r.lote || '-'}\n📐 Superficie: ${r.superficie} m²\nPrecio de lista: US$ ${r.valorOriginal}\n*TC de la cotización: Bs ${r.tcOriginal.toFixed(2)} por US$ 1*\n\n`;
+    let detalle = '';
+    if (r.tipoCotizacion === 'contado') {
+      detalle = `*CONTADO / LIQUIDACIÓN*\nPlazo: ${r.plazoLiquidacionVisual} desde la venta.\nDescuento: ${(r.descPctAplicado * 100).toFixed(0)}%\nAhorro: US$ ${r.ahorroTotal}\n*Precio con descuento: US$ ${r.valorFinal}*\nEquivalencia al TC indicado: *Bs ${r.totalBsA}*.\n\nEl descuento al precio y su equivalencia en TC son dos formas de expresar el mismo beneficio; no se suman ni se aplican dos veces. No se combina con el descuento a crédito de US$ 1/m². El importe en bolivianos se confirma con el TC vigente al realizar el pago.\n\n`;
     } else {
-        contentStr += `✅ *[FINANCIAMIENTO_ESTRATÉGICO]*\n`;
-        if (resultado.descuentoM2Aplicado > 0) contentStr += `🎁 *Bono Promocional:* Descuento de $us ${resultado.descuentoM2Aplicado} x m²\n`;
-        contentStr += `*Valor del Terreno:* $us ${resultado.valorFinal} (Bs. ${resultado.valorFinalBs})\n\n`;
-        contentStr += `📊 *Proyección a ${resultado.plazo} años*\n*Inversión Inicial:* ${resultado.inicialPct}% ($us ${resultado.inicial} | Bs. ${resultado.inicialBs})\n\n`;
-        contentStr += `⏳ *Periodo de Gracia Activo:*\nAdquiriendo hoy, su primera cuota se programa para *Octubre*.\n*Cuota Fija Mensual:* $us ${resultado.mensual} (Bs. ${resultado.mensualBs})\n\n`;
+      detalle = `*COMPRA A CRÉDITO*\n${r.descuentoM2Aplicado > 0 ? `Descuento: US$ ${r.descuentoM2Aplicado.toFixed(2)}/m² · Ahorro: US$ ${r.ahorroTotal}\n` : ''}Valor del terreno: US$ ${r.valorFinal}\nPlazo: ${r.plazo} años (${r.plazo * 12} mensualidades).\n*Cuota inicial (${r.inicialPct}%): US$ ${r.inicial}*\nSi la venta se realiza el ${fechaLegible(r.fechaTC)}, la inicial se paga al TC de ese día: *Bs ${r.inicialBs}*. Si cambia la fecha de venta, se actualiza la conversión.\n\n*Cuota mensual fija: US$ ${r.mensual}*\nCada mensualidad se paga en bolivianos al *TC vigente del día de su respectivo pago*. El monto en dólares es fijo; el monto en bolivianos puede variar cada mes. A modo de referencia, con el TC de esta cotización equivaldría a Bs ${r.mensualBs}; ese importe en bolivianos no queda congelado.\nPrimer mes de pago propuesto: ${r.planPagosDetallado[0]?.mesLabel || 'por acordar'}, sujeto al cronograma acordado.\nSin escalonado mensual en dólares. No se combina con los descuentos de contado/liquidación.\n\n`;
     }
-    return saludo + ubicacion + precioLista + contentStr + `¿Desea que agendemos una visita ejecutiva al proyecto? 🤝`;
+    return encabezado + detalle + 'Promoción vigente desde el 01/10/2026. Los descuentos se mantienen diariamente; la fecha corresponde al TC utilizado, que puede variar cada día. Cotización sujeta a verificación de datos y condiciones de venta.\n\n¿Coordinamos una visita al proyecto?';
   };
 
   const enviarWhatsApp = () => { 
     if (!resultado) return; 
-    window.open(`https://wa.me/?text=${encodeURIComponent(getTextToCopy())}`, '_blank'); 
+    if (resultado.fechaTC !== fechaBolivia()) { showNotification('Actualiza el TC y vuelve a cotizar antes de compartir.'); return; }
+    window.open(`https://wa.me/?text=${encodeURIComponent(getTextToCopy())}`, '_blank', 'noopener,noreferrer'); 
   };
 
-  const copiarTexto = () => {
+  const copiarTexto = async () => {
     if (!resultado) return;
-    const mensaje = getTextToCopy();
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(mensaje).then(() => showNotification("¡Extracción de datos copiada al portapapeles!"));
-    } else {
-        let textArea = document.createElement("textarea"); 
-        textArea.value = mensaje;
-        textArea.style.position = "fixed"; 
-        textArea.style.left = "-999999px"; 
-        document.body.appendChild(textArea);
-        textArea.focus(); 
-        textArea.select();
-        try { document.execCommand('copy'); showNotification("¡Extracción de datos copiada al portapapeles!"); } catch (error) {}
-        textArea.remove();
-    }
+    if (resultado.fechaTC !== fechaBolivia()) { showNotification('Actualiza el TC y vuelve a cotizar antes de copiar.'); return; }
+    try {
+      const mensaje = getTextToCopy();
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(mensaje);
+      } else {
+        const field = document.createElement('textarea');
+        field.value = mensaje; field.style.position = 'fixed'; field.style.left = '-9999px';
+        document.body.appendChild(field);
+        try { field.select(); if (!document.execCommand('copy')) throw new Error('No se pudo copiar'); }
+        finally { field.remove(); }
+      }
+      setCopiado(true); showNotification('Cotización copiada.');
+    } catch { showNotification('No se pudo copiar. Puedes abrir la cotización con el botón WhatsApp.'); }
   };
-
   return (
     <div className="min-h-screen bg-[#020617] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200 pb-20 w-full max-w-[100vw]">
       
@@ -928,14 +730,14 @@ export default function App() {
              <div className="flex items-center gap-2">
                <div className="bg-cyan-500/20 p-2 rounded-xl border border-cyan-500/30 shrink-0"><Activity className="w-5 h-5 text-cyan-400" /></div>
                <div>
-                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC Mercado</div>
-                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> En Vivo</div>
+                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC de la cotización</div>
+                 <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div> Ingreso manual</div>
                </div>
              </div>
              <div className="relative shrink-0 flex-1 sm:flex-none">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 font-bold text-sm">Bs.</span>
                 <input 
-                  type="number" step="0.01" value={tcFlexible} onChange={(e) => setTcFlexible(Number(e.target.value))} 
+                  aria-label="Tipo de cambio de hoy en bolivianos por dólar" type="number" min="0.01" step="0.01" value={tcFlexible || ''} onChange={(e) => setTcFlexible(Number(e.target.value))} 
                   className="bg-[#04070b] border border-slate-700/80 text-cyan-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-cyan-500 transition-all shadow-inner focus:shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
                 />
              </div>
@@ -948,23 +750,22 @@ export default function App() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32 bg-cyan-500/20 blur-[80px] pointer-events-none z-0"></div>
             <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-slate-900/50 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)] mb-4 sm:mb-5 backdrop-blur-md relative z-10">
               <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Plataforma Fintech de Alta Precisión</span>
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-300 text-center">Tu próxima venta empieza con una buena visita</span>
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg flex items-center justify-center flex-wrap gap-2 sm:gap-4 w-full relative z-10">
               Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 drop-shadow-[0_0_20px_rgba(34,211,238,0.2)]">Quantum</span>
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase relative z-10">Motor Financiero V 3.0</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 sm:mt-4 font-semibold tracking-widest uppercase relative z-10">Asesores · Cotización y visitas · Octubre 2026</p>
           </div>
           <div className="hidden md:block w-32"></div>
         </div>
 
+        <div className="mb-6 rounded-2xl border border-cyan-500/25 bg-slate-900/70 p-4 flex flex-wrap items-center justify-between gap-3 no-print">
+          <div><p className="text-cyan-300 font-bold text-sm">Condiciones comerciales desde el 01/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos diarios · TC variable · Crédito sin escalonado mensual en dólares</p></div>
+          <label className="text-xs text-slate-300">Fecha del TC <input aria-label="Fecha del tipo de cambio" type="date" value={fechaTC} onChange={e => setFechaTC(e.target.value)} className="ml-2 bg-slate-950 border border-slate-600 rounded-lg p-2 text-white" /></label>
+        </div>
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
-           <MapaEspacial 
-             loteActivo={lote}
-             proyectoActivo={proyecto}
-             baseDeDatosLotes={baseDeDatosLotes}
-             onLoteClick={handleMapClickSelection}
-           />
+           <MapaEspacial proyectoActivo={proyecto} />
         </div>
 
         <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
@@ -1241,9 +1042,9 @@ export default function App() {
                             onChange={(e) => setPlazoLiquidacion(e.target.value)} 
                             className="w-full bg-[#060b13] border border-cyan-500/50 text-cyan-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(34,211,238,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-cyan-500 focus:border-cyan-400" 
                           >
-                            <option value="30">En los primeros 30 días (-30% | TC Ref: 8.44)</option>
-                            <option value="60">Entre 31 y 60 días (-20% | TC Ref: 9.64)</option>
-                            <option value="90">Entre 61 y 90 días (-10% | TC Ref: 10.85)</option>
+                            <option value="30">{`Primeros 30 días (-30% | TC equivalente: ${(tcFlexible * 0.70).toFixed(2)})`}</option>
+                            <option value="60">{`De 31 a 60 días (-20% | TC equivalente: ${(tcFlexible * 0.80).toFixed(2)})`}</option>
+                            <option value="90">{`De 61 a 90 días (-10% | TC equivalente: ${(tcFlexible * 0.90).toFixed(2)})`}</option>
                           </select>
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
                             <ChevronDown className="w-5 h-5" />
@@ -1263,7 +1064,7 @@ export default function App() {
                             min="0" 
                             disabled={!aplicarDescM2} 
                             value={descuentoM2} 
-                            onChange={(e) => setDescuentoM2(Number(e.target.value))} 
+                            readOnly aria-label="Descuento a crédito de un dólar por metro cuadrado" 
                             className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#060b13] border border-emerald-500 text-white focus:ring-1 focus:ring-emerald-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
                           />
                         </div>
@@ -1272,6 +1073,9 @@ export default function App() {
                   </div>
                 </div>
 
+                {tipoCotizacion === 'credito' && <label className="block text-xs text-slate-300 mt-4">Primer mes de pago propuesto (confirmar con el cliente)
+                  <input type="month" min={fechaTC.slice(0, 7)} value={primerMesPago} onChange={e => setPrimerMesPago(e.target.value)} className="mt-2 w-full bg-slate-950 border border-slate-600 rounded-xl p-3 text-white" />
+                </label>}
                 {tipoCotizacion === 'credito' && (
                 <div className="grid grid-cols-12 gap-4 sm:gap-5 mt-4 animate-in slide-in-from-top-4 fade-in duration-300">
                   <div className="col-span-12 md:col-span-8 bg-emerald-950/30 border border-emerald-500/40 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 relative shadow-[inset_0_0_15px_rgba(52,211,153,0.1)]">
@@ -1401,6 +1205,10 @@ export default function App() {
                       </div>
                   </div>
 
+                  <div className="mb-5 p-4 rounded-xl border border-cyan-500/30 bg-cyan-950/20 text-sm text-slate-200 leading-relaxed">
+                    <strong>TC cotizado el {fechaLegible(resultado.fechaTC)}: Bs {resultado.tcOriginal.toFixed(2)} / US$ 1.</strong>{' '}
+                    {resultado.tipoCotizacion === 'credito' ? 'Inicial al TC del día de la venta. Mensualidades fijas en dólares; cada pago en bolivianos se convierte al TC vigente de su fecha. Las equivalencias futuras en Bs son referenciales.' : 'El descuento se aplica una sola vez: al precio o como TC equivalente. Ambas opciones dan el mismo total; no se combinan con el descuento a crédito. El TC de pago debe confirmarse.'}
+                  </div>
                   {/* BLOQUE AL CONTADO REDISEÑADO CON COMPARACIÓN CONMUTATIVA */}
                   {resultado.tipoCotizacion === 'contado' && (
                     <div className="animate-in zoom-in-95 duration-500 space-y-6">
@@ -1412,7 +1220,7 @@ export default function App() {
                              
                              <div className="inline-flex flex-col items-center gap-1 px-6 py-3 rounded-2xl bg-cyan-950/80 border border-cyan-500/50 shadow-[0_0_20px_rgba(34,211,238,0.2)] mb-6">
                                <span className="text-cyan-200 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                 <Timer className="w-4 h-4 text-cyan-400"/> Liquidación en {resultado.plazoLiquidacionVisual}
+                                 <Timer className="w-4 h-4 text-cyan-400"/> Liquidación: {resultado.plazoLiquidacionVisual}
                                </span>
                              </div>
 
@@ -1423,7 +1231,7 @@ export default function App() {
                              {/* DEMOSTRADOR DE PROPIEDAD CONMUTATIVA */}
                              <div className="mt-8 w-full max-w-3xl">
                                <div className="flex items-center justify-center gap-3 text-cyan-400 text-xs font-black uppercase tracking-widest mb-4">
-                                 <Scale className="w-4 h-4" /> Demostración de Equivalencia
+                                 <Scale className="w-4 h-4" /> Un beneficio · Dos formas equivalentes
                                </div>
                                
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1450,7 +1258,7 @@ export default function App() {
                                    </div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">{resultado.tcOriginal}</span></div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-emerald-400 font-bold">-{resultado.descPctAplicado * 100}%</span></div>
-                                   <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Nuevo T.C. (Hoy)</span> <span className="font-black text-white">{resultado.tcEfectivo.toFixed(3)}</span></div>
+                                   <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">TC equivalente</span> <span className="font-black text-white">{resultado.tcEfectivo.toFixed(2)}</span></div>
                                    <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">x $us {resultado.valorOriginal}</span></div>
                                    <div className="flex justify-between text-lg border-t border-emerald-500/50 pt-2 mt-2 bg-emerald-950/20 -mx-5 -mb-5 px-5 pb-5 rounded-b-2xl">
                                      <span className="text-emerald-400 font-black mt-2">Total Bs.</span> 
@@ -1483,7 +1291,7 @@ export default function App() {
                         <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
                           <div className="text-emerald-500 text-[10px] font-extrabold uppercase tracking-widest">Inversión Total</div>
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.valorFinal}</div>
-                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.valorFinalBs}</div>
+                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Referencia al TC cotizado: Bs. {resultado.valorFinalBs}</div>
                           {resultado.ahorroTotalRaw > 0 && (
                             <div className="mt-2 text-[9px] text-amber-400 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40 inline-block uppercase shadow-sm">
                               Bono Promocional Incluido: $us {resultado.ahorroTotal}
@@ -1493,7 +1301,7 @@ export default function App() {
                         <div className="bg-[#0b111a] p-5 rounded-2xl border border-slate-700 text-center sm:text-left relative shadow-lg">
                           <div className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-widest">Cuota Inicial ({resultado.inicialPct}%)</div>
                           <div className="text-3xl font-black text-white mt-1">$us {resultado.inicial}</div>
-                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Bs. {resultado.inicialBs}</div>
+                          <div className="text-[11px] font-bold text-emerald-500 mt-1 truncate">Al TC de la venta: Bs. {resultado.inicialBs}</div>
                         </div>
                       </div>
 
@@ -1504,12 +1312,12 @@ export default function App() {
                                   <Calendar className="w-5 h-5 text-emerald-400"/> Proyección Financiera Estructural
                                 </h3>
                                 <p className="text-slate-400 text-xs mt-2">
-                                  Periodo de gracia activado. Sus obligaciones inician en <strong className="text-emerald-400">Octubre 2026</strong>.
+                                  Primer mes propuesto: <strong className="text-emerald-400">{resultado.planPagosDetallado?.[0]?.mesLabel}</strong>. Confirmar al acordar el cronograma.
                                 </p>
                           </div>
                           
                           <button onClick={() => setExpandedPlan(!expandedPlan)} className="w-full bg-[#0b111a] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800">
-                             <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase">Desplegar Cuadros de Cuota Fija ($us / Bs.)</span>
+                             <span className="text-emerald-400 font-bold text-sm tracking-widest uppercase">Ver mensualidades fijas en dólares</span>
                              <ChevronDown className={`w-5 h-5 text-emerald-400 transition-transform duration-300 ${expandedPlan ? 'rotate-180' : ''}`} />
                           </button>
 
@@ -1548,7 +1356,7 @@ export default function App() {
                             <div className="grid grid-cols-3 gap-2 sm:gap-4 pb-3 border-b border-slate-800 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-[#0b111a] z-10">
                               <div>Plazo</div>
                               <div className="text-emerald-400">Cuota ($us)</div>
-                              <div className="text-emerald-400">Cuota (Bs.)</div>
+                              <div className="text-emerald-400">Bs. referenciales</div>
                             </div>
                             <div className="pt-2">
                               {resultado.planPlazosAlternativos?.map((plan, i) => (
@@ -1604,5 +1412,3 @@ export default function App() {
     </div>
   );
 }
-
-
