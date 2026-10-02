@@ -186,7 +186,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(fechaBolivia() === '2026-10-01' ? 12 : 0);
+  const [tcFlexible, setTcFlexible] = useState(fechaBolivia() === '2026-10-02' ? 11.90 : 0);
   const [fechaTC, setFechaTC] = useState(fechaBolivia());
   const [primerMesPago, setPrimerMesPago] = useState(siguienteMes()); 
   
@@ -477,7 +477,7 @@ export default function App() {
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
     if (!Number.isFinite(sup) || !Number.isFinite(prec) || sup <= 0 || prec <= 0) { setResultado(null); showNotification('Ingresa superficie y precio mayores que cero.'); return; }
     if (!Number.isFinite(tcFlexible) || tcFlexible <= 0 || fechaTC !== fechaBolivia()) { setResultado(null); showNotification('Confirma el TC y su fecha para la cotización de hoy.'); return; }
-    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 01/10/2026.'); return; }
+    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 02/10/2026.'); return; }
     if (tipoCotizacion === 'credito' && (!Number.isInteger(ans) || ans < 1 || ans > 14)) { setResultado(null); return; }
     
     const valor_original = sup * prec;
