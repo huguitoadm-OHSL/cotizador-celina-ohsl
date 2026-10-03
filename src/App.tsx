@@ -38,7 +38,7 @@ const proyectosPorRegional: Record<string, string[]> = {
 // Fecha comercial en Bolivia, independiente de la zona horaria del dispositivo.
 const fechaBolivia = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const fechaLegible = (iso: string) => iso.split('-').reverse().join('/');
-const PROMOCION = { desde: '2026-10-01', descuentoM2: 1, contado: { '30': 0.30, '60': 0.20, '90': 0.10 } as Record<string, number> };
+const PROMOCION = { desde: '2026-10-03', descuentoM2: 1, contado: { '30': 0.30, '60': 0.20, '90': 0.10 } as Record<string, number> };
 const siguienteMes = () => {
   const [y, m] = fechaBolivia().split('-').map(Number);
   return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`;
@@ -186,7 +186,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(fechaBolivia() === '2026-10-02' ? 11.90 : 0);
+  const [tcFlexible, setTcFlexible] = useState(fechaBolivia() === '2026-10-03' ? 12 : 0);
   const [fechaTC, setFechaTC] = useState(fechaBolivia());
   const [primerMesPago, setPrimerMesPago] = useState(siguienteMes()); 
   
