@@ -1,9 +1,9 @@
-// Celina Quantum · Versión para asesores · Condiciones desde 01/10/2026.
-// Reemplazar src/App.tsx. Conserva las fuentes API/lotes.json y los GeoJSON de public/.
-// Compatible con react-map-gl 7 (entrada /maplibre) y maplibre-gl 4.
-// El TC se ingresa manualmente: Bs 12 es la referencia proporcionada para 01/10/2026.
-// GPS: requiere HTTPS/localhost y autorización de ubicación del dispositivo.
-// El acceso por contraseña del prototipo es solo una barrera de interfaz, no autenticación de servidor.
+// Celina Quantum · Versión para asesores · Condiciones actualizadas a 06/10/2026[cite: 1].
+// Reemplazar src/App.tsx. Conserva las fuentes API/lotes.json y los GeoJSON de public/[cite: 1].
+// Compatible con react-map-gl 7 (entrada /maplibre) y maplibre-gl 4[cite: 1].
+// El TC se ingresa manualmente: Bs 11.97 es la referencia proporcionada[cite: 1].
+// GPS: requiere HTTPS/localhost y autorización de ubicación del dispositivo[cite: 1].
+// El acceso por contraseña del prototipo es solo una barrera de interfaz, no autenticación de servidor[cite: 1].
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
@@ -38,7 +38,7 @@ const proyectosPorRegional: Record<string, string[]> = {
 // Fecha comercial en Bolivia, independiente de la zona horaria del dispositivo.
 const fechaBolivia = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const fechaLegible = (iso: string) => iso.split('-').reverse().join('/');
-const PROMOCION = { desde: '2026-10-03', descuentoM2: 1, contado: { '30': 0.30, '60': 0.20, '90': 0.10 } as Record<string, number> };
+const PROMOCION = { desde: '2026-10-06', descuentoM2: 1, contado: { '5': 0.30, '30': 0.25, '60': 0.10 } as Record<string, number> };
 const siguienteMes = () => {
   const [y, m] = fechaBolivia().split('-').map(Number);
   return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`;
@@ -186,7 +186,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(fechaBolivia() === '2026-10-03' ? 12 : 0);
+  const [tcFlexible, setTcFlexible] = useState(11.97);
   const [fechaTC, setFechaTC] = useState(fechaBolivia());
   const [primerMesPago, setPrimerMesPago] = useState(siguienteMes()); 
   
@@ -200,7 +200,7 @@ export default function App() {
   const descuentoM2 = PROMOCION.descuentoM2; 
   const [aplicarDescM2, setAplicarDescM2] = useState(true); 
   
-  const [plazoLiquidacion, setPlazoLiquidacion] = useState("30"); 
+  const [plazoLiquidacion, setPlazoLiquidacion] = useState("5"); 
 
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
@@ -477,7 +477,7 @@ export default function App() {
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
     if (!Number.isFinite(sup) || !Number.isFinite(prec) || sup <= 0 || prec <= 0) { setResultado(null); showNotification('Ingresa superficie y precio mayores que cero.'); return; }
     if (!Number.isFinite(tcFlexible) || tcFlexible <= 0 || fechaTC !== fechaBolivia()) { setResultado(null); showNotification('Confirma el TC y su fecha para la cotización de hoy.'); return; }
-    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 02/10/2026.'); return; }
+    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 06/10/2026.'); return; }
     if (tipoCotizacion === 'credito' && (!Number.isInteger(ans) || ans < 1 || ans > 14)) { setResultado(null); return; }
     
     const valor_original = sup * prec;
@@ -573,26 +573,26 @@ export default function App() {
       valorOriginalRaw: valor_original, 
       valorOriginal: formatMoney(valor_original), 
       valorFinal: formatMoney(valor_final), 
-      valorFinalBs: formatMoney(valor_final * TC_FLEX_NUMBER), // NUEVO
+      valorFinalBs: formatMoney(valor_final * TC_FLEX_NUMBER), 
       ahorroTotalRaw: ahorro_total, 
       ahorroTotal: formatMoney(ahorro_total),
       inicialRaw: cuota_inicial, 
       inicial: formatMoney(cuota_inicial), 
-      inicialBs: formatMoney(cuota_inicial * TC_FLEX_NUMBER), // NUEVO
+      inicialBs: formatMoney(cuota_inicial * TC_FLEX_NUMBER), 
       inicialPct: formatPct,
       saldoRaw: tipoCotizacion === 'credito' ? valor_final - cuota_inicial : 0, 
       mensualRaw: cuota_final, 
       mensual: formatMoney(cuota_final), 
-      mensualBs: formatMoney(cuota_final * TC_FLEX_NUMBER), // NUEVO
+      mensualBs: formatMoney(cuota_final * TC_FLEX_NUMBER), 
       plazo: ans, 
       planPagosDetallado: planPagosDetallado,
-      planPlazosAlternativos: planPlazosAlternativos, // NUEVO
+      planPlazosAlternativos: planPlazosAlternativos, 
       descPctAplicado: descPctMapeo,
       tcOriginal: TC_FLEX_NUMBER,
       tcEfectivo: tcEfectivoAplicado,
       totalBsA: formatMoney(totalBs_OpcionA),
       totalBsB: formatMoney(totalBs_OpcionB),
-      plazoLiquidacionVisual: plazoLiquidacion === '30' ? 'los primeros 30 días' : plazoLiquidacion === '60' ? '31 a 60 días' : '61 a 90 días',
+      plazoLiquidacionVisual: plazoLiquidacion === '5' ? '0 a 5 días' : plazoLiquidacion === '30' ? '6 a 30 días' : '31 a 60 días',
       descuentoM2Aplicado: tipoCotizacion === 'credito' && aplicarDescM2 ? descuentoM2 : 0,
       timestampId: new Date().getTime()
     });
@@ -773,7 +773,7 @@ export default function App() {
         </header>
 
         <div className="mb-6 rounded-2xl border border-sky-500/25 bg-slate-900/70 p-4 flex flex-wrap items-center justify-between gap-3 no-print">
-          <div><p className="text-sky-300 font-bold text-sm">Condiciones comerciales desde el 01/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos diarios · TC variable · Crédito sin escalonado mensual en dólares</p></div>
+          <div><p className="text-sky-300 font-bold text-sm">Condiciones comerciales desde el 06/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos diarios · TC variable · Crédito sin escalonado mensual en dólares</p></div>
           <label className="text-xs text-slate-300">Fecha del TC <input aria-label="Fecha del tipo de cambio" type="date" value={fechaTC} onChange={e => setFechaTC(e.target.value)} className="ml-2 bg-slate-950 border border-slate-600 rounded-lg p-2 text-white" /></label>
         </div>
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
@@ -1054,9 +1054,9 @@ export default function App() {
                             onChange={(e) => setPlazoLiquidacion(e.target.value)} 
                             className="w-full bg-[#0b111b] border border-sky-500/50 text-sky-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(56,189,248,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-sky-500 focus:border-sky-400" 
                           >
-                            <option value="30">{`Primeros 30 días (-30% | TC equivalente: ${(tcFlexible * 0.70).toFixed(2)})`}</option>
-                            <option value="60">{`De 31 a 60 días (-20% | TC equivalente: ${(tcFlexible * 0.80).toFixed(2)})`}</option>
-                            <option value="90">{`De 61 a 90 días (-10% | TC equivalente: ${(tcFlexible * 0.90).toFixed(2)})`}</option>
+                            <option value="5">{`De 0 a 5 días (-30% | TC equivalente: ${(tcFlexible * 0.70).toFixed(2)})`}</option>
+                            <option value="30">{`De 6 a 30 días (-25% | TC equivalente: ${(tcFlexible * 0.75).toFixed(2)})`}</option>
+                            <option value="60">{`De 31 a 60 días (-10% | TC equivalente: ${(tcFlexible * 0.90).toFixed(2)})`}</option>
                           </select>
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-sky-500">
                             <ChevronDown className="w-5 h-5" />
@@ -1413,5 +1413,3 @@ export default function App() {
     </div>
   );
 }
-
-
