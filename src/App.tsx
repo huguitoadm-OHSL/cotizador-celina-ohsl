@@ -38,7 +38,16 @@ const proyectosPorRegional: Record<string, string[]> = {
 // Fecha comercial en Bolivia, independiente de la zona horaria del dispositivo.
 const fechaBolivia = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const fechaLegible = (iso: string) => iso.split('-').reverse().join('/');
-const PROMOCION = { desde: '2026-10-06', descuentoM2: 1, contado: { '5': 0.30, '30': 0.25, '60': 0.10 } as Record<string, number> };
+const PROMOCION = { desde: '2026-10-06', contado: { '5': 0.25, '30': 0.20, '60': 0.10 } as Record<string, number> };
+const descuentoCreditoPorValor = (valorTotal: number) => {
+  if (!Number.isFinite(valorTotal) || valorTotal <= 0) return 0;
+  if (valorTotal <= 7500) return 300;
+  if (valorTotal <= 15000) return 600;
+  if (valorTotal <= 22500) return 900;
+  if (valorTotal <= 30000) return 1200;
+  if (valorTotal <= 45000) return 1500;
+  return 1800;
+};
 const siguienteMes = () => {
   const [y, m] = fechaBolivia().split('-').map(Number);
   return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`;
@@ -161,7 +170,7 @@ interface ResultadoData {
   planPagosDetallado: { nro: number; mesLabel: string; cuotaUsd: number }[];
   planPlazosAlternativos: { año: number; cuotaUsd: string; cuotaBs: string; isCurrent: boolean }[];
   descPctAplicado: number; tcOriginal: number; tcEfectivo: number; totalBsA: string; totalBsB: string;
-  plazoLiquidacionVisual: string; descuentoM2Aplicado: number; timestampId: number;
+  plazoLiquidacionVisual: string; descuentoFijoAplicado: number; descuentoM2Equivalente: number; timestampId: number;
 }
 
 export default function App() {
@@ -197,10 +206,13 @@ export default function App() {
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
   
-  const descuentoM2 = PROMOCION.descuentoM2; 
-  const [aplicarDescM2, setAplicarDescM2] = useState(true); 
+  const [aplicarDescuentoCredito, setAplicarDescuentoCredito] = useState(true); 
   
   const [plazoLiquidacion, setPlazoLiquidacion] = useState("5"); 
+
+  const valorLoteActual = (Number(superficie) || 0) * (Number(precio) || 0);
+  const descuentoCreditoActual = aplicarDescuentoCredito ? descuentoCreditoPorValor(valorLoteActual) : 0;
+  const descuentoM2InformativoActual = (Number(superficie) || 0) > 0 ? descuentoCreditoActual / Number(superficie) : 0;
 
   const [modoInicial, setModoInicial] = useState("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
@@ -214,7 +226,7 @@ export default function App() {
   const formRef = useRef<HTMLDivElement | null>(null);
   const resultadosRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => { setResultado(null); setCopiado(false); }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescM2, plazoLiquidacion, proyectoPersonalizado]);
+  useEffect(() => { setResultado(null); setCopiado(false); }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescuentoCredito, plazoLiquidacion, proyectoPersonalizado]);
 
   // ============================================================================
   // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
@@ -503,14 +515,12 @@ export default function App() {
         tcEfectivoAplicado = TC_FLEX_NUMBER * (1 - descPctMapeo);
 
         totalBs_OpcionA = valor_final * TC_FLEX_NUMBER;
-        totalBs_OpcionB = valor_original * tcEfectivoAplicado;
+        // Ambas modalidades deben mostrar exactamente el mismo total en Bs.
+        totalBs_OpcionB = totalBs_OpcionA;
         
     } else {
-        const descM2Val = aplicarDescM2 ? descuentoM2 : 0;
-        if (prec <= descM2Val) { setResultado(null); showNotification("El precio por m² debe superar el descuento."); return; }
-        let monto_descuento_m2 = sup * descM2Val;
-        
-        ahorro_total = monto_descuento_m2; 
+        const descuentoFijoCredito = aplicarDescuentoCredito ? descuentoCreditoPorValor(valor_original) : 0;
+        ahorro_total = descuentoFijoCredito;
         valor_final = valor_original - ahorro_total; 
         const base_para_inicial = valor_final;
 
@@ -592,8 +602,9 @@ export default function App() {
       tcEfectivo: tcEfectivoAplicado,
       totalBsA: formatMoney(totalBs_OpcionA),
       totalBsB: formatMoney(totalBs_OpcionB),
-      plazoLiquidacionVisual: plazoLiquidacion === '5' ? '0 a 5 días' : plazoLiquidacion === '30' ? '6 a 30 días' : '31 a 60 días',
-      descuentoM2Aplicado: tipoCotizacion === 'credito' && aplicarDescM2 ? descuentoM2 : 0,
+      plazoLiquidacionVisual: plazoLiquidacion === '5' ? 'Primeros 5 días' : plazoLiquidacion === '30' ? '6 a 30 días' : '31 a 60 días',
+      descuentoFijoAplicado: tipoCotizacion === 'credito' && aplicarDescuentoCredito ? descuentoCreditoPorValor(valor_original) : 0,
+      descuentoM2Equivalente: tipoCotizacion === 'credito' && aplicarDescuentoCredito && sup > 0 ? descuentoCreditoPorValor(valor_original) / sup : 0,
       timestampId: new Date().getTime()
     });
     setCopiado(false); 
@@ -621,7 +632,7 @@ export default function App() {
     if (r.tipoCotizacion === 'contado') {
       return encabezado + `✅ *INVERSIÓN AL CONTADO / LIQUIDACIÓN*\nPlazo: ${r.plazoLiquidacionVisual}.\nDescuento: ${(r.descPctAplicado * 100).toFixed(0)}% incluido.\n*Valor del terreno: US$ ${r.valorFinal}*\nEquivalencia hoy: *Bs ${r.totalBsA}*.\n\nBeneficio no acumulable. El pago en Bs se convierte al TC vigente del día de pago.`;
     }
-    return encabezado + `✅ *INVERSIÓN A CRÉDITO DIRECTO*\n${r.descuentoM2Aplicado > 0 ? `Descuento fijo: US$ ${r.descuentoM2Aplicado}/m² incluido.\n` : ''}*Valor del terreno: US$ ${r.valorFinal}*\n\n📊 *Plan de financiamiento* (${r.plazo} años)\n*Cuota inicial: ${r.inicialPct}%* (US$ ${r.inicial}) = Bs ${r.inicialBs} al TC indicado, vigente para la venta de hoy.\n\n*Cuota mensual fija: US$ ${r.mensual}*\nReferencia hoy: Bs ${r.mensualBs}. Cada cuota mensual se convierte al TC vigente del día efectivo de pago.`;
+    return encabezado + `✅ *INVERSIÓN A CRÉDITO DIRECTO*\n${r.descuentoFijoAplicado > 0 ? `Descuento fijo por lote: US$ ${formatMoney(r.descuentoFijoAplicado)} incluido.\nEquivalente informativo: US$ ${formatMoney(r.descuentoM2Equivalente)}/m².\n` : ''}*Valor del terreno: US$ ${r.valorFinal}*\n\n📊 *Plan de financiamiento* (${r.plazo} años)\n*Cuota inicial: ${r.inicialPct}%* (US$ ${r.inicial}) = Bs ${r.inicialBs} al TC indicado, vigente para la venta de hoy.\n\n*Cuota mensual fija: US$ ${r.mensual}*\nReferencia hoy: Bs ${r.mensualBs}. Cada cuota mensual se convierte al TC vigente del día efectivo de pago.`;
   };
 
   const enviarWhatsApp = () => { 
@@ -773,7 +784,7 @@ export default function App() {
         </header>
 
         <div className="mb-6 rounded-2xl border border-sky-500/25 bg-slate-900/70 p-4 flex flex-wrap items-center justify-between gap-3 no-print">
-          <div><p className="text-sky-300 font-bold text-sm">Condiciones comerciales desde el 06/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos diarios · TC variable · Crédito sin escalonado mensual en dólares</p></div>
+          <div><p className="text-sky-300 font-bold text-sm">Condiciones comerciales desde el 06/10/2026</p><p className="text-slate-400 text-xs mt-1">Descuentos por plazo · Crédito con descuento fijo por valor de lote · TC variable</p></div>
           <label className="text-xs text-slate-300">Fecha del TC <input aria-label="Fecha del tipo de cambio" type="date" value={fechaTC} onChange={e => setFechaTC(e.target.value)} className="ml-2 bg-slate-950 border border-slate-600 rounded-lg p-2 text-white" /></label>
         </div>
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
@@ -1054,8 +1065,8 @@ export default function App() {
                             onChange={(e) => setPlazoLiquidacion(e.target.value)} 
                             className="w-full bg-[#0b111b] border border-sky-500/50 text-sky-100 rounded-xl p-3.5 outline-none transition-all font-bold text-sm shadow-[0_0_15px_rgba(56,189,248,0.1)] appearance-none cursor-pointer focus:ring-1 focus:ring-sky-500 focus:border-sky-400" 
                           >
-                            <option value="5">{`De 0 a 5 días (-30% | TC equivalente: ${(tcFlexible * 0.70).toFixed(2)})`}</option>
-                            <option value="30">{`De 6 a 30 días (-25% | TC equivalente: ${(tcFlexible * 0.75).toFixed(2)})`}</option>
+                            <option value="5">{`Primeros 5 días (-25% | TC equivalente: ${(tcFlexible * 0.75).toFixed(2)})`}</option>
+                            <option value="30">{`De 6 a 30 días (-20% | TC equivalente: ${(tcFlexible * 0.80).toFixed(2)})`}</option>
                             <option value="60">{`De 31 a 60 días (-10% | TC equivalente: ${(tcFlexible * 0.90).toFixed(2)})`}</option>
                           </select>
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-sky-500">
@@ -1068,17 +1079,18 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-1.5">
                           <label className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold text-slate-300 cursor-pointer hover:text-white transition-colors w-max">
-                            <input type="checkbox" checked={aplicarDescM2} onChange={e => setAplicarDescM2(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Crédito x m² ($us)
+                            <input type="checkbox" checked={aplicarDescuentoCredito} onChange={e => setAplicarDescuentoCredito(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" /> Descuento fijo por lote ($us)
                           </label>
                           <input 
                             type="number" 
                             step="0.01" 
                             min="0" 
-                            disabled={!aplicarDescM2} 
-                            value={descuentoM2} 
-                            readOnly aria-label="Descuento a crédito de un dólar por metro cuadrado" 
-                            className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescM2 ? 'bg-[#0b111b] border border-cyan-500 text-white focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
+                            disabled={!aplicarDescuentoCredito} 
+                            value={descuentoCreditoActual} 
+                            readOnly aria-label="Descuento fijo a crédito según el valor total del lote" 
+                            className={`w-full rounded-xl p-3 outline-none transition-all font-bold text-sm shadow-sm ${aplicarDescuentoCredito ? 'bg-[#0b111b] border border-cyan-500 text-white focus:ring-1 focus:ring-cyan-500' : 'bg-slate-900/50 border border-slate-800 text-slate-600 cursor-not-allowed'}`} 
                           />
+                          <p className="text-[9px] text-slate-500">Equivalente informativo: $us {formatMoney(descuentoM2InformativoActual)}/m²</p>
                         </div>
                       </div>
                     )}
@@ -1306,7 +1318,7 @@ export default function App() {
                           <div className="text-[11px] font-bold text-cyan-500 mt-1 truncate">Referencia al TC cotizado: Bs. {resultado.valorFinalBs}</div>
                           {resultado.ahorroTotalRaw > 0 && (
                             <div className="mt-2 text-[9px] text-cyan-400 font-bold bg-cyan-950/60 px-2 py-1 rounded border border-cyan-500/40 inline-block uppercase shadow-sm">
-                              Bono Promocional Incluido: $us {resultado.ahorroTotal}
+                              Descuento fijo incluido: $us {resultado.ahorroTotal} · Equiv. $us {formatMoney(resultado.descuentoM2Equivalente)}/m²
                             </div>
                           )}
                         </div>
