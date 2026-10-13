@@ -1,14 +1,14 @@
-// Celina Quantum · Versión para asesores · Condiciones actualizadas a 06/10/2026[cite: 1].
-// Reemplazar src/App.tsx. Conserva las fuentes API/lotes.json y los GeoJSON de public/[cite: 1].
-// Compatible con react-map-gl 7 (entrada /maplibre) y maplibre-gl 4[cite: 1].
-// El TC se ingresa manualmente: Bs 11.97 es la referencia proporcionada[cite: 1].
-// GPS: requiere HTTPS/localhost y autorización de ubicación del dispositivo[cite: 1].
-// El acceso por contraseña del prototipo es solo una barrera de interfaz, no autenticación de servidor[cite: 1].
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+// Celina Quantum · Versión API empresarial exclusiva · 13/10/2026.
+// Sustituir src/App.tsx. Inventario, precios y estados: SOLO API del simulador empresarial.
+// Los GeoJSON de public/ se utilizan únicamente como planos de referencia.
+// Compatible con react-map-gl 7 (/maplibre) y maplibre-gl 4.
+// GPS: requiere HTTPS/localhost y autorización del usuario.
+// Atención: el acceso por contraseña actual es una barrera visual, no autenticación de servidor.
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
   CheckCircle2, Building2, ChevronRight, FileText, MapPin, Gift, TrendingUp, ShieldCheck, ChevronDown, 
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, Activity, Wallet, CreditCard, Lock, Unlock,
+  LayoutTemplate, Loader2, AlertCircle, Scale, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server,
   Timer
 } from "lucide-react";
@@ -161,6 +161,140 @@ interface LoteData {
   estado: string; categoria: string; vendedor: string;
   api_cuota_inicial: number; api_initial_tipo: string; api_initial_pct: number; api_initial_valor: number;
 }
+// ============================================================================
+// API EXCLUSIVA DE LA EMPRESA. Sin inventarios alternativos ni modo manual.
+// ============================================================================
+const API_BASE = 'https://simulador.data-gc.net';
+const ESTADOS_COMERCIALIZABLES = new Set(['LIBRE', 'DISPONIBLE']);
+const normalizarNombre = (valor: unknown) => String(valor ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+
+const nombresEmpresa: Record<string, string[]> = {
+  'URUBÓ NORTE': ['CELINA URUBO DEL NORTE', 'URUBO NORTE'],
+  'ROSA RODALI': ['ROSA RODALI', 'CELINA ROSA RODALI'],
+  'CELINA PAILÓN': ['CELINA PAILON', 'PAILON'],
+  'EL ENCANTO': ['EL ENCANTO', 'CELINA EL ENCANTO'],
+  'EL ENCANTO FASE 2': ['EL ENCANTO FASE 2', 'EL ENCANTO 2', 'CELINA EL ENCANTO FASE 2'],
+  'SANTA ROSA - FASE 1': ['SANTA ROSA FASE 1', 'SANTA ROSA - FASE 1'],
+  'SANTA ROSA - FASE 2': ['SANTA ROSA FASE 2', 'SANTA ROSA - FASE 2'],
+  'SANTA ROSA - FASE 3': ['SANTA ROSA FASE 3', 'SANTA ROSA - FASE 3'],
+  'TAMARINDO': ['TAMARINDO', 'CELINA TAMARINDO'],
+  'JARDINES DEL BOSQUE': ['JARDINES DEL BOSQUE'],
+  'EL PORVENIR': ['EL PORVENIR', 'CELINA EL PORVENIR'],
+  'EL PORVENIR FASE 2': ['EL PORVENIR FASE 2', 'EL PORVENIR 2', 'CELINA EL PORVENIR FASE 2'],
+  'MUYURINA': ['CELINA MUYURINA', 'MUYURINA'],
+  'LOS JARDINES': ['LOS JARDINES', 'CELINA LOS JARDINES'],
+  'EL RENACER': ['EL RENACER', 'CELINA EL RENACER'],
+  'CELINA 3': ['CELINA III', 'CELINA 3'],
+  'CELINA 4': ['CELINA IV', 'CELINA 4'],
+  'CELINA 5': ['CELINA V', 'CELINA 5'],
+  'RANCHO NUEVO': ['CELINA - RANCHO NUEVO', 'RANCHO NUEVO'],
+  'CELINA X': ['CELINA X', 'CELINA 10'],
+  'CAÑAVERAL': ['CAÑAVERAL', 'CELINA CAÑAVERAL'],
+  'SANTA FE': ['CELINA SANTA FE', 'SANTA FE'],
+  'VILLA BELLA VIVIENDAS': ['VILLA BELLA', 'VILLA BELLA VIVIENDAS'],
+  'CELINA 7 FASE 3': ['CELINA VII FASE 3', 'CELINA 7 FASE 3'],
+  'CELINA 8': ['CELINA 8', 'CELINA VIII'],
+  'CLARA CHUCHIO': ['CELINA CLARA CHUCHIO', 'CLARA CHUCHIO'],
+  'SAN JORGE': ['SAN JORGE', 'CELINA SAN JORGE'],
+  'CELINA VII FASE 1': ['CELINA VII FASE 1', 'CELINA 7 FASE 1'],
+  'CELINA VII FASE 2': ['CELINA VII FASE 2', 'CELINA 7 FASE 2'],
+  'PRADERAS DEL NORTE': ['PRADERAS DEL NORTE', 'CELINA PRADERAS DEL NORTE'],
+  'NARANJAL III': ['NARANJAL III', 'NARANJAL 3'],
+  'CELINA II': ['CELINA II', 'CELINA 2']
+};
+
+const numeroAPI = (valor: unknown): number => {
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : NaN;
+  if (valor == null || valor === '') return NaN;
+  let cad = String(valor).trim();
+  if (cad.includes('.') && cad.includes(',')) {
+    cad = cad.indexOf('.') < cad.indexOf(',')
+      ? cad.replace(/\./g, '').replace(',', '.') : cad.replace(/,/g, '');
+  } else if (cad.includes(',')) cad = cad.replace(',', '.');
+  const resultado = Number(cad.replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(resultado) ? resultado : NaN;
+};
+
+const leerJsonVivo = async (ruta: string, signal?: AbortSignal): Promise<any> => {
+  const respuesta = await fetch(`${API_BASE}${ruta}`, {
+    method: 'GET', cache: 'no-store', signal,
+    headers: { Accept: 'application/json' }
+  });
+  if (!respuesta.ok) throw new Error(`La API empresarial no respondió (${respuesta.status}).`);
+  const tipo = respuesta.headers.get('content-type') || '';
+  if (!tipo.toLowerCase().includes('json')) throw new Error('La API devolvió una respuesta que no es JSON.');
+  return respuesta.json();
+};
+
+const obtenerLotesVivos = async (proyectoElegido: string, signal?: AbortSignal): Promise<LoteData[]> => {
+  const proyectosRespuesta = await leerJsonVivo('/api/proyectos', signal);
+  if (!Array.isArray(proyectosRespuesta?.proyectos)) {
+    throw new Error('Formato de proyectos no reconocido en la API.');
+  }
+  const posibles = new Set([proyectoElegido, `CELINA ${proyectoElegido}`,
+    ...(nombresEmpresa[proyectoElegido] || [])].map(normalizarNombre));
+  const coincidencias = proyectosRespuesta.proyectos.filter((p: any) =>
+    p && posibles.has(normalizarNombre(p.proyecto)) && p.project_id != null && p.project_id !== '');
+  // Dos IDs con el mismo alias pueden corresponder a fases distintas: no mezclar inventarios.
+  if (coincidencias.length !== 1) {
+    throw new Error(coincidencias.length === 0
+      ? 'Este proyecto no está identificado en la API empresarial.'
+      : 'El proyecto coincide con varios registros de la API. Debe revisarse su correspondencia.');
+  }
+  const idProyecto = encodeURIComponent(String(coincidencias[0].project_id));
+  const lotesRespuesta = await leerJsonVivo(`/api/lotes?project_id=${idProyecto}`, signal);
+  if (!Array.isArray(lotesRespuesta?.lotes)) throw new Error('Formato de lotes no reconocido en la API.');
+
+  const disponibles: LoteData[] = [];
+  const claves = new Set<string>();
+  const repetidas = new Set<string>();
+  for (const fila of lotesRespuesta.lotes) {
+    if (!fila || typeof fila !== 'object') continue;
+    const uv = String(fila.uv ?? 'SN').trim().toUpperCase() || 'SN';
+    const mzn = String(fila.manzano ?? fila.mzn ?? 'SN').trim().toUpperCase() || 'SN';
+    const lote = String(fila.lote ?? '').trim().toUpperCase();
+    if (!lote) continue;
+    const clave = JSON.stringify([uv, mzn, lote]);
+    if (claves.has(clave)) repetidas.add(clave);
+    claves.add(clave);
+    // ESTADO FALTANTE / DESCONOCIDO = NO DISPONIBLE (nunca presumir «LIBRE»).
+    const estado = normalizarNombre(fila.estado ?? fila.status);
+    if (!ESTADOS_COMERCIALIZABLES.has(estado)) {
+      repetidas.add(clave); // Si hay versiones contradictorias del mismo lote, no ofrecerlo.
+      continue;
+    }
+    // Se prioriza el precio unitario expuesto por la API, nunca por GeoJSON o Excel.
+    const precioCampo = fila.precio_m2 ?? fila.precio_mt2 ?? fila.precio ?? fila.price;
+    const superficie = numeroAPI(fila.mt2 ?? fila.superficie);
+    const precio = numeroAPI(precioCampo);
+    if (!Number.isFinite(superficie) || superficie <= 0 ||
+        !Number.isFinite(precio) || precio <= 0) {
+      repetidas.add(clave);
+      continue;
+    }
+    disponibles.push({
+      proyecto: proyectoElegido, uv, mzn, lote, superficie, precio, estado,
+      categoria: String(fila.categoria ?? 'ESTÁNDAR').trim().toUpperCase(),
+      vendedor: 'API EMPRESA',
+      api_cuota_inicial: numeroAPI(fila.cuota_inicial) || 0,
+      api_initial_tipo: String(fila.initial_tipo ?? ''),
+      api_initial_pct: numeroAPI(fila.initial_pct) || 0,
+      api_initial_valor: numeroAPI(fila.initial_valor) || 0
+    });
+  }
+  // Ante duplicados ambiguos se excluye el lote; no se escoge uno arbitrariamente.
+  return disponibles.filter(d => !repetidas.has(JSON.stringify([d.uv, d.mzn, d.lote])));
+};
+
+const mismoLote = (a: Pick<LoteData,'uv'|'mzn'|'lote'>, b: Pick<LoteData,'uv'|'mzn'|'lote'>) =>
+  a.uv === b.uv && a.mzn === b.mzn && a.lote === b.lote;
+const mismosDatosComerciales = (a: LoteData, b: LoteData) =>
+  a.superficie === b.superficie && a.precio === b.precio && a.categoria === b.categoria &&
+  a.api_cuota_inicial === b.api_cuota_inicial && a.api_initial_tipo === b.api_initial_tipo &&
+  a.api_initial_pct === b.api_initial_pct && a.api_initial_valor === b.api_initial_valor;
+
 interface ResultadoData {
   fechaTC: string; primerMesPago: string; tipoCotizacion: string; regional: string; proyecto: string;
   uv: string; mzn: string; lote: string; superficie: number; categoria: string;
@@ -189,11 +323,13 @@ export default function App() {
 
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
-  const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
-  const [usarAPI, setUsarAPI] = useState(true); 
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState<LoteData[]>([]);
   const [cargandoBD, setCargandoBD] = useState(true);
-  const [usarBD, setUsarBD] = useState(true);
+  const [errorAPI, setErrorAPI] = useState('');
+  const [ultimaConsulta, setUltimaConsulta] = useState<number | null>(null);
+  const [apiDisponible, setApiDisponible] = useState(false);
+  const [verificandoSalida, setVerificandoSalida] = useState(false);
+  const consultaIdRef = useRef(0);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
   const [tcFlexible, setTcFlexible] = useState(11.70);
   const [fechaTC, setFechaTC] = useState(fechaBolivia());
@@ -226,149 +362,60 @@ export default function App() {
   const formRef = useRef<HTMLDivElement | null>(null);
   const resultadosRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => { setResultado(null); setCopiado(false); }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescuentoCredito, plazoLiquidacion, proyectoPersonalizado]);
+  useEffect(() => { setResultado(null); setCopiado(false); }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescuentoCredito, plazoLiquidacion, proyecto, tipoCotizacion]);
 
   // ============================================================================
-  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
+  // SINCRONIZACIÓN EXCLUSIVA CON LA API: al abrir, cambiar proyecto,
+  // recuperar el foco y periódicamente. Si la API falla, se BLOQUEA la venta.
   // ============================================================================
   useEffect(() => {
-    if (!isAuthenticated || !proyecto) return;
-    const cargarDatos = async () => {
-      setCargandoBD(true);
-      const getSafeVal = (obj: Record<string, any>, propName: string) => {
-          const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
-          return key ? obj[key] : undefined;
-      };
-      const extractNumber = (val: unknown) => {
-          if (val === undefined || val === null || val === '') return 0;
-          if (typeof val === 'number') return val;
-          let s = String(val).trim();
-          if (s.includes('.') && s.includes(',')) {
-              if (s.indexOf('.') < s.indexOf(',')) s = s.replace(/\./g, '').replace(',', '.');
-              else s = s.replace(/,/g, '');
-          } else if (s.includes(',')) s = s.replace(',', '.');
-          s = s.replace(/[^0-9.-]/g, '');
-          const n = Number(s);
-          return isNaN(n) ? 0 : n;
-      };
-      
-      if (usarAPI) {
-        try {
-          const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
-          if (!resProj.ok) throw new Error("API Falló");
-          const dataProj = await resProj.json();
-          const projAPI = dataProj.proyectos.find((p: { proyecto: string }) => {
-             const apiName = String(p.proyecto).trim().toUpperCase();
-             const local = proyecto.trim().toUpperCase();
-             const map: Record<string, string[]> = {
-                "URUBÓ NORTE": ["CELINA URUBO DEL NORTE", "URUBO NORTE"],
-                "ROSA RODALI": ["ROSA RODALI", "CELINA ROSA RODALI"],
-                "CELINA PAILÓN": ["CELINA PAILON", "PAILON"],
-                "EL ENCANTO": ["EL ENCANTO", "CELINA EL ENCANTO"],
-                "EL ENCANTO FASE 2": ["EL ENCANTO FASE 2", "EL ENCANTO 2", "CELINA EL ENCANTO FASE 2"],
-                "SANTA ROSA - FASE 1": ["SANTA ROSA FASE 1", "SANTA ROSA - FASE 1"],
-                "SANTA ROSA - FASE 2": ["SANTA ROSA FASE 2", "SANTA ROSA - FASE 2"],
-                "SANTA ROSA - FASE 3": ["SANTA ROSA FASE 3", "SANTA ROSA - FASE 3"],
-                "TAMARINDO": ["TAMARINDO", "CELINA TAMARINDO"],
-                "JARDINES DEL BOSQUE": ["JARDINES DEL BOSQUE"],
-                "EL PORVENIR": ["EL PORVENIR", "CELINA EL PORVENIR"],
-                "EL PORVENIR FASE 2": ["EL PORVENIR FASE 2", "EL PORVENIR 2", "CELINA EL PORVENIR FASE 2"],
-                "MUYURINA": ["CELINA MUYURINA", "MUYURINA"],
-                "LOS JARDINES": ["LOS JARDINES", "CELINA LOS JARDINES"],
-                "EL RENACER": ["EL RENACER", "CELINA EL RENACER"],
-                "CELINA 3": ["CELINA III", "CELINA 3"],
-                "CELINA 4": ["CELINA IV", "CELINA 4"],
-                "CELINA 5": ["CELINA V", "CELINA 5"],
-                "RANCHO NUEVO": ["CELINA - RANCHO NUEVO", "RANCHO NUEVO"],
-                "CELINA X": ["CELINA X", "CELINA 10"],
-                "CAÑAVERAL": ["CAÑAVERAL", "CELINA CAÑAVERAL"],
-                "SANTA FE": ["CELINA SANTA FE", "SANTA FE"],
-                "VILLA BELLA VIVIENDAS": ["VILLA BELLA", "VILLA BELLA VIVIENDAS"],
-                "CELINA 7 FASE 3": ["CELINA VII FASE 3", "CELINA 7 FASE 3"],
-                "CELINA 8": ["CELINA 8", "CELINA VIII"],
-                "CLARA CHUCHIO": ["CELINA CLARA CHUCHIO", "CLARA CHUCHIO"],
-                "SAN JORGE": ["SAN JORGE", "CELINA SAN JORGE"],
-                "CELINA VII FASE 1": ["CELINA VII FASE 1", "CELINA 7 FASE 1"],
-                "CELINA VII FASE 2": ["CELINA VII FASE 2", "CELINA 7 FASE 2"],
-                "PRADERAS DEL NORTE": ["PRADERAS DEL NORTE", "CELINA PRADERAS DEL NORTE"],
-                "NARANJAL III": ["NARANJAL III", "NARANJAL 3"],
-                "CELINA II": ["CELINA II", "CELINA 2"]
-             };
-             if (map[local] && map[local].includes(apiName)) return true;
-             return apiName === local || apiName === `CELINA ${local}`;
-          });
-          
-          if (projAPI && projAPI.project_id) {
-            const resLotes = await fetch(`https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`);
-            if (!resLotes.ok) throw new Error("API Lotes Falló");
-            const dataLotes = await resLotes.json();
-            if (dataLotes.lotes) {
-              const apiMapped = dataLotes.lotes.map((loteFresco: Record<string, any>) => {
-                const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
-                const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
-                
-                return {
-                  proyecto: proyecto, 
-                  uv: loteFresco.uv ? String(loteFresco.uv).trim().toUpperCase() : "SN",
-                  mzn: loteFresco.manzano ? String(loteFresco.manzano).trim().toUpperCase() : "SN",
-                  lote: String(loteFresco.lote).trim().toUpperCase(),
-                  superficie: extractNumber(loteFresco.mt2 || loteFresco.superficie),
-                  precio: extractNumber(rawPrecio),
-                  estado: String(loteFresco.estado || "LIBRE").toUpperCase(),
-                  categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
-                  vendedor: "API VIVA",
-                  api_cuota_inicial: extractNumber(loteFresco.cuota_inicial),
-                  api_initial_tipo: String(loteFresco.initial_tipo || ""),
-                  api_initial_pct: extractNumber(loteFresco.initial_pct),
-                  api_initial_valor: extractNumber(loteFresco.initial_valor)
-                };
-              });
-              setBaseDeDatosLotes(apiMapped);
-              setCargandoBD(false);
-              return; 
-            }
-          }
-          throw new Error("Proyecto no encontrado en API");
-        } catch (error) { setUsarAPI(false); }
-      } else {
-        try {
-          let rawData;
-          try {
-            const response = await fetch('/lotes.json');
-            if (!response.ok) throw new Error('Fallo local');
-            rawData = await response.json();
-          } catch (e) {
-            const timestamp = new Date().getTime();
-            const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
-            const fallbackResponse = await fetch(githubRawUrl);
-            if (!fallbackResponse.ok) throw new Error('Fallo github');
-            rawData = await fallbackResponse.json();
-          }
-          if (!Array.isArray(rawData)) rawData = [];
-          const normalizedData = rawData.map(item => ({
-              proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
-              uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
-              mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
-              lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
-              superficie: extractNumber(getSafeVal(item, 'superficie')),
-              precio: extractNumber(getSafeVal(item, 'precio')),
-              estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
-              categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
-              vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
-              api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
-              api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
-              api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
-              api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
-          }));
-          const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
-          
-          setBaseDeDatosLotes(lotesPermitidos);
-          setCargandoBD(false);
-        } catch (error) { setCargandoBD(false); setUsarBD(false); }
+    if (!isAuthenticated || !proyecto) {
+      setBaseDeDatosLotes([]); setApiDisponible(false); setUltimaConsulta(null);
+      return;
+    }
+    const controller = new AbortController();
+    const id = ++consultaIdRef.current;
+    let numeroCarga = 0;
+    setCargandoBD(true);
+    setApiDisponible(false);
+    setBaseDeDatosLotes([]);
+    setResultado(null);
+    setErrorAPI('');
+    setUltimaConsulta(null);
+    const cargar = async () => {
+      const ciclo = ++numeroCarga;
+      // Cada actualización invalida las cotizaciones antiguas, incluso si hay error.
+      setResultado(null);
+      try {
+        const vigentes = await obtenerLotesVivos(proyecto, controller.signal);
+        if (controller.signal.aborted || id !== consultaIdRef.current || ciclo !== numeroCarga) return;
+        setBaseDeDatosLotes(vigentes);
+        setApiDisponible(true);
+        setErrorAPI(vigentes.length ? '' : 'La API no confirma lotes libres con precio y superficie válidos en este proyecto.');
+        setUltimaConsulta(Date.now());
+      } catch (err: any) {
+        if (controller.signal.aborted || id !== consultaIdRef.current || ciclo !== numeroCarga) return;
+        setBaseDeDatosLotes([]);
+        setApiDisponible(false);
+        setUltimaConsulta(null);
+        setErrorAPI(err?.message || 'Sin conexión con la API empresarial. Cotización bloqueada.');
+      } finally {
+        if (!controller.signal.aborted && id === consultaIdRef.current && ciclo === numeroCarga) setCargandoBD(false);
       }
     };
-    cargarDatos();
-  }, [proyecto, isAuthenticated, usarAPI]); 
+    void cargar();
+    const intervalo = window.setInterval(() => { if (!document.hidden) void cargar(); }, 60000);
+    const alVolver = () => { if (!document.hidden) void cargar(); };
+    window.addEventListener('focus', alVolver);
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      consultaIdRef.current++;
+      controller.abort();
+      window.clearInterval(intervalo);
+      window.removeEventListener('focus', alVolver);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
+  }, [proyecto, isAuthenticated]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -380,7 +427,7 @@ export default function App() {
 
   useEffect(() => {
     if (proyectosPorRegional[regional] && !proyectosPorRegional[regional].includes(proyecto)) {
-      setProyecto(proyectosPorRegional[regional][0] || "OTRO");
+      setProyecto(proyectosPorRegional[regional][0] || 'MUYURINA');
     }
   }, [regional]);
 
@@ -393,55 +440,23 @@ export default function App() {
   useEffect(() => {
     setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
     setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
-    setResultado(null); setProyectoPersonalizado(""); 
+    setResultado(null); 
     setExpandedPlan(false);
   }, [proyecto, tipoCotizacion]);
 
-  const getAlias = (p: string) => {
-    if (!p) return [];
-    const aliases = [p, `CELINA ${p}`];
-    if (p === "URUBÓ NORTE") aliases.push("CELINA URUBO DEL NORTE", "URUBO NORTE");
-    if (p === "ROSA RODALI") aliases.push("ROSA DE RODALI", "CELINA ROSA RODALI");
-    if (p === "CELINA PAILÓN") aliases.push("CELINA PAILON", "PAILON");
-    if (p === "EL ENCANTO FASE 2") aliases.push("EL ENCANTO 2", "EL ENCANTO FASE II", "EL ENCANTO FASE 2");
-    if (p === "SANTA ROSA - FASE 1") aliases.push("SANTA ROSA FASE 1", "SANTA ROSA 1");
-    if (p === "SANTA ROSA - FASE 2") aliases.push("SANTA ROSA FASE 2", "SANTA ROSA 2");
-    if (p === "SANTA ROSA - FASE 3") aliases.push("SANTA ROSA FASE 3", "SANTA ROSA 3");
-    if (p === "EL PORVENIR FASE 2") aliases.push("EL PORVENIR 2", "EL PORVENIR FASE II");
-    if (p === "CELINA 3") aliases.push("CELINA III");
-    if (p === "CELINA 4") aliases.push("CELINA IV");
-    if (p === "CELINA 5") aliases.push("CELINA V");
-    if (p === "CELINA X") aliases.push("CELINA 10", "CELINA X");
-    if (p === "RANCHO NUEVO") aliases.push("CELINA - RANCHO NUEVO", "CELINA RANCHO NUEVO");
-    if (p === "MUYURINA") aliases.push("CELINA MUYURINA");
-    if (p === "SANTA FE") aliases.push("CELINA SANTA FE");
-    if (p === "VILLA BELLA VIVIENDAS") aliases.push("VILLA BELLA");
-    if (p === "CELINA 7 FASE 3") aliases.push("CELINA VII FASE 3");
-    if (p === "CELINA VII FASE 1") aliases.push("CELINA 7 FASE 1");
-    if (p === "CELINA VII FASE 2") aliases.push("CELINA 7 FASE 2");
-    if (p === "CLARA CHUCHIO") aliases.push("CELINA CLARA CHUCHIO");
-    return aliases;
-  };
-
-  const lotesDelProyecto = useMemo(() => {
-    const currentAliases = getAlias(proyecto);
-    return baseDeDatosLotes?.filter(l => 
-      currentAliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || currentAliases.includes(l.proyecto)
-    ) || [];
-  }, [baseDeDatosLotes, proyecto]);
-  
-  const tieneBD = lotesDelProyecto.length > 0;
-  const modoBD = usarBD && tieneBD;
-  
-  const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
+  // Listas comerciales únicamente de la API. El modo director no omite el filtro.
+  const lotesDelProyecto = baseDeDatosLotes;
+  const lotesParaDropdown = apiDisponible ? lotesDelProyecto : [];
+  const tieneBD = lotesParaDropdown.length > 0;
+  const modoBD = true; // Estilo original, pero sin edición ni fuentes alternativas.
   const sortAlphaNum = (a: string, b: string) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   const uvsDisponibles = [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
 
-  useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
-  useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
-  useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
+  useEffect(() => { if (uv && !uvsDisponibles.includes(uv)) { setUv(''); setMzn(''); setLote(''); setSuperficie(''); setPrecio(''); setCategoria(''); } }, [baseDeDatosLotes, uv]);
+  useEffect(() => { if (mzn && !mznsDisponibles.includes(mzn)) { setMzn(''); setLote(''); setSuperficie(''); setPrecio(''); setCategoria(''); } }, [baseDeDatosLotes, uv, mzn]);
+  useEffect(() => { if (lote && !lotesDisponibles.includes(lote)) { setLote(''); setSuperficie(''); setPrecio(''); setCategoria(''); } }, [baseDeDatosLotes, uv, mzn, lote]);
 
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
@@ -483,9 +498,10 @@ export default function App() {
   // ============================================================================
   // MOTOR DE CÁLCULO REFACTORIZADO 
   // ============================================================================
-  const calcular = () => {
-    const sup = Number(superficie) || 0; 
-    const prec = Number(precio) || 0; 
+  const calcular = (loteVigente: LoteData) => {
+    // Ni superficie ni precio proceden de inputs editables ni del mapa.
+    const sup = loteVigente.superficie;
+    const prec = loteVigente.precio; 
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
     if (!Number.isFinite(sup) || !Number.isFinite(prec) || sup <= 0 || prec <= 0) { setResultado(null); showNotification('Ingresa superficie y precio mayores que cero.'); return; }
     if (!Number.isFinite(tcFlexible) || tcFlexible <= 0 || fechaTC !== fechaBolivia()) { setResultado(null); showNotification('Confirma el TC y su fecha para la cotización de hoy.'); return; }
@@ -493,11 +509,11 @@ export default function App() {
     if (tipoCotizacion === 'credito' && (!Number.isInteger(ans) || ans < 1 || ans > 14)) { setResultado(null); return; }
     
     const valor_original = sup * prec;
-    const nombreProyectoFinal = proyecto === "OTRO" ? proyectoPersonalizado : proyecto;
+    const nombreProyectoFinal = proyecto;
     
     let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
-    let planPagosDetallado = [];
-    let planPlazosAlternativos = [];
+    let planPagosDetallado: ResultadoData['planPagosDetallado'] = [];
+    let planPlazosAlternativos: ResultadoData['planPlazosAlternativos'] = [];
     
     const TC_FLEX_NUMBER = Number(tcFlexible);
     
@@ -579,7 +595,8 @@ export default function App() {
     
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
     setResultado({
-      fechaTC, primerMesPago, tipoCotizacion, regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria,
+      fechaTC, primerMesPago, tipoCotizacion, regional, proyecto: nombreProyectoFinal,
+      uv: loteVigente.uv, mzn: loteVigente.mzn, lote: loteVigente.lote, superficie: sup, categoria: loteVigente.categoria,
       valorOriginalRaw: valor_original, 
       valorOriginal: formatMoney(valor_original), 
       valorFinal: formatMoney(valor_final), 
@@ -610,24 +627,47 @@ export default function App() {
     setCopiado(false); 
   };
 
-  const handleProcesar = (e: React.FormEvent) => {
+  // Consultar nuevamente la empresa antes de permitir una cotización.
+  const handleProcesar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCalculating || verificandoSalida) return;
+    if (!apiDisponible || cargandoBD || !uv || !mzn || !lote) {
+      setResultado(null); showNotification('Selecciona un lote LIBRE confirmado por la API empresarial.'); return;
+    }
     setIsCalculating(true);
-    setTimeout(() => {
-      try { calcular(); } catch(err) { showNotification("Error de ingesta de datos. Revisa la integridad del lote."); } 
-      finally { 
-        setIsCalculating(false); 
-        if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
+    setResultado(null);
+    const seleccion = { uv, mzn, lote };
+    const idConsulta = consultaIdRef.current;
+    try {
+      const vigentes = await obtenerLotesVivos(proyecto);
+      if (idConsulta !== consultaIdRef.current) return; // Cambió el proyecto o cerró sesión.
+      const fresco = vigentes.find(l => mismoLote(l, seleccion));
+      setBaseDeDatosLotes(vigentes);
+      setUltimaConsulta(Date.now()); setApiDisponible(true);
+      setErrorAPI('');
+      if (!fresco) { showNotification('El lote ya no está libre, no es cotizable o cambió su registro en la empresa.'); return; }
+      const mostrado = baseDeDatosLotes.find(l => mismoLote(l, seleccion));
+      if (!mostrado || !mismosDatosComerciales(mostrado, fresco)) {
+        showNotification('La empresa actualizó este lote. Revisa el precio, superficie e inicial antes de volver a cotizar.');
+        return;
       }
-    }, 500);
+      calcular(fresco);
+    } catch (err: any) {
+      if (idConsulta !== consultaIdRef.current) return;
+      setBaseDeDatosLotes([]); setApiDisponible(false); setUltimaConsulta(null);
+      setErrorAPI(err?.message || 'No se pudo validar el estado en la empresa.');
+      showNotification('No se puede cotizar sin confirmar disponibilidad con la API.');
+    } finally {
+      setIsCalculating(false);
+      resultadosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   // ============================================================================
   // EXPORTACIÓN B2C PARA WHATSAPP
   // ============================================================================
-  const getTextToCopy = () => {
-    if (!resultado) return '';
-    const r = resultado;
+  const getTextToCopy = (r: ResultadoData | null = resultado) => {
+    if (!r) return '';
     const encabezado = `📍 *Proyecto ${r.proyecto}*\nUV ${r.uv || '-'} | MZN ${r.mzn || '-'} | Lote ${r.lote || '-'} (${r.superficie} m²)\n${r.categoria && r.categoria !== 'ESTÁNDAR' ? `🏷️ ${r.categoria}\n` : ''}💎 Precio de lista: US$ ${r.valorOriginal}\n📅 TC ${fechaLegible(r.fechaTC)}: Bs ${r.tcOriginal.toFixed(2)}\n\n`;
     if (r.tipoCotizacion === 'contado') {
       return encabezado + `✅ *INVERSIÓN AL CONTADO / LIQUIDACIÓN*\nPlazo: ${r.plazoLiquidacionVisual}.\nDescuento: ${(r.descPctAplicado * 100).toFixed(0)}% incluido.\n*Valor del terreno: US$ ${r.valorFinal}*\nEquivalencia hoy: *Bs ${r.totalBsA}*.\n\nBeneficio no acumulable. El pago en Bs se convierte al TC vigente del día de pago.`;
@@ -635,17 +675,63 @@ export default function App() {
     return encabezado + `✅ *INVERSIÓN A CRÉDITO DIRECTO*\n${r.descuentoFijoAplicado > 0 ? `Descuento fijo por lote: US$ ${formatMoney(r.descuentoFijoAplicado)} incluido.\nEquivalente informativo: US$ ${formatMoney(r.descuentoM2Equivalente)}/m².\n` : ''}*Valor del terreno: US$ ${r.valorFinal}*\n\n📊 *Plan de financiamiento* (${r.plazo} años)\n*Cuota inicial: ${r.inicialPct}%* (US$ ${r.inicial}) = Bs ${r.inicialBs} al TC indicado, vigente para la venta de hoy.\n\n*Cuota mensual fija: US$ ${r.mensual}*\nReferencia hoy: Bs ${r.mensualBs}. Cada cuota mensual se convierte al TC vigente del día efectivo de pago.`;
   };
 
-  const enviarWhatsApp = () => { 
-    if (!resultado) return; 
-    if (resultado.fechaTC !== fechaBolivia()) { showNotification('Actualiza el TC y vuelve a cotizar antes de compartir.'); return; }
-    window.open(`https://wa.me/?text=${encodeURIComponent(getTextToCopy())}`, '_blank', 'noopener,noreferrer'); 
+  // La última verificación también se realiza al copiar/compartir.
+  const comprobarAntesDeCompartir = async (r: ResultadoData): Promise<boolean> => {
+    if (r.fechaTC !== fechaBolivia()) {
+      showNotification('Actualiza el TC y vuelve a cotizar antes de compartir.'); return false;
+    }
+    if (r.proyecto !== proyecto || r.uv !== uv || r.mzn !== mzn || r.lote !== lote) {
+      showNotification('Cambió la selección. Genera una nueva cotización.'); return false;
+    }
+    const idConsulta = consultaIdRef.current;
+    try {
+      const vigentes = await obtenerLotesVivos(r.proyecto);
+      if (idConsulta !== consultaIdRef.current) return false;
+      const vigente = vigentes.find(l => mismoLote(l, r));
+      const anterior = baseDeDatosLotes.find(l => mismoLote(l, r));
+      if (!vigente || !anterior || !mismosDatosComerciales(anterior, vigente) ||
+          vigente.superficie !== r.superficie || vigente.superficie * vigente.precio !== r.valorOriginalRaw) {
+        setResultado(null);
+        setBaseDeDatosLotes(vigentes);
+        showNotification('La disponibilidad o datos del lote cambiaron. Debes generar una nueva cotización.');
+        return false;
+      }
+      setBaseDeDatosLotes(vigentes);
+      setUltimaConsulta(Date.now()); setApiDisponible(true);
+      return true;
+    } catch (err: any) {
+      if (idConsulta !== consultaIdRef.current) return false;
+      setResultado(null); setBaseDeDatosLotes([]); setApiDisponible(false);
+      setUltimaConsulta(null);
+      setErrorAPI(err?.message || 'No se puede verificar el lote.');
+      showNotification('Sin validación de la empresa, no se permite compartir.');
+      return false;
+    }
+  };
+
+  const enviarWhatsApp = async () => {
+    if (!resultado || verificandoSalida) return;
+    const actual = resultado;
+    // Abrir en el gesto del usuario evita que el navegador bloquee el popup asíncrono.
+    const destino = window.open('about:blank', '_blank');
+    setVerificandoSalida(true);
+    try {
+      if (!(await comprobarAntesDeCompartir(actual))) { destino?.close(); return; }
+      const url = `https://wa.me/?text=${encodeURIComponent(getTextToCopy(actual))}`;
+      if (destino) { destino.opener = null; destino.location.replace(url); }
+      else window.location.assign(url);
+    } catch {
+      destino?.close();
+      showNotification('No se pudo abrir WhatsApp. Intenta copiar la cotización.');
+    } finally { setVerificandoSalida(false); }
   };
 
   const copiarTexto = async () => {
-    if (!resultado) return;
-    if (resultado.fechaTC !== fechaBolivia()) { showNotification('Actualiza el TC y vuelve a cotizar antes de copiar.'); return; }
+    if (!resultado || verificandoSalida) return;
+    setVerificandoSalida(true);
     try {
-      const mensaje = getTextToCopy();
+      if (!(await comprobarAntesDeCompartir(resultado))) return;
+      const mensaje = getTextToCopy(resultado);
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(mensaje);
       } else {
@@ -655,8 +741,9 @@ export default function App() {
         try { field.select(); if (!document.execCommand('copy')) throw new Error('No se pudo copiar'); }
         finally { field.remove(); }
       }
-      setCopiado(true); showNotification('Cotización copiada.');
-    } catch { showNotification('No se pudo copiar. Puedes abrir la cotización con el botón WhatsApp.'); }
+      setCopiado(true); showNotification('Cotización copiada tras verificar el lote con la empresa.');
+    } catch { showNotification('No se pudo copiar. Puedes intentar compartir mediante WhatsApp.'); }
+    finally { setVerificandoSalida(false); }
   };
   return (
     <div className="quantum-command min-h-screen bg-[#06090f] relative font-['Plus_Jakarta_Sans'] text-slate-300 overflow-x-hidden selection:bg-sky-500/30 selection:text-sky-200 pb-20 w-full max-w-[100vw]">
@@ -803,19 +890,8 @@ export default function App() {
                 <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white drop-shadow-md">Prepara tu propuesta</h2>
               </div>
               
-              <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
-                <button 
-                    onClick={() => setUsarAPI(false)} 
-                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                >
-                    <Database className="w-3 h-3" /> Excel Local
-                </button>
-                <button 
-                    onClick={() => setUsarAPI(true)} 
-                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-cyan-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
-                >
-                    <Server className="w-3 h-3" /> API Server
-                </button>
+              <div className="relative z-10 flex items-center gap-2 bg-cyan-950/50 border border-cyan-500/50 text-cyan-200 px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-wider">
+                <Server className="w-4 h-4" /> API empresarial · Única fuente
               </div>
             </div>
             
@@ -862,18 +938,12 @@ export default function App() {
                       <Building2 className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> Proyecto
                     </label>
                     {cargandoBD ? (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-cyan-400 flex items-center gap-1.5 border border-cyan-500/30 px-3 py-1.5 rounded-full bg-cyan-500/10 shrink-0">
-                        <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
-                      </span>
+                      <span className="text-[10px] text-cyan-300 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Verificando API...</span>
                     ) : tieneBD ? (
-                      <button 
-                        type="button" 
-                        onClick={() => setUsarBD(!usarBD)} 
-                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-sky-900/50 text-sky-300 border border-sky-500/40 hover:bg-sky-800/50 hover:shadow-[0_0_10px_rgba(56,189,248,0.2)]' : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
-                      >
-                        {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
-                      </button>
-                    ) : null}
+                      <span className="text-[10px] text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" /> {lotesDelProyecto.length} lotes libres</span>
+                    ) : (
+                      <span className="text-[10px] text-amber-300 flex items-center gap-1.5"><AlertCircle className="w-3 h-3" /> Sin lotes verificables</span>
+                    )}
                   </div>
                   <div className="relative">
                     <select 
@@ -882,20 +952,16 @@ export default function App() {
                       className={`w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(14,165,233,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]'}`}
                     >
                       {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
-                      <option value="OTRO">OTRO...</option>
                     </select>
                     <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                       <ChevronDown className="w-5 h-5" />
                     </div>
                   </div>
-                  {proyecto === "OTRO" && (
-                    <input 
-                      type="text" 
-                      value={proyectoPersonalizado} 
-                      onChange={e => setProyectoPersonalizado(e.target.value)} 
-                      className="w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-semibold mt-3 animate-pop focus:shadow-[0_0_15px_rgba(56,189,248,0.15)] focus:border-sky-500" 
-                      placeholder="Escribe el nombre del proyecto..." 
-                    />
+                  {errorAPI && !cargandoBD && (
+                    <p role="alert" className="mt-3 text-amber-300 text-xs font-semibold flex items-start gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{errorAPI} La cotización está bloqueada.</p>
+                  )}
+                  {ultimaConsulta && apiDisponible && (
+                    <p className="mt-2 text-[10px] text-slate-400">Verificación empresarial: {new Date(ultimaConsulta).toLocaleTimeString('es-BO', { timeZone: 'America/La_Paz' })}. Se valida nuevamente al cotizar y compartir.</p>
                   )}
                 </div>
 
@@ -906,18 +972,14 @@ export default function App() {
                         <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-400 drop-shadow-[0_0_5px_rgba(56,189,248,0.5)]' : 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
-                      {!usarBD && tieneBD && (
-                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
-                          <Edit2 className="w-3 h-3"/> Ingreso Manual
-                        </span>
-                      )}
+                      <span className="text-[9px] text-cyan-300 font-semibold uppercase">Selección desde la API</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>UV</label>
-                        {modoBD ? (
                            <div className="relative group">
                              <select 
+                               disabled={!apiDisponible || cargandoBD || !tieneBD} 
                                value={uv} 
                                onChange={handleUvChange} 
                                className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`}
@@ -929,21 +991,12 @@ export default function App() {
                                <ChevronDown className="w-3 h-3" />
                              </div>
                            </div>
-                        ) : (
-                          <input 
-                            type="text" 
-                            value={uv} 
-                            onChange={handleUvChange} 
-                            placeholder="Ej. 49" 
-                            className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`} 
-                          />
-                        )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>MZN</label>
-                        {modoBD ? (
                            <div className="relative group">
                              <select 
+                               disabled={!apiDisponible || cargandoBD || !tieneBD} 
                                value={mzn} 
                                onChange={handleMznChange} 
                                className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`}
@@ -955,21 +1008,12 @@ export default function App() {
                                <ChevronDown className="w-3 h-3" />
                              </div>
                            </div>
-                        ) : (
-                          <input 
-                            type="text" 
-                            value={mzn} 
-                            onChange={handleMznChange} 
-                            placeholder="Ej. 6" 
-                            className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`} 
-                          />
-                        )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>LOTE</label>
-                        {modoBD ? (
                            <div className="relative group">
                              <select 
+                               disabled={!apiDisponible || cargandoBD || !tieneBD} 
                                value={lote} 
                                onChange={handleLoteChange} 
                                className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`}
@@ -981,15 +1025,6 @@ export default function App() {
                                <ChevronDown className="w-3 h-3" />
                              </div>
                            </div>
-                        ) : (
-                          <input 
-                            type="text" 
-                            value={lote} 
-                            onChange={handleLoteChange} 
-                            placeholder="Ej. 9" 
-                            className={`w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 min-w-0 transition-colors shadow-inner outline-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(56,189,248,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(34,211,238,0.15)]'}`} 
-                          />
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1003,7 +1038,7 @@ export default function App() {
                     <input 
                       type="text" 
                       value={categoria} 
-                      onChange={e => setCategoria(e.target.value)} 
+                      readOnly 
                       placeholder="Ej. LOTE S/CALLE ESQ. A" 
                       className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-sky-950/30 border border-sky-500/40 text-sky-100 shadow-[inset_0_0_15px_rgba(56,189,248,0.1)] focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 shadow-[inset_0_0_15px_rgba(34,211,238,0.1)] focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]') : 'bg-[#0b111b] border border-slate-700 text-white'}`} 
                     />
@@ -1021,7 +1056,7 @@ export default function App() {
                       type="number" 
                       required 
                       value={superficie} 
-                      onChange={e => setSuperficie(e.target.value)} 
+                      readOnly 
                       placeholder="Ej. 240" 
                       className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0b111b] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-sky-400 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]' : 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]'}`} 
                     />
@@ -1037,7 +1072,7 @@ export default function App() {
                       type="number" 
                       required 
                       value={precio} 
-                      onChange={e => setPrecio(e.target.value)} 
+                      readOnly 
                       placeholder="Ej. 145" 
                       className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0b111b] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-sky-400 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]' : 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]'}`} 
                     />
@@ -1150,7 +1185,7 @@ export default function App() {
                 )}
 
                 <button 
-                  type="submit" disabled={isCalculating} 
+                  type="submit" disabled={isCalculating || cargandoBD || !apiDisponible || !tieneBD || !uv || !mzn || !lote || verificandoSalida} 
                   className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-sky-500 via-blue-500 to-sky-400 hover:from-sky-400 hover:via-blue-400 hover:to-sky-300 shadow-[0_0_30px_rgba(56,189,248,0.4)] hover:shadow-[0_0_45px_rgba(56,189,248,0.6)]' : 'from-cyan-500 via-blue-500 to-cyan-400 hover:from-cyan-400 hover:via-blue-400 hover:to-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:shadow-[0_0_45px_rgba(34,211,238,0.6)]'} text-[#06090f] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
                 >
                   <div className="absolute inset-0 bg-white/40 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out"></div>
@@ -1402,13 +1437,13 @@ export default function App() {
 
                   <div className="mt-8 pt-6 border-t border-slate-800 flex flex-col sm:flex-row gap-3">
                         <button 
-                          onClick={copiarTexto} 
+                          onClick={copiarTexto} disabled={verificandoSalida || !apiDisponible} 
                           className={`flex-1 bg-[#0b111b] border font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-inner ${resultado.tipoCotizacion === 'contado' ? 'border-sky-500/60 text-sky-400 hover:bg-sky-900/30' : 'border-cyan-500/60 text-cyan-400 hover:bg-cyan-900/30'}`}
                         >
                           {copiado ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />} {copiado ? 'COPIADO' : 'COPIAR TEXTO'}
                         </button>
                         <button 
-                          onClick={enviarWhatsApp} 
+                          onClick={enviarWhatsApp} disabled={verificandoSalida || !apiDisponible} 
                           className="flex-1 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#06090f] font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:-translate-y-1 text-sm uppercase tracking-wider"
                         >
                           <Send className="w-5 h-5" /> WhatsApp
