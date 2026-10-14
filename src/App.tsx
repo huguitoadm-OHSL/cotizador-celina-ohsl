@@ -1,5 +1,5 @@
 // Celina Quantum · Versión para asesores · Condiciones actualizadas a 06/10/2026[cite: 1].
-// API empresarial como fuente exclusiva de lotes; GeoJSON solo para planos.
+// Reemplazar src/App.tsx. Conserva las fuentes API/lotes.json y los GeoJSON de public/[cite: 1].
 // Compatible con react-map-gl 7 (entrada /maplibre) y maplibre-gl 4[cite: 1].
 // El TC se ingresa manualmente: Bs 11.97 es la referencia proporcionada[cite: 1].
 // GPS: requiere HTTPS/localhost y autorización de ubicación del dispositivo[cite: 1].
@@ -190,8 +190,10 @@ export default function App() {
   const [regional, setRegional] = useState("MONTERO");
   const [proyecto, setProyecto] = useState("MUYURINA");
   const [proyectoPersonalizado, setProyectoPersonalizado] = useState("");
+  const [usarAPI, setUsarAPI] = useState(true); 
   const [baseDeDatosLotes, setBaseDeDatosLotes] = useState<LoteData[]>([]);
   const [cargandoBD, setCargandoBD] = useState(true);
+  const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState("credito"); 
   const [tcFlexible, setTcFlexible] = useState(11.70);
   const [fechaTC, setFechaTC] = useState(fechaBolivia());
@@ -226,13 +228,17 @@ export default function App() {
 
   useEffect(() => { setResultado(null); setCopiado(false); }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescuentoCredito, plazoLiquidacion, proyectoPersonalizado]);
 
-  // ÚNICA FUENTE DE INVENTARIO: API DE GRUPO PAZ. SIN FALLBACK LOCAL.
+  // ============================================================================
+  // CARGADOR UNIFICADO: EXCEL LOCAL vs API SERVER
+  // ============================================================================
   useEffect(() => {
-    if (!isAuthenticated || !proyecto) { setBaseDeDatosLotes([]); setCargandoBD(false); return; }
-    let vigente = true;
+    if (!isAuthenticated || !proyecto) return;
     const cargarDatos = async () => {
       setCargandoBD(true);
-      setBaseDeDatosLotes([]);
+      const getSafeVal = (obj: Record<string, any>, propName: string) => {
+          const key = Object.keys(obj).find(k => k.trim().toLowerCase().includes(propName.toLowerCase()));
+          return key ? obj[key] : undefined;
+      };
       const extractNumber = (val: unknown) => {
           if (val === undefined || val === null || val === '') return 0;
           if (typeof val === 'number') return val;
@@ -246,8 +252,8 @@ export default function App() {
           return isNaN(n) ? 0 : n;
       };
       
-      try {
-          if (!vigente) return;
+      if (usarAPI) {
+        try {
           const resProj = await fetch('https://simulador.data-gc.net/api/proyectos');
           if (!resProj.ok) throw new Error("API Falló");
           const dataProj = await resProj.json();
@@ -308,7 +314,7 @@ export default function App() {
                   lote: String(loteFresco.lote).trim().toUpperCase(),
                   superficie: extractNumber(loteFresco.mt2 || loteFresco.superficie),
                   precio: extractNumber(rawPrecio),
-                  estado: String(loteFresco.estado ?? "").trim().toUpperCase(),
+                  estado: String(loteFresco.estado || "LIBRE").toUpperCase(),
                   categoria: loteFresco.categoria ? String(loteFresco.categoria).toUpperCase() : "ESTÁNDAR",
                   vendedor: "API VIVA",
                   api_cuota_inicial: extractNumber(loteFresco.cuota_inicial),
@@ -317,20 +323,52 @@ export default function App() {
                   api_initial_valor: extractNumber(loteFresco.initial_valor)
                 };
               });
-              if (!vigente) return;
-              setBaseDeDatosLotes(apiMapped.filter((l: LoteData) => l.estado === "LIBRE" && l.superficie > 0 && l.precio > 0 && Boolean(l.lote)));
-
+              setBaseDeDatosLotes(apiMapped);
+              setCargandoBD(false);
               return; 
             }
           }
           throw new Error("Proyecto no encontrado en API");
-      } catch (error) {
-        if (vigente) { setBaseDeDatosLotes([]); console.error('No se pudo consultar el inventario empresarial:', error); }
-      } finally { if (vigente) setCargandoBD(false); }
+        } catch (error) { setUsarAPI(false); }
+      } else {
+        try {
+          let rawData;
+          try {
+            const response = await fetch('/lotes.json');
+            if (!response.ok) throw new Error('Fallo local');
+            rawData = await response.json();
+          } catch (e) {
+            const timestamp = new Date().getTime();
+            const githubRawUrl = `https://raw.githubusercontent.com/huguitoadm-OHSL/cotizador-celina-ohsl/main/public/lotes.json?t=${timestamp}`;
+            const fallbackResponse = await fetch(githubRawUrl);
+            if (!fallbackResponse.ok) throw new Error('Fallo github');
+            rawData = await fallbackResponse.json();
+          }
+          if (!Array.isArray(rawData)) rawData = [];
+          const normalizedData = rawData.map(item => ({
+              proyecto: String(getSafeVal(item, 'proyecto') || "").trim().toUpperCase(),
+              uv: String(getSafeVal(item, 'uv') || "").trim().toUpperCase() || "SN", 
+              mzn: String(getSafeVal(item, 'mzn') || "").trim().toUpperCase(),
+              lote: String(getSafeVal(item, 'lote') || "").trim().toUpperCase(),
+              superficie: extractNumber(getSafeVal(item, 'superficie')),
+              precio: extractNumber(getSafeVal(item, 'precio')),
+              estado: String(getSafeVal(item, 'estado') || "LIBRE").trim().toUpperCase(),
+              categoria: String(getSafeVal(item, 'categoria') || "ESTÁNDAR").trim().toUpperCase(),
+              vendedor: String(getSafeVal(item, 'vendedor') || "NO ASIGNADO").trim().toUpperCase(),
+              api_cuota_inicial: extractNumber(getSafeVal(item, 'cuota_inicial')),
+              api_initial_tipo: String(getSafeVal(item, 'initial_tipo') || ""),
+              api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
+              api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
+          }));
+          const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
+          
+          setBaseDeDatosLotes(lotesPermitidos);
+          setCargandoBD(false);
+        } catch (error) { setCargandoBD(false); setUsarBD(false); }
+      }
     };
-    void cargarDatos();
-    return () => { vigente = false; };
-  }, [proyecto, isAuthenticated]);
+    cargarDatos();
+  }, [proyecto, isAuthenticated, usarAPI]); 
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -393,15 +431,15 @@ export default function App() {
   }, [baseDeDatosLotes, proyecto]);
   
   const tieneBD = lotesDelProyecto.length > 0;
-  const modoBD = true; // No se permite ingresar un lote sin confirmación de API.
+  const modoBD = usarBD && tieneBD;
   
-  const lotesParaDropdown = lotesDelProyecto.filter(l => l.estado === "LIBRE");
+  const lotesParaDropdown = lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado));
   const sortAlphaNum = (a: string, b: string) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   const uvsDisponibles = [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum);
   const mznsDisponibles = [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum);
   const lotesDisponibles = lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum);
 
-  useEffect(() => { if (!cargandoBD && uv && !uvsDisponibles.includes(uv)) { setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setResultado(null); } }, [cargandoBD, uvsDisponibles, uv]);
+  useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
   useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
   useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
 
@@ -446,10 +484,6 @@ export default function App() {
   // MOTOR DE CÁLCULO REFACTORIZADO 
   // ============================================================================
   const calcular = () => {
-    const confirmado = lotesParaDropdown.find(l => l.uv === uv && l.mzn === mzn && l.lote === lote);
-    if (!confirmado || confirmado.superficie !== Number(superficie) || confirmado.precio !== Number(precio)) {
-      setResultado(null); showNotification('Solo puedes cotizar lotes LIBRES confirmados por API.'); return;
-    }
     const sup = Number(superficie) || 0; 
     const prec = Number(precio) || 0; 
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
@@ -769,7 +803,20 @@ export default function App() {
                 <h2 className="text-lg sm:text-xl font-bold tracking-wide text-white drop-shadow-md">Prepara tu propuesta</h2>
               </div>
               
-              <div className="relative z-10 flex items-center gap-2 bg-cyan-950/40 text-cyan-300 px-3 py-2 rounded-full border border-cyan-700/50 text-[10px] font-bold uppercase"><Server className="w-3 h-3" /> API SERVER</div>
+              <div className="relative z-10 flex items-center gap-2 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
+                <button 
+                    onClick={() => setUsarAPI(false)} 
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${!usarAPI ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <Database className="w-3 h-3" /> Excel Local
+                </button>
+                <button 
+                    onClick={() => setUsarAPI(true)} 
+                    className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-cyan-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
+                >
+                    <Server className="w-3 h-3" /> API Server
+                </button>
+              </div>
             </div>
             
             <div className="p-5 sm:p-8 flex-1 bg-[#090e17]/60 backdrop-blur-md">
@@ -818,7 +865,15 @@ export default function App() {
                       <span className="text-[9px] sm:text-[10px] font-bold text-cyan-400 flex items-center gap-1.5 border border-cyan-500/30 px-3 py-1.5 rounded-full bg-cyan-500/10 shrink-0">
                         <Loader2 className="w-3 h-3 animate-spin"/> Cargando BD...
                       </span>
-                    ) : tieneBD ? (<span className="text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full border border-cyan-500/40 bg-cyan-900/50 text-cyan-300">BÚSQUEDA INTELIGENTE</span>) : (<span className="text-[9px] font-bold text-amber-400">SIN LOTES LIBRES O SIN CONEXIÓN API</span>)}
+                    ) : tieneBD ? (
+                      <button 
+                        type="button" 
+                        onClick={() => setUsarBD(!usarBD)} 
+                        className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? (tipoCotizacion === 'contado' ? 'bg-sky-900/50 text-sky-300 border border-sky-500/40 hover:bg-sky-800/50 hover:shadow-[0_0_10px_rgba(56,189,248,0.2)]' : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-800/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]') : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50'}`}
+                      >
+                        {usarBD ? <Database className={`w-3 h-3 ${tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'}`}/> : <Edit2 className="w-3 h-3"/>} BÚSQUEDA INTELIGENTE
+                      </button>
+                    ) : null}
                   </div>
                   <div className="relative">
                     <select 
@@ -827,7 +882,7 @@ export default function App() {
                       className={`w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none ${tipoCotizacion === 'contado' ? 'focus:border-sky-500 focus:shadow-[0_0_15px_rgba(14,165,233,0.15)]' : 'focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)]'}`}
                     >
                       {proyectosPorRegional[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
-
+                      <option value="OTRO">OTRO...</option>
                     </select>
                     <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`}>
                       <ChevronDown className="w-5 h-5" />
@@ -851,6 +906,11 @@ export default function App() {
                         <MapPin className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-400 drop-shadow-[0_0_5px_rgba(56,189,248,0.5)]' : 'text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]'}`} />
                         <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ubicación del Lote</span>
                       </div>
+                      {!usarBD && tieneBD && (
+                        <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
+                          <Edit2 className="w-3 h-3"/> Ingreso Manual
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <div className="space-y-1.5 text-center flex flex-col">
@@ -943,7 +1003,7 @@ export default function App() {
                     <input 
                       type="text" 
                       value={categoria} 
-                      readOnly 
+                      onChange={e => setCategoria(e.target.value)} 
                       placeholder="Ej. LOTE S/CALLE ESQ. A" 
                       className={`w-full rounded-xl p-3.5 text-xs sm:text-sm font-semibold placeholder-slate-600 outline-none transition-colors ${modoBD ? (tipoCotizacion==='contado' ? 'bg-sky-950/30 border border-sky-500/40 text-sky-100 shadow-[inset_0_0_15px_rgba(56,189,248,0.1)] focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'bg-cyan-950/30 border border-cyan-500/40 text-cyan-100 shadow-[inset_0_0_15px_rgba(34,211,238,0.1)] focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]') : 'bg-[#0b111b] border border-slate-700 text-white'}`} 
                     />
@@ -961,7 +1021,7 @@ export default function App() {
                       type="number" 
                       required 
                       value={superficie} 
-                      readOnly 
+                      onChange={e => setSuperficie(e.target.value)} 
                       placeholder="Ej. 240" 
                       className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0b111b] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-sky-400 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]' : 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]'}`} 
                     />
@@ -977,7 +1037,7 @@ export default function App() {
                       type="number" 
                       required 
                       value={precio} 
-                      readOnly 
+                      onChange={e => setPrecio(e.target.value)} 
                       placeholder="Ej. 145" 
                       className={`w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 transition-all outline-none bg-[#0b111b] border border-slate-700 shadow-inner ${tipoCotizacion === 'contado' ? 'text-sky-400 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(56,189,248,0.15)]' : 'text-cyan-400 focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.15)]'}`} 
                     />
