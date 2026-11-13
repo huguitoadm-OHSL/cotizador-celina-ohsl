@@ -4,11 +4,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   Calculator, Send, Map as MapIcon, DollarSign, Percent, Calendar, 
-  CheckCircle2, Building2, ChevronRight, FileText, MapPin, Gift, TrendingUp, ShieldCheck, ChevronDown, 
-  Database, Edit2, LayoutTemplate, Loader2, AlertCircle, Scale, Activity, Wallet, CreditCard, Lock, Unlock,
+  CheckCircle2, Building2, ChevronRight, FileText, MapPin, Gift, TrendingUp, 
+  ShieldCheck, ChevronDown, Database, Edit2, LayoutTemplate, Loader2, 
+  AlertCircle, Scale, Activity, Wallet, CreditCard, Lock, Unlock,
   Maximize, Minimize, Eye, Crosshair, Server, Timer, Sparkles, User
 } from "lucide-react";
-import Map, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl/maplibre';
+import MapGL, { Source, Layer, GeolocateControl, NavigationControl } from 'react-map-gl/maplibre';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -69,7 +70,14 @@ const ALIAS_PROYECTOS: Record<string, string[]> = {
 // ============================================================================
 // MOTOR DE REGLAS COMERCIALES: CAMPAÑA NOVIEMBRE 2026
 // ============================================================================
-const fechaBolivia = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const fechaBolivia = () =>
+  new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/La_Paz',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+
 const fechaLegible = (iso: string) => iso.split('-').reverse().join('/');
 
 const PROMOCION = {
@@ -81,7 +89,6 @@ const PROMOCION = {
   } as Record<string, { pct: number; label: string }>
 };
 
-// Índice de columna según el Valor Contado del Lote ($us)
 const obtenerIndiceTramoValor = (valorTotal: number): number => {
   if (!Number.isFinite(valorTotal) || valorTotal <= 0) return -1;
   if (valorTotal <= 7500) return 0;
@@ -92,14 +99,13 @@ const obtenerIndiceTramoValor = (valorTotal: number): number => {
   return 5;
 };
 
-// 2. VENTA A PLAZOS: Descuento base por valor contado del lote ($us)
 const DESCUENTOS_PLAZO_POR_TRAMO = [250, 500, 800, 1200, 1500, 1800];
+
 const descuentoCreditoPorValor = (valorTotal: number): number => {
   const idx = obtenerIndiceTramoValor(valorTotal);
   return idx >= 0 ? DESCUENTOS_PLAZO_POR_TRAMO[idx] : 0;
 };
 
-// 3. ANEXO III: Descuento adicional por incremento de cuota inicial (en puntos porcentuales)
 export type EscalaIncremento = 'ninguno' | '3_599' | '6_799' | '8_mas';
 
 const MATRIZ_ANEXO_III: Record<Exclude<EscalaIncremento, 'ninguno'>, number[]> = {
@@ -141,11 +147,72 @@ const archivoPlano = (proyecto: string) => {
     'SANTA ROSA - FASE 2': 'santa_rosa_-_fase_2.geojson',
     'SANTA ROSA - FASE 3': 'santa_rosa_-_fase_3.geojson'
   };
-  return '/' + encodeURIComponent(especiales[proyecto] || `${proyecto.toLowerCase().replace(/\s+/g, '_')}.geojson`);
+  const nombreArchivo = especiales[proyecto] || `${proyecto.toLowerCase().replace(/\s+/g, '_')}.geojson`;
+  return '/' + encodeURIComponent(nombreArchivo);
 };
 
-// Caché en memoria para acelerar el cambio de proyectos en campo
-const cacheLotesAPI = new Map<string, LoteData[]>();
+// ============================================================================
+// INTERFACES DE DATOS ESTRUCTURADOS Y CACHÉ EN MEMORIA
+// ============================================================================
+interface LoteData {
+  proyecto: string;
+  uv: string;
+  mzn: string;
+  lote: string;
+  superficie: number;
+  precio: number;
+  estado: string;
+  categoria: string;
+  vendedor: string;
+  api_cuota_inicial: number;
+  api_initial_tipo: string;
+  api_initial_pct: number;
+  api_initial_valor: number;
+}
+
+interface ResultadoData {
+  nombreCliente: string;
+  fechaTC: string;
+  primerMesPago: string;
+  tipoCotizacion: string;
+  regional: string;
+  proyecto: string;
+  uv: string;
+  mzn: string;
+  lote: string;
+  superficie: number;
+  categoria: string;
+  valorOriginalRaw: number;
+  valorOriginal: string;
+  valorFinal: string;
+  valorFinalBs: string;
+  ahorroTotalRaw: number;
+  ahorroTotal: string;
+  inicialRaw: number;
+  inicial: string;
+  inicialBs: string;
+  inicialPct: string;
+  saldoRaw: number;
+  mensualRaw: number;
+  mensual: string;
+  mensualBs: string;
+  plazo: number;
+  planPagosDetallado: { nro: number; mesLabel: string; cuotaUsd: number }[];
+  planPlazosAlternativos: { año: number; cuotaUsd: string; cuotaBs: string; isCurrent: boolean }[];
+  descPctAplicado: number;
+  tcOriginal: number;
+  tcEfectivo: number;
+  totalBsA: string;
+  totalBsB: string;
+  plazoLiquidacionVisual: string;
+  descuentoFijoAplicado: number;
+  descuentoAnexoIIIAplicado: number;
+  escalaAnexoIIILabel: string;
+  descuentoM2Equivalente: number;
+  timestampId: number;
+}
+
+const cacheLotesAPI: Record<string, LoteData[]> = {};
 let cacheLotesLocal: LoteData[] | null = null;
 
 // ============================================================================
@@ -167,13 +234,22 @@ const MapaEspacial = React.memo(({ proyectoActivo }: { proyectoActivo: string })
 
   const verProyecto = useCallback(() => {
     if (boundsRef.current && mapRef.current) {
-      mapRef.current.fitBounds(boundsRef.current, { padding: 45, maxZoom: 17, pitch: 0, duration: 900 });
+      mapRef.current.fitBounds(boundsRef.current, {
+        padding: 45,
+        maxZoom: 17,
+        pitch: 0,
+        duration: 900
+      });
     }
   }, []);
 
   useEffect(() => {
     const abort = new AbortController();
-    setCargando(true); setPlano(null); setErrorPlano(''); boundsRef.current = null;
+    setCargando(true);
+    setPlano(null);
+    setErrorPlano('');
+    boundsRef.current = null;
+
     (async () => {
       try {
         const res = await fetch(archivoPlano(proyectoActivo), { signal: abort.signal });
@@ -190,10 +266,18 @@ const MapaEspacial = React.memo(({ proyectoActivo }: { proyectoActivo: string })
             if (!Number.isFinite(lng) || !Number.isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90) {
               throw new Error('El plano debe usar coordenadas WGS84 en longitud y latitud.');
             }
-            west = Math.min(west, lng); east = Math.max(east, lng); south = Math.min(south, lat); north = Math.max(north, lat);
-          } else coords.forEach(visit);
+            west = Math.min(west, lng);
+            east = Math.max(east, lng);
+            south = Math.min(south, lat);
+            north = Math.max(north, lat);
+          } else {
+            coords.forEach(visit);
+          }
         };
-        const geometry = (g: any) => { if (g?.type === 'GeometryCollection') g.geometries.forEach(geometry); else visit(g?.coordinates); };
+        const geometry = (g: any) => {
+          if (g?.type === 'GeometryCollection') g.geometries.forEach(geometry);
+          else visit(g?.coordinates);
+        };
         data.features.forEach((f: any) => geometry(f.geometry));
         if (!Number.isFinite(west)) throw new Error('El plano no contiene geometrías visibles.');
         if (abort.signal.aborted) return;
@@ -205,64 +289,214 @@ const MapaEspacial = React.memo(({ proyectoActivo }: { proyectoActivo: string })
         if (!abort.signal.aborted) setCargando(false);
       }
     })();
+
     return () => abort.abort();
   }, [proyectoActivo]);
 
-  useEffect(() => { if (ready && plano) verProyecto(); }, [ready, plano, verProyecto]);
+  useEffect(() => {
+    if (ready && plano) verProyecto();
+  }, [ready, plano, verProyecto]);
 
   useEffect(() => {
     const timer = setTimeout(() => mapRef.current?.resize(), 100);
-    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFullscreen(false);
+    };
     window.addEventListener('keydown', escape);
     const previous = document.body.style.overflow;
     if (fullscreen) document.body.style.overflow = 'hidden';
-    return () => { clearTimeout(timer); window.removeEventListener('keydown', escape); document.body.style.overflow = previous; };
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', escape);
+      document.body.style.overflow = previous;
+    };
   }, [fullscreen]);
 
   const localizar = () => {
-    if (!window.isSecureContext) { setGps('La ubicación requiere HTTPS o localhost.'); return; }
-    if (!navigator.geolocation) { setGps('Este dispositivo no permite geolocalización.'); return; }
-    if (!ready) { setGps('Espera a que cargue el mapa.'); return; }
+    if (!window.isSecureContext) {
+      setGps('La ubicación requiere HTTPS o localhost.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      setGps('Este dispositivo no permite geolocalización.');
+      return;
+    }
+    if (!ready) {
+      setGps('Espera a que cargue el mapa.');
+      return;
+    }
     setGps(siguiendo ? 'GPS pausado' : 'Buscando tu ubicación…');
     geoRef.current?.trigger();
   };
 
-  const textProperty: any = ['coalesce', ['get', 'name'], ['get', 'Name'], ['get', 'Text'], ['get', 'text'], ['get', 'Lote'], ['get', 'lote'], ''];
+  const textProperty: any = [
+    'coalesce',
+    ['get', 'name'],
+    ['get', 'Name'],
+    ['get', 'Text'],
+    ['get', 'text'],
+    ['get', 'Lote'],
+    ['get', 'lote'],
+    ''
+  ];
+
+  const sectionClasses = fullscreen
+    ? 'fixed inset-0 z-[99999] bg-slate-950 flex flex-col h-[100dvh]'
+    : 'relative rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950 shadow-2xl flex flex-col h-[500px] sm:h-[580px]';
 
   return (
-    <section className={fullscreen ? 'fixed inset-0 z-[99999] bg-slate-950 flex flex-col h-[100dvh]' : 'relative rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950 shadow-2xl flex flex-col h-[500px] sm:h-[580px]'} aria-label="Visor del proyecto">
+    <section className={sectionClasses} aria-label="Visor del proyecto">
       <div className="p-4 bg-slate-900/95 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
         <div>
-          <h3 className="text-white font-bold flex items-center gap-2"><MapPin className="w-5 h-5 text-cyan-400"/>{proyectoActivo}</h3>
+          <h3 className="text-white font-bold flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-cyan-400" />
+            {proyectoActivo}
+          </h3>
           <p className="text-slate-400 text-xs mt-1">Plano de referencia geoespacial · Vista satelital</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button type="button" onClick={localizar} className="px-3 py-2.5 rounded-xl bg-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-2 hover:bg-cyan-300 transition-colors"><Crosshair className="w-4 h-4"/>{siguiendo ? 'Pausar GPS' : 'Mi ubicación'}</button>
-          <button type="button" disabled={!plano} onClick={verProyecto} className="px-3 py-2.5 rounded-xl border border-slate-600 text-white text-xs disabled:opacity-40 hover:bg-slate-800 transition-colors">Centrar plano</button>
-          <button type="button" onClick={() => setFullscreen(!fullscreen)} aria-label={fullscreen ? 'Cerrar pantalla completa' : 'Pantalla completa'} className="p-2.5 rounded-xl border border-slate-600 text-white hover:bg-slate-800 transition-colors">{fullscreen ? <Minimize className="w-4 h-4"/> : <Maximize className="w-4 h-4"/>}</button>
+          <button
+            type="button"
+            onClick={localizar}
+            className="px-3 py-2.5 rounded-xl bg-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-2 hover:bg-cyan-300 transition-colors"
+          >
+            <Crosshair className="w-4 h-4" />
+            {siguiendo ? 'Pausar GPS' : 'Mi ubicación'}
+          </button>
+          <button
+            type="button"
+            disabled={!plano}
+            onClick={verProyecto}
+            className="px-3 py-2.5 rounded-xl border border-slate-600 text-white text-xs disabled:opacity-40 hover:bg-slate-800 transition-colors"
+          >
+            Centrar plano
+          </button>
+          <button
+            type="button"
+            onClick={() => setFullscreen(!fullscreen)}
+            aria-label={fullscreen ? 'Cerrar pantalla completa' : 'Pantalla completa'}
+            className="p-2.5 rounded-xl border border-slate-600 text-white hover:bg-slate-800 transition-colors"
+          >
+            {fullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
         </div>
       </div>
+
       <div className="flex-1 relative min-h-0">
-         { setReady(true); setErrorMapa(''); }} onError={() => setErrorMapa('No se pudo cargar parte del mapa. Revisa tu conexión.')} style={{ width: '100%', height: '100%' }}>
-          <GeolocateControl ref={geoRef} position="bottom-right" trackUserLocation showUserLocation showAccuracyCircle positionOptions={{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }} fitBoundsOptions={{ maxZoom: 19 }}
-            onGeolocate={(e) => { setPrecision(e.coords.accuracy); setGps('Ubicación recibida'); }}
-            onTrackUserLocationStart={() => { setSiguiendo(true); setGps('Seguimiento activado'); }}
-            onTrackUserLocationEnd={() => { setSiguiendo(false); setGps('Seguimiento pausado · pulsa Mi ubicación para volver'); }}
-            onError={(e) => { setSiguiendo(false); setPrecision(null); setGps(e.code === 1 ? 'Permite el acceso a tu ubicación en el navegador.' : e.code === 3 ? 'Se agotó la espera del GPS. Intenta de nuevo al aire libre.' : 'No se pudo obtener tu ubicación. Activa el GPS e intenta nuevamente.'); }} />
+        <MapGL
+          ref={mapRef}
+          mapLib={maplibregl}
+          initialViewState={{ longitude: -63.2435, latitude: -17.3635, zoom: 12, pitch: 0 }}
+          mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+          maxZoom={21}
+          onLoad={() => {
+            setReady(true);
+            setErrorMapa('');
+          }}
+          onError={() => {
+            setErrorMapa('No se pudo cargar parte del mapa. Revisa tu conexión.');
+          }}
+          style={{ width: '100%', height: '100%' }}
+        >
+          <GeolocateControl
+            ref={geoRef}
+            position="bottom-right"
+            trackUserLocation
+            showUserLocation
+            showAccuracyCircle
+            positionOptions={{ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }}
+            fitBoundsOptions={{ maxZoom: 19 }}
+            onGeolocate={(e: any) => {
+              setPrecision(e.coords.accuracy);
+              setGps('Ubicación recibida');
+            }}
+            onTrackUserLocationStart={() => {
+              setSiguiendo(true);
+              setGps('Seguimiento activado');
+            }}
+            onTrackUserLocationEnd={() => {
+              setSiguiendo(false);
+              setGps('Seguimiento pausado · pulsa Mi ubicación para volver');
+            }}
+            onError={(e: any) => {
+              setSiguiendo(false);
+              setPrecision(null);
+              if (e.code === 1) {
+                setGps('Permite el acceso a tu ubicación en el navegador.');
+              } else if (e.code === 3) {
+                setGps('Se agotó la espera del GPS. Intenta de nuevo al aire libre.');
+              } else {
+                setGps('No se pudo obtener tu ubicación. Activa el GPS e intenta nuevamente.');
+              }
+            }}
+          />
           <NavigationControl position="bottom-right" visualizePitch />
-          <Source id="satellite-source" type="raster" tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']} tileSize={256} maxzoom={20} attribution="Imágenes © Google">
+          <Source
+            id="satellite-source"
+            type="raster"
+            tiles={['https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}']}
+            tileSize={256}
+            maxzoom={20}
+            attribution="Imágenes © Google"
+          >
             <Layer id="satellite-layer" type="raster" paint={{ 'raster-opacity': 1 }} />
           </Source>
-          {plano && <Source id="plano-referencia" type="geojson" data={plano}>
-            <Layer id="plano-sombra" type="line" paint={{ 'line-color': '#082f49', 'line-width': 4, 'line-opacity': 0.7 }} />
-            <Layer id="plano-lineas" type="line" paint={{ 'line-color': '#67e8f9', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 18, 1.8], 'line-opacity': 0.95 }} />
-            <Layer id="plano-textos" type="symbol" minzoom={17} filter={['==', ['geometry-type'], 'Point']} layout={{ 'text-field': textProperty, 'text-size': 11, 'text-font': ['Open Sans Regular'], 'text-allow-overlap': false }} paint={{ 'text-color': '#ffffff', 'text-halo-color': '#0f172a', 'text-halo-width': 1.5 }} />
-          </Source>}
-        </Map>
-        {(cargando || errorPlano || errorMapa) && <div role="status" className="absolute top-3 left-3 right-14 bg-slate-950/90 border border-slate-600 rounded-xl p-3 text-xs text-slate-100 pointer-events-none">{errorPlano || errorMapa || 'Cargando plano…'}</div>}
+          {plano && (
+            <Source id="plano-referencia" type="geojson" data={plano}>
+              <Layer
+                id="plano-sombra"
+                type="line"
+                paint={{ 'line-color': '#082f49', 'line-width': 4, 'line-opacity': 0.7 }}
+              />
+              <Layer
+                id="plano-lineas"
+                type="line"
+                paint={{
+                  'line-color': '#67e8f9',
+                  'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 18, 1.8],
+                  'line-opacity': 0.95
+                }}
+              />
+              <Layer
+                id="plano-textos"
+                type="symbol"
+                minzoom={17}
+                filter={['==', ['geometry-type'], 'Point']}
+                layout={{
+                  'text-field': textProperty,
+                  'text-size': 11,
+                  'text-font': ['Open Sans Regular'],
+                  'text-allow-overlap': false
+                }}
+                paint={{
+                  'text-color': '#ffffff',
+                  'text-halo-color': '#0f172a',
+                  'text-halo-width': 1.5
+                }}
+              />
+            </Source>
+          )}
+        </MapGL>
+        {(cargando || errorPlano || errorMapa) && (
+          <div
+            role="status"
+            className="absolute top-3 left-3 right-14 bg-slate-950/90 border border-slate-600 rounded-xl p-3 text-xs text-slate-100 pointer-events-none"
+          >
+            {errorPlano || errorMapa || 'Cargando plano…'}
+          </div>
+        )}
       </div>
-      <div role="status" aria-live="polite" className="px-4 py-3 text-xs text-slate-300 bg-slate-900 flex flex-wrap justify-between gap-2">
-        <span>{siguiendo ? '● ' : ''}{gps}{precision !== null ? ` · Precisión aproximada ±${Math.ceil(precision)} m` : ''}</span>
+
+      <div
+        role="status"
+        aria-live="polite"
+        className="px-4 py-3 text-xs text-slate-300 bg-slate-900 flex flex-wrap justify-between gap-2"
+      >
+        <span>
+          {siguiendo ? '● ' : ''}
+          {gps}
+          {precision !== null ? ` · Precisión aproximada ±${Math.ceil(precision)} m` : ''}
+        </span>
         <span className="text-slate-500">Ubicación orientativa · Consulta el lote en el formulario</span>
       </div>
     </section>
@@ -270,27 +504,8 @@ const MapaEspacial = React.memo(({ proyectoActivo }: { proyectoActivo: string })
 });
 
 // ============================================================================
-// INTERFACES DE DATOS ESTRUCTURADOS
+// APLICACIÓN PRINCIPAL CELINA QUANTUM
 // ============================================================================
-interface LoteData {
-  proyecto: string; uv: string; mzn: string; lote: string; superficie: number; precio: number;
-  estado: string; categoria: string; vendedor: string;
-  api_cuota_inicial: number; api_initial_tipo: string; api_initial_pct: number; api_initial_valor: number;
-}
-
-interface ResultadoData {
-  nombreCliente: string; fechaTC: string; primerMesPago: string; tipoCotizacion: string; regional: string; proyecto: string;
-  uv: string; mzn: string; lote: string; superficie: number; categoria: string;
-  valorOriginalRaw: number; valorOriginal: string; valorFinal: string; valorFinalBs: string;
-  ahorroTotalRaw: number; ahorroTotal: string; inicialRaw: number; inicial: string; inicialBs: string;
-  inicialPct: string; saldoRaw: number; mensualRaw: number; mensual: string; mensualBs: string; plazo: number;
-  planPagosDetallado: { nro: number; mesLabel: string; cuotaUsd: number }[];
-  planPlazosAlternativos: { año: number; cuotaUsd: string; cuotaBs: string; isCurrent: boolean }[];
-  descPctAplicado: number; tcOriginal: number; tcEfectivo: number; totalBsA: string; totalBsB: string;
-  plazoLiquidacionVisual: string; descuentoFijoAplicado: number; descuentoAnexoIIIAplicado: number;
-  escalaAnexoIIILabel: string; descuentoM2Equivalente: number; timestampId: number;
-}
-
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false); 
@@ -300,9 +515,18 @@ export default function App() {
   
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === "SALMO23") { setIsAuthenticated(true); setIsAdmin(false); setLoginError(false); } 
-    else if (passwordInput === "OHSARAVIA") { setIsAuthenticated(true); setIsAdmin(true); setLoginError(false); } 
-    else { setLoginError(true); setTimeout(() => setLoginError(false), 2000); }
+    if (passwordInput === "SALMO23") {
+      setIsAuthenticated(true);
+      setIsAdmin(false);
+      setLoginError(false);
+    } else if (passwordInput === "OHSARAVIA") {
+      setIsAuthenticated(true);
+      setIsAdmin(true);
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+      setTimeout(() => setLoginError(false), 2000);
+    }
   };
 
   const [nombreCliente, setNombreCliente] = useState("");
@@ -324,12 +548,11 @@ export default function App() {
   const [superficie, setSuperficie] = useState("");
   const [precio, setPrecio] = useState(""); 
   const [categoria, setCategoria] = useState("");
-  const [pctInicialParametrizado, setPctInicialParametrizado] = useState<number>(7); // Referencia parametrizada del lote
+  const [pctInicialParametrizado, setPctInicialParametrizado] = useState<number>(7);
   
-  // Controles de Campaña Noviembre 2026
   const [aplicarDescuentoCredito, setAplicarDescuentoCredito] = useState(true); 
   const [modoAnexoIII, setModoAnexoIII] = useState<'auto' | EscalaIncremento>('auto');
-  const [plazoLiquidacion, setPlazoLiquidacion] = useState("1"); // '1' (Contado 18%), '5' (5 días 15%), '30' (30 días 10%)
+  const [plazoLiquidacion, setPlazoLiquidacion] = useState("1");
 
   const [modoInicial, setModoInicial] = useState<"porcentaje" | "monto">("porcentaje"); 
   const [inicialPorcentaje, setInicialPorcentaje] = useState(""); 
@@ -345,7 +568,10 @@ export default function App() {
 
   const formatMoney = useCallback((amount: number) => {
     if (isNaN(amount) || amount === undefined || amount === null) return "0.00";
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
   }, []);
 
   const showNotification = useCallback((message: string) => {
@@ -353,11 +579,11 @@ export default function App() {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // Cálculos reactivos en tiempo real para previsualización de descuentos a crédito
   const valorLoteActual = (Number(superficie) || 0) * (Number(precio) || 0);
-  const descuentoBaseCreditoActual = aplicarDescuentoCredito ? descuentoCreditoPorValor(valorLoteActual) : 0;
+  const descuentoBaseCreditoActual = aplicarDescuentoCredito
+    ? descuentoCreditoPorValor(valorLoteActual)
+    : 0;
 
-  // Cálculo de porcentaje de inicial actual y puntos porcentuales de incremento (Anexo III)
   const pctInicialEfectivoPreview = useMemo(() => {
     if (valorLoteActual <= 0) return 0;
     const basePreliminar = Math.max(valorLoteActual - descuentoBaseCreditoActual, 1);
@@ -376,15 +602,21 @@ export default function App() {
     : 0;
 
   const descuentoCreditoTotalActual = descuentoBaseCreditoActual + descuentoAnexoIIIActual;
-  const descuentoM2InformativoActual = (Number(superficie) || 0) > 0 ? descuentoCreditoTotalActual / Number(superficie) : 0;
+  const descuentoM2InformativoActual = (Number(superficie) || 0) > 0
+    ? descuentoCreditoTotalActual / Number(superficie)
+    : 0;
 
   useEffect(() => {
     setResultado(null);
     setCopiado(false);
-  }, [tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria, años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescuentoCredito, modoAnexoIII, plazoLiquidacion, proyectoPersonalizado, nombreCliente]);
+  }, [
+    tcFlexible, fechaTC, primerMesPago, uv, mzn, lote, superficie, precio, categoria,
+    años, modoInicial, inicialMonto, inicialPorcentaje, aplicarDescuentoCredito,
+    modoAnexoIII, plazoLiquidacion, proyectoPersonalizado, nombreCliente
+  ]);
 
   // ============================================================================
-  // CARGADOR UNIFICADO CON CACHÉ EN MEMORIA: EXCEL LOCAL vs API SERVER
+  // CARGADOR UNIFICADO CON CACHÉ EN MEMORIA
   // ============================================================================
   useEffect(() => {
     if (!isAuthenticated || !proyecto) return;
@@ -412,9 +644,9 @@ export default function App() {
       setCargandoBD(true);
 
       if (usarAPI) {
-        if (cacheLotesAPI.has(proyecto)) {
+        if (cacheLotesAPI[proyecto]) {
           if (isMounted) {
-            setBaseDeDatosLotes(cacheLotesAPI.get(proyecto)!);
+            setBaseDeDatosLotes(cacheLotesAPI[proyecto]);
             setCargandoBD(false);
           }
           return;
@@ -432,12 +664,15 @@ export default function App() {
           });
           
           if (projAPI && projAPI.project_id) {
-            const resLotes = await fetch(`https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`);
+            const urlLotes = `https://simulador.data-gc.net/api/lotes?project_id=${projAPI.project_id}`;
+            const resLotes = await fetch(urlLotes);
             if (!resLotes.ok) throw new Error("API Lotes Falló");
             const dataLotes = await resLotes.json();
             if (dataLotes.lotes) {
               const apiMapped: LoteData[] = dataLotes.lotes.map((loteFresco: Record<string, any>) => {
-                const keyPrecio = Object.keys(loteFresco).find(k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric'));
+                const keyPrecio = Object.keys(loteFresco).find(
+                  k => k.toLowerCase().includes('prec') || k.toLowerCase().includes('pric')
+                );
                 const rawPrecio = keyPrecio ? loteFresco[keyPrecio] : 0;
                 return {
                   proyecto: proyecto, 
@@ -455,7 +690,7 @@ export default function App() {
                   api_initial_valor: extractNumber(loteFresco.initial_valor)
                 };
               });
-              cacheLotesAPI.set(proyecto, apiMapped);
+              cacheLotesAPI[proyecto] = apiMapped;
               if (isMounted) {
                 setBaseDeDatosLotes(apiMapped);
                 setCargandoBD(false);
@@ -505,7 +740,9 @@ export default function App() {
             api_initial_pct: extractNumber(getSafeVal(item, 'initial_pct')),
             api_initial_valor: extractNumber(getSafeVal(item, 'initial_valor'))
           }));
-          const lotesPermitidos = normalizedData.filter(l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto));
+          const lotesPermitidos = normalizedData.filter(
+            l => !['CELINA 1', 'CELINA 2', 'PARAÍSO DEL NORTE'].includes(l.proyecto)
+          );
           cacheLotesLocal = lotesPermitidos;
           if (isMounted) {
             setBaseDeDatosLotes(lotesPermitidos);
@@ -537,43 +774,92 @@ export default function App() {
     }
   }, [regional, proyecto]);
 
-  const handleUvChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => { setUv(e.target.value); setMzn(""); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleMznChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => { setMzn(e.target.value); setLote(""); setSuperficie(""); setPrecio(""); setCategoria(""); };
-  const handleLoteChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => { setLote(e.target.value); };
+  const handleUvChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+    setUv(e.target.value);
+    setMzn("");
+    setLote("");
+    setSuperficie("");
+    setPrecio("");
+    setCategoria("");
+  };
+
+  const handleMznChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+    setMzn(e.target.value);
+    setLote("");
+    setSuperficie("");
+    setPrecio("");
+    setCategoria("");
+  };
+
+  const handleLoteChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+    setLote(e.target.value);
+  };
 
   useEffect(() => {
-    setUv(""); setMzn(""); setLote(""); setSuperficie(""); setPrecio("");
-    setInicialPorcentaje(""); setInicialMonto(""); setAños(""); setCategoria("");
-    setResultado(null); setProyectoPersonalizado(""); 
+    setUv("");
+    setMzn("");
+    setLote("");
+    setSuperficie("");
+    setPrecio("");
+    setInicialPorcentaje("");
+    setInicialMonto("");
+    setAños("");
+    setCategoria("");
+    setResultado(null);
+    setProyectoPersonalizado("");
     setExpandedPlan(false);
   }, [proyecto, tipoCotizacion]);
 
   const lotesDelProyecto = useMemo(() => {
     const aliases = [proyecto, `CELINA ${proyecto}`, ...(ALIAS_PROYECTOS[proyecto] || [])];
-    return baseDeDatosLotes?.filter(l => 
-      aliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || aliases.includes(l.proyecto)
+    return baseDeDatosLotes?.filter(
+      l => aliases.some(alias => l.proyecto === alias || l?.proyecto?.includes(alias)) || aliases.includes(l.proyecto)
     ) || [];
   }, [baseDeDatosLotes, proyecto]);
   
   const tieneBD = lotesDelProyecto.length > 0;
   const modoBD = usarBD && tieneBD;
   
-  const lotesParaDropdown = useMemo(() => 
-    lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado)),
-  [lotesDelProyecto, isAdmin]);
+  const lotesParaDropdown = useMemo(
+    () => lotesDelProyecto.filter(l => isAdmin || ["LIBRE", "DISPONIBLE", "BLOQUEADO", "RESERVADO", ""].includes(l.estado)),
+    [lotesDelProyecto, isAdmin]
+  );
 
-  const sortAlphaNum = (a: string, b: string) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-  const uvsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum), [lotesParaDropdown]);
-  const mznsDisponibles = useMemo(() => [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum), [lotesParaDropdown, uv]);
-  const lotesDisponibles = useMemo(() => lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum), [lotesParaDropdown, uv, mzn]);
+  const sortAlphaNum = (a: string, b: string) =>
+    String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 
-  useEffect(() => { if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv(""); }, [modoBD, uvsDisponibles, uv]);
-  useEffect(() => { if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn(""); }, [modoBD, mznsDisponibles, mzn]);
-  useEffect(() => { if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote(""); }, [modoBD, lotesDisponibles, lote]);
+  const uvsDisponibles = useMemo(
+    () => [...new Set(lotesParaDropdown.map(l => l.uv))].sort(sortAlphaNum),
+    [lotesParaDropdown]
+  );
+
+  const mznsDisponibles = useMemo(
+    () => [...new Set(lotesParaDropdown.filter(l => l.uv === uv).map(l => l.mzn))].sort(sortAlphaNum),
+    [lotesParaDropdown, uv]
+  );
+
+  const lotesDisponibles = useMemo(
+    () => lotesParaDropdown.filter(l => l.uv === uv && l.mzn === mzn).map(l => l.lote).sort(sortAlphaNum),
+    [lotesParaDropdown, uv, mzn]
+  );
+
+  useEffect(() => {
+    if (modoBD && uv && !uvsDisponibles.includes(uv)) setUv("");
+  }, [modoBD, uvsDisponibles, uv]);
+
+  useEffect(() => {
+    if (modoBD && mzn && !mznsDisponibles.includes(mzn)) setMzn("");
+  }, [modoBD, mznsDisponibles, mzn]);
+
+  useEffect(() => {
+    if (modoBD && lote && !lotesDisponibles.includes(lote)) setLote("");
+  }, [modoBD, lotesDisponibles, lote]);
 
   useEffect(() => {
     if (modoBD && uv && mzn && lote) {
-      const loteEncontrado = lotesDelProyecto.find(l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote));
+      const loteEncontrado = lotesDelProyecto.find(
+        l => String(l.uv) === String(uv) && String(l.mzn) === String(mzn) && String(l.lote) === String(lote)
+      );
       if (loteEncontrado) {
         setSuperficie(loteEncontrado.superficie.toString());
         setPrecio(loteEncontrado.precio.toString()); 
@@ -613,6 +899,7 @@ export default function App() {
     const sup = Number(superficie) || 0; 
     const prec = Number(precio) || 0; 
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
+
     if (!Number.isFinite(sup) || !Number.isFinite(prec) || sup <= 0 || prec <= 0) {
       setResultado(null);
       showNotification('⚠️ Ingresa superficie y precio mayores que cero.');
@@ -632,9 +919,16 @@ export default function App() {
     const valor_original = sup * prec;
     const nombreProyectoFinal = proyecto === "OTRO" ? (proyectoPersonalizado || "PROYECTO ESPECIAL") : proyecto;
     
-    let valor_final = 0, ahorro_total = 0, cuota_inicial = 0, pct_efectivo = 0, pago_puro = 0, seguro = 0, cbdi = 0, cuota_final = 0;
-    let planPagosDetallado: { nro: number; mesLabel: string; cuotaUsd: number }[] = [];
-    let planPlazosAlternativos: { año: number; cuotaUsd: string; cuotaBs: string; isCurrent: boolean }[] = [];
+    let valor_final = 0;
+    let ahorro_total = 0;
+    let cuota_inicial = 0;
+    let pct_efectivo = 0;
+    let pago_puro = 0;
+    let seguro = 0;
+    let cbdi = 0;
+    let cuota_final = 0;
+    const planPagosDetallado: { nro: number; mesLabel: string; cuotaUsd: number }[] = [];
+    const planPlazosAlternativos: { año: number; cuotaUsd: string; cuotaBs: string; isCurrent: boolean }[] = [];
     
     const TC_FLEX_NUMBER = Number(tcFlexible);
     let tcEfectivoAplicado = TC_FLEX_NUMBER;
@@ -690,9 +984,13 @@ export default function App() {
         8: 23.90, 9: 25.12, 10: 26.38, 11: 27.67, 12: 29.00, 13: 30.36, 14: 31.75
       };
       
-      pago_puro = tasa === 0 ? saldo / meses : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
+      pago_puro = tasa === 0
+        ? saldo / meses
+        : saldo * (tasa * Math.pow(1 + tasa, meses)) / (Math.pow(1 + tasa, meses) - 1);
       if (isNaN(pago_puro) || !isFinite(pago_puro)) pago_puro = 0;
-      const factorSeguro = baseSeguro[ans] ? (baseSeguro[ans] / refSaldo) : (26.38 + (ans - 10) * 1.3) / refSaldo;
+      const factorSeguro = baseSeguro[ans]
+        ? (baseSeguro[ans] / refSaldo)
+        : (26.38 + (ans - 10) * 1.3) / refSaldo;
       seguro = saldo * factorSeguro;
       cuota_final = pago_puro + seguro + cbdi;
 
@@ -712,9 +1010,13 @@ export default function App() {
 
       for (let i = 14; i >= 1; i--) {
         const m_i = i * 12;
-        let pp_i = tasa === 0 ? saldo / m_i : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
+        let pp_i = tasa === 0
+          ? saldo / m_i
+          : saldo * (tasa * Math.pow(1 + tasa, m_i)) / (Math.pow(1 + tasa, m_i) - 1);
         if (isNaN(pp_i) || !isFinite(pp_i)) pp_i = 0;
-        const fS_i = baseSeguro[i] ? (baseSeguro[i] / refSaldo) : (26.38 + (i - 10) * 1.3) / refSaldo;
+        const fS_i = baseSeguro[i]
+          ? (baseSeguro[i] / refSaldo)
+          : (26.38 + (i - 10) * 1.3) / refSaldo;
         const c_final_i = pp_i + (saldo * fS_i) + cbdi;
 
         planPlazosAlternativos.push({
@@ -729,7 +1031,16 @@ export default function App() {
     const formatPct = (pct_efectivo % 1 === 0) ? pct_efectivo.toFixed(0) : pct_efectivo.toFixed(2);
     setResultado({
       nombreCliente: nombreCliente.trim(),
-      fechaTC, primerMesPago, tipoCotizacion, regional, proyecto: nombreProyectoFinal, uv, mzn, lote, superficie: sup, categoria,
+      fechaTC,
+      primerMesPago,
+      tipoCotizacion,
+      regional,
+      proyecto: nombreProyectoFinal,
+      uv,
+      mzn,
+      lote,
+      superficie: sup,
+      categoria,
       valorOriginalRaw: valor_original, 
       valorOriginal: formatMoney(valor_original), 
       valorFinal: formatMoney(valor_final), 
@@ -756,7 +1067,9 @@ export default function App() {
       descuentoFijoAplicado: descFijoBase,
       descuentoAnexoIIIAplicado: descAnexoIII,
       escalaAnexoIIILabel: ETIQUETAS_ANEXO_III[escalaAnexoIIIActiva],
-      descuentoM2Equivalente: tipoCotizacion === 'credito' && aplicarDescuentoCredito && sup > 0 ? ahorro_total / sup : 0,
+      descuentoM2Equivalente: tipoCotizacion === 'credito' && aplicarDescuentoCredito && sup > 0
+        ? ahorro_total / sup
+        : 0,
       timestampId: new Date().getTime()
     });
     setCopiado(false); 
@@ -766,10 +1079,15 @@ export default function App() {
     e.preventDefault();
     setIsCalculating(true);
     setTimeout(() => {
-      try { calcular(); } catch { showNotification("⚠️ Error de ingesta de datos. Revisa la integridad del lote."); } 
-      finally { 
+      try {
+        calcular();
+      } catch {
+        showNotification("⚠️ Error de ingesta de datos. Revisa la integridad del lote.");
+      } finally { 
         setIsCalculating(false); 
-        if (resultadosRef.current) resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); 
+        if (resultadosRef.current) {
+          resultadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }
     }, 350);
   };
@@ -782,7 +1100,8 @@ export default function App() {
     const r = resultado;
     const destinatario = r.nombreCliente ? `*${r.nombreCliente}*` : `*[Nombre_Cliente]*`;
     const saludo = `Hola ${destinatario}, te comparto la propuesta oficial de inversión con los beneficios de nuestra *Campaña Noviembre 2026*:\n\n`;
-    const encabezado = `📍 *Proyecto:* ${r.proyecto}\n📐 *Ubicación:* UV ${r.uv || '-'} | MZN ${r.mzn || '-'} | Lote ${r.lote || '-'} (${r.superficie} m²)\n${r.categoria && r.categoria !== 'ESTÁNDAR' ? `🏷️ *Categoría:* ${r.categoria}\n` : ''}💎 *Precio de lista:* US$ ${r.valorOriginal}\n📅 *TC Referencial (${fechaLegible(r.fechaTC)}):* Bs ${r.tcOriginal.toFixed(2)}\n\n`;
+    const catLine = r.categoria && r.categoria !== 'ESTÁNDAR' ? `🏷️ *Categoría:* ${r.categoria}\n` : '';
+    const encabezado = `📍 *Proyecto:* ${r.proyecto}\n📐 *Ubicación:* UV ${r.uv || '-'} | MZN ${r.mzn || '-'} | Lote ${r.lote || '-'} (${r.superficie} m²)\n${catLine}💎 *Precio de lista:* US$ ${r.valorOriginal}\n📅 *TC Referencial (${fechaLegible(r.fechaTC)}):* Bs ${r.tcOriginal.toFixed(2)}\n\n`;
 
     if (r.tipoCotizacion === 'contado') {
       return saludo + encabezado +
@@ -793,9 +1112,13 @@ export default function App() {
         `⏳ *Nota:* Beneficio exclusivo por campaña vigente. ¿Agendamos la reserva de tu terreno hoy?`;
     }
 
+    const bonoAnexoLine = r.descuentoAnexoIIIAplicado > 0
+      ? `🚀 *Bono Anexo III (${r.escalaAnexoIIILabel}):* -US$ ${formatMoney(r.descuentoAnexoIIIAplicado)}\n`
+      : '';
+
     const bloqueDescuentos = r.ahorroTotalRaw > 0
       ? `🎁 *Beneficio Campaña A Plazos:* -US$ ${formatMoney(r.descuentoFijoAplicado)}\n` +
-        (r.descuentoAnexoIIIAplicado > 0 ? `🚀 *Bono Anexo III (${r.escalaAnexoIIILabel}):* -US$ ${formatMoney(r.descuentoAnexoIIIAplicado)}\n` : '') +
+        bonoAnexoLine +
         `✨ *Ahorro Total Directo:* *US$ ${r.ahorroTotal}* (Equiv. US$ ${formatMoney(r.descuentoM2Equivalente)}/m²)\n`
       : '';
 
@@ -822,13 +1145,22 @@ export default function App() {
         await navigator.clipboard.writeText(mensaje);
       } else {
         const field = document.createElement('textarea');
-        field.value = mensaje; field.style.position = 'fixed'; field.style.left = '-9999px';
+        field.value = mensaje;
+        field.style.position = 'fixed';
+        field.style.left = '-9999px';
         document.body.appendChild(field);
-        try { field.select(); if (!document.execCommand('copy')) throw new Error('No se pudo copiar'); }
-        finally { field.remove(); }
+        try {
+          field.select();
+          if (!document.execCommand('copy')) throw new Error('No se pudo copiar');
+        } finally {
+          field.remove();
+        }
       }
-      setCopiado(true); showNotification('✅ Cotización copiada al portapapeles.');
-    } catch { showNotification('⚠️ No se pudo copiar. Usa el botón de WhatsApp.'); }
+      setCopiado(true);
+      showNotification('✅ Cotización copiada al portapapeles.');
+    } catch {
+      showNotification('⚠️ No se pudo copiar. Usa el botón de WhatsApp.');
+    }
   };
 
   return (
@@ -867,8 +1199,12 @@ export default function App() {
               <div className="absolute inset-0 bg-sky-400/30 rounded-full blur-xl"></div>
               <Lock className="w-10 h-10 text-[#06090f] relative z-10" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-sky-400 drop-shadow-[0_0_15px_rgba(56,189,248,0.4)]">Quantum</span></h1>
-            <p className="text-sky-400 text-xs uppercase tracking-[0.2em] font-black mb-8 border border-sky-500/30 bg-sky-950/40 px-4 py-1.5 rounded-full">Asesores · Campaña Noviembre 2026</p>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
+              Celina <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-sky-400">Quantum</span>
+            </h1>
+            <p className="text-sky-400 text-xs uppercase tracking-[0.2em] font-black mb-8 border border-sky-500/30 bg-sky-950/40 px-4 py-1.5 rounded-full">
+              Asesores · Campaña Noviembre 2026
+            </p>
             <form onSubmit={handleLogin} className="w-full space-y-6 relative z-10">
               <div className="relative">
                 <input 
@@ -876,12 +1212,19 @@ export default function App() {
                   value={passwordInput} 
                   onChange={(e) => setPasswordInput(e.target.value)} 
                   placeholder="Tu clave de acceso" 
-                  className={`w-full bg-[#0b111b] border ${loginError ? 'border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-slate-700 focus:border-sky-500 focus:shadow-[0_0_20px_rgba(14,165,233,0.2)]'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none transition-all shadow-inner`} 
+                  className={`w-full bg-[#0b111b] border ${loginError ? 'border-rose-500/50' : 'border-slate-700 focus:border-sky-500'} text-white text-center text-lg tracking-widest p-4 rounded-2xl outline-none transition-all shadow-inner`} 
                 />
-                {loginError && (<div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold animate-in slide-in-from-top-1">Acceso denegado. Intenta de nuevo.</div>)}
+                {loginError && (
+                  <div className="absolute -bottom-6 left-0 right-0 text-rose-400 text-xs font-bold">
+                    Acceso denegado. Intenta de nuevo.
+                  </div>
+                )}
               </div>
-              <button type="submit" className="w-full bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-[#06090f] font-black py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(14,165,233,0.3)] hover:shadow-[0_0_40px_rgba(14,165,233,0.6)] flex items-center justify-center gap-2 uppercase tracking-widest text-sm hover:-translate-y-1">
-                <Unlock className="w-5 h-5"/> Ingresar a mi espacio
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-[#06090f] font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-sm"
+              >
+                <Unlock className="w-5 h-5" /> Ingresar a mi espacio
               </button>
             </form>
             <div className="mt-12 pt-6 border-t border-slate-800/50 w-full relative z-10">
@@ -893,8 +1236,12 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-sky-950/90 text-sky-50 px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(14,165,233,0.3)] flex items-center gap-3 font-bold text-sm tracking-wide border border-sky-500/50 backdrop-blur-md w-max max-w-[90vw]">
-          {toast.includes('⚠️') ? <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0" />}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-sky-950/90 text-sky-50 px-6 py-3 rounded-full shadow-lg flex items-center gap-3 font-bold text-sm tracking-wide border border-sky-500/50 backdrop-blur-md w-max max-w-[90vw]">
+          {toast.includes('⚠️') ? (
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0" />
+          )}
           <span className="truncate">{toast}</span>
         </div>
       )}
@@ -905,27 +1252,40 @@ export default function App() {
         
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6 no-print w-full min-w-0">
           <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-center sm:justify-start">
-            <button onClick={() => setIsAuthenticated(false)} className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl shadow-inner flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0">
-              <Lock className="w-4 h-4"/> Salir
+            <button
+              type="button"
+              onClick={() => setIsAuthenticated(false)}
+              className="bg-slate-900/50 hover:bg-rose-950/80 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors p-2.5 rounded-xl flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest shrink-0"
+            >
+              <Lock className="w-4 h-4" /> Salir
             </button>
             {isAdmin && (
-              <div className="bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+              <div className="bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
                 <Eye className="w-4 h-4" /> MODO DIRECTOR
               </div>
             )}
           </div>
-          <div className="bg-[#090e17]/80 backdrop-blur-md border border-sky-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shadow-[0_0_20px_rgba(14,165,233,0.15)] w-full sm:w-auto">
+          <div className="bg-[#090e17]/80 backdrop-blur-md border border-sky-500/30 p-2.5 sm:p-3 rounded-2xl flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
             <div className="flex items-center gap-2">
-              <div className="bg-sky-500/20 p-2 rounded-xl border border-sky-500/30 shrink-0"><Activity className="w-5 h-5 text-sky-400" /></div>
+              <div className="bg-sky-500/20 p-2 rounded-xl border border-sky-500/30 shrink-0">
+                <Activity className="w-5 h-5 text-sky-400" />
+              </div>
               <div>
                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">TC de la cotización</div>
-                <div className="text-xs font-bold text-white flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></div> Ingreso manual</div>
+                <div className="text-xs font-bold text-white flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></div> Ingreso manual
+                </div>
               </div>
             </div>
             <div className="relative shrink-0 flex-1 sm:flex-none">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-500 font-bold text-sm">Bs.</span>
               <input 
-                aria-label="Tipo de cambio de hoy en bolivianos por dólar" type="number" min="0.01" step="0.01" value={tcFlexible || ''} onChange={(e) => setTcFlexible(Number(e.target.value))} 
+                aria-label="Tipo de cambio de hoy en bolivianos por dólar"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={tcFlexible || ''}
+                onChange={(e) => setTcFlexible(Number(e.target.value))} 
                 className="bg-[#080d15] border border-slate-700/80 text-sky-400 font-black text-lg rounded-xl pl-10 pr-3 py-2 w-full sm:w-28 text-center outline-none focus:border-sky-500 transition-all shadow-inner" 
               />
             </div>
@@ -937,19 +1297,29 @@ export default function App() {
             <div className="quantum-eyebrow"><span /> PLATAFORMA COMERCIAL / ASESORES</div>
             <h1><span>CELINA</span><strong>QUANTUM<span className="quantum-dot">.</span></strong></h1>
             <p>Motor predictivo y espacial.<br className="sm:hidden" /> Campaña Oficial de Descuentos · Noviembre 2026.</p>
-            <div className="quantum-modules"><span><MapPin size={14}/> EXPLORA</span><span><Calculator size={14}/> COTIZA</span><span><Send size={14}/> CONVIERTE</span></div>
+            <div className="quantum-modules">
+              <span><MapPin size={14} /> EXPLORA</span>
+              <span><Calculator size={14} /> COTIZA</span>
+              <span><Send size={14} /> CONVIERTE</span>
+            </div>
           </div>
           <div className="quantum-orbit" aria-hidden="true">
             <svg viewBox="0 0 340 260" fill="none">
-              <defs><linearGradient id="quantum-orbit-light" x1="70" y1="30" x2="290" y2="230" gradientUnits="userSpaceOnUse"><stop stopColor="#22d3ee"/><stop offset="1" stopColor="#2563eb"/></linearGradient></defs>
-              <circle cx="176" cy="128" r="97" stroke="#1e3449" strokeWidth="1"/>
-              <circle cx="176" cy="128" r="78" stroke="#1e3449" strokeDasharray="2 9"/>
-              <ellipse cx="176" cy="128" rx="140" ry="39" stroke="url(#quantum-orbit-light)" transform="rotate(-31 176 128)"/>
-              <ellipse cx="176" cy="128" rx="118" ry="50" stroke="#1675ac" transform="rotate(42 176 128)"/>
-              <path d="M176 56 237 92v72l-61 36-61-36V92l61-36Z" fill="#0b2032" stroke="url(#quantum-orbit-light)" strokeWidth="2"/>
-              <path d="m115 92 61 36 61-36M176 128v72M145 74l62 36v72M206 74l-61 36v72M115 128l61 36 61-36" stroke="#2682b5"/>
-              <circle cx="290" cy="64" r="5" fill="#67e8f9"/><circle cx="61" cy="181" r="3" fill="#3b82f6"/>
-              <path d="M24 43h26m-13-13v26M283 218h26m-13-13v26" stroke="#3b6c8d"/>
+              <defs>
+                <linearGradient id="quantum-orbit-light" x1="70" y1="30" x2="290" y2="230" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#22d3ee" />
+                  <stop offset="1" stopColor="#2563eb" />
+                </linearGradient>
+              </defs>
+              <circle cx="176" cy="128" r="97" stroke="#1e3449" strokeWidth="1" />
+              <circle cx="176" cy="128" r="78" stroke="#1e3449" strokeDasharray="2 9" />
+              <ellipse cx="176" cy="128" rx="140" ry="39" stroke="url(#quantum-orbit-light)" transform="rotate(-31 176 128)" />
+              <ellipse cx="176" cy="128" rx="118" ry="50" stroke="#1675ac" transform="rotate(42 176 128)" />
+              <path d="M176 56 237 92v72l-61 36-61-36V92l61-36Z" fill="#0b2032" stroke="url(#quantum-orbit-light)" strokeWidth="2" />
+              <path d="m115 92 61 36 61-36M176 128v72M145 74l62 36v72M206 74l-61 36v72M115 128l61 36 61-36" stroke="#2682b5" />
+              <circle cx="290" cy="64" r="5" fill="#67e8f9" />
+              <circle cx="61" cy="181" r="3" fill="#3b82f6" />
+              <path d="M24 43h26m-13-13v26M283 218h26m-13-13v26" stroke="#3b6c8d" />
               <text x="115" y="241" fill="#5f8fab" fontSize="9" letterSpacing="4">QUANTUM / NOV 2026</text>
             </svg>
           </div>
@@ -957,10 +1327,23 @@ export default function App() {
 
         <div className="mb-6 rounded-2xl border border-sky-500/25 bg-slate-900/70 p-4 flex flex-wrap items-center justify-between gap-3 no-print">
           <div>
-            <p className="text-sky-300 font-bold text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-cyan-400"/> Campaña Descuentos de Celina · Noviembre 2026</p>
-            <p className="text-slate-400 text-xs mt-1">Contado: 18% (al contado), 15% (5 días), 10% (30 días) · Plazos: Descuento por tramo ($250 a $1.800) + Bono Anexo III por incremento de inicial</p>
+            <p className="text-sky-300 font-bold text-sm flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400" /> Campaña Descuentos de Celina · Noviembre 2026
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
+              Contado: 18% (al contado), 15% (5 días), 10% (30 días) · Plazos: Descuento por tramo ($250 a $1.800) + Bono Anexo III
+            </p>
           </div>
-          <label className="text-xs text-slate-300">Fecha del TC <input aria-label="Fecha del tipo de cambio" type="date" value={fechaTC} onChange={e => setFechaTC(e.target.value)} className="ml-2 bg-slate-950 border border-slate-600 rounded-lg p-2 text-white" /></label>
+          <label className="text-xs text-slate-300">
+            Fecha del TC
+            <input
+              aria-label="Fecha del tipo de cambio"
+              type="date"
+              value={fechaTC}
+              onChange={e => setFechaTC(e.target.value)}
+              className="ml-2 bg-slate-950 border border-slate-600 rounded-lg p-2 text-white"
+            />
+          </label>
         </div>
 
         <div className="w-full mb-8 sm:mb-12 no-print relative z-20">
@@ -969,7 +1352,7 @@ export default function App() {
 
         <div ref={formRef} className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start w-full min-w-0">
           
-          <div className="lg:col-span-5 glass-panel rounded-2xl overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-slate-700/50">
+          <div className="lg:col-span-5 glass-panel rounded-2xl overflow-hidden transition-all duration-500 flex flex-col no-print min-w-0 border border-slate-700/50">
             <div className="bg-[#0d1420]/90 backdrop-blur-xl p-5 sm:p-6 flex items-center justify-between gap-3 relative overflow-hidden border-b border-slate-800 flex-wrap">
               <div className="flex items-center gap-3 relative z-10">
                 <div className="bg-sky-500/10 p-2.5 rounded-xl border border-sky-500/30">
@@ -989,7 +1372,7 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => setUsarAPI(true)} 
-                  className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-cyan-600 text-white shadow-[0_0_10px_rgba(5,150,105,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
+                  className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-1 ${usarAPI ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-cyan-400'}`}
                 >
                   <Server className="w-3 h-3" /> API Viva
                 </button>
@@ -1002,20 +1385,19 @@ export default function App() {
                   <button 
                     type="button" 
                     onClick={() => setTipoCotizacion('credito')} 
-                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'credito' ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.5)]' : 'text-slate-500 hover:text-cyan-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-sm font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'credito' ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950' : 'text-slate-500 hover:text-cyan-400'}`}
                   >
-                    <CreditCard className="w-4 h-4"/> Venta a Plazos
+                    <CreditCard className="w-4 h-4" /> Venta a Plazos
                   </button>
                   <button 
                     type="button" 
                     onClick={() => setTipoCotizacion('contado')} 
-                    className={`flex-1 py-3 text-xs sm:text-[11px] font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-sky-400 to-blue-500 text-slate-950 shadow-[0_0_20px_rgba(14,165,233,0.5)]' : 'text-slate-500 hover:text-sky-400'}`}
+                    className={`flex-1 py-3 text-xs sm:text-[11px] font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative z-10 ${tipoCotizacion === 'contado' ? 'bg-gradient-to-br from-sky-400 to-blue-500 text-slate-950' : 'text-slate-500 hover:text-sky-400'}`}
                   >
-                    <Wallet className="w-4 h-4 shrink-0"/> Contado / Liquidación
+                    <Wallet className="w-4 h-4 shrink-0" /> Contado / Liquidación
                   </button>
                 </div>
 
-                {/* Nombre opcional del cliente para personalizar WhatsApp */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <User className="w-3.5 h-3.5 text-cyan-400" /> Nombre del Cliente (Opcional para WhatsApp)
@@ -1031,7 +1413,7 @@ export default function App() {
 
                 <div className="space-y-2.5">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <MapIcon className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> Regional
+                    <MapIcon className="w-4 h-4 shrink-0 text-cyan-500" /> Regional
                   </label>
                   <div className="relative">
                     <select 
@@ -1039,7 +1421,9 @@ export default function App() {
                       onChange={e => setRegional(e.target.value)} 
                       className="w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none focus:border-cyan-500"
                     >
-                      {Object.keys(PROYECTOS_POR_REGIONAL).map(reg => <option key={reg} value={reg}>{reg}</option>)}
+                      {Object.keys(PROYECTOS_POR_REGIONAL).map(reg => (
+                        <option key={reg} value={reg}>{reg}</option>
+                      ))}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
                       <ChevronDown className="w-5 h-5" />
@@ -1050,11 +1434,11 @@ export default function App() {
                 <div className="space-y-2.5 relative">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Building2 className={`w-4 h-4 shrink-0 ${tipoCotizacion === 'contado' ? 'text-sky-500' : 'text-cyan-500'}`} /> Proyecto
+                      <Building2 className="w-4 h-4 shrink-0 text-cyan-500" /> Proyecto
                     </label>
                     {cargandoBD ? (
                       <span className="text-[9px] sm:text-[10px] font-bold text-cyan-400 flex items-center gap-1.5 border border-cyan-500/30 px-3 py-1.5 rounded-full bg-cyan-500/10 shrink-0">
-                        <Loader2 className="w-3 h-3 animate-spin"/> Sincronizando...
+                        <Loader2 className="w-3 h-3 animate-spin" /> Sincronizando...
                       </span>
                     ) : tieneBD ? (
                       <button 
@@ -1062,7 +1446,8 @@ export default function App() {
                         onClick={() => setUsarBD(!usarBD)} 
                         className={`text-[9px] sm:text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shrink-0 shadow-sm ${usarBD ? 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/40' : 'bg-slate-800/50 text-slate-400 border border-slate-700'}`}
                       >
-                        {usarBD ? <Database className="w-3 h-3 text-cyan-400"/> : <Edit2 className="w-3 h-3"/>} {usarBD ? 'CATÁLOGO ACTIVO' : 'MODO MANUAL'}
+                        {usarBD ? <Database className="w-3 h-3 text-cyan-400" /> : <Edit2 className="w-3 h-3" />}
+                        {usarBD ? 'CATÁLOGO ACTIVO' : 'MODO MANUAL'}
                       </button>
                     ) : null}
                   </div>
@@ -1072,7 +1457,9 @@ export default function App() {
                       onChange={e => setProyecto(e.target.value)} 
                       className="w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 sm:p-4 transition-all font-bold text-base sm:text-lg cursor-pointer appearance-none focus:border-cyan-500"
                     >
-                      {PROYECTOS_POR_REGIONAL[regional]?.map(p => <option key={p} value={p}>{p}</option>)}
+                      {PROYECTOS_POR_REGIONAL[regional]?.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
                       <option value="OTRO">OTRO...</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
@@ -1099,7 +1486,7 @@ export default function App() {
                       </div>
                       {!usarBD && tieneBD && (
                         <span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase flex items-center gap-1 shrink-0">
-                          <Edit2 className="w-3 h-3"/> Ingreso Manual
+                          <Edit2 className="w-3 h-3" /> Ingreso Manual
                         </span>
                       )}
                     </div>
@@ -1108,42 +1495,78 @@ export default function App() {
                         <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-500">UV</label>
                         {modoBD ? (
                           <div className="relative">
-                            <select value={uv} onChange={handleUvChange} className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer outline-none focus:border-cyan-500">
+                            <select
+                              value={uv}
+                              onChange={handleUvChange}
+                              className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer outline-none focus:border-cyan-500"
+                            >
                               <option value="" disabled hidden>Selec.</option>
                               {uvsDisponibles.map(u => <option key={u} value={u}>{u}</option>)}
                             </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-500"><ChevronDown className="w-3 h-3" /></div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-500">
+                              <ChevronDown className="w-3 h-3" />
+                            </div>
                           </div>
                         ) : (
-                          <input type="text" value={uv} onChange={handleUvChange} placeholder="Ej. 49" className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 outline-none focus:border-cyan-500" />
+                          <input
+                            type="text"
+                            value={uv}
+                            onChange={handleUvChange}
+                            placeholder="Ej. 49"
+                            className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 outline-none focus:border-cyan-500"
+                          />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-500">MZN</label>
                         {modoBD ? (
                           <div className="relative">
-                            <select value={mzn} onChange={handleMznChange} className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer outline-none focus:border-cyan-500">
+                            <select
+                              value={mzn}
+                              onChange={handleMznChange}
+                              className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer outline-none focus:border-cyan-500"
+                            >
                               <option value="" disabled hidden>Selec.</option>
                               {mznsDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-500"><ChevronDown className="w-3 h-3" /></div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-500">
+                              <ChevronDown className="w-3 h-3" />
+                            </div>
                           </div>
                         ) : (
-                          <input type="text" value={mzn} onChange={handleMznChange} placeholder="Ej. 6" className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 outline-none focus:border-cyan-500" />
+                          <input
+                            type="text"
+                            value={mzn}
+                            onChange={handleMznChange}
+                            placeholder="Ej. 6"
+                            className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 outline-none focus:border-cyan-500"
+                          />
                         )}
                       </div>
                       <div className="space-y-1.5 text-center flex flex-col">
                         <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-cyan-500">LOTE</label>
                         {modoBD ? (
                           <div className="relative">
-                            <select value={lote} onChange={handleLoteChange} className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer outline-none focus:border-cyan-500">
+                            <select
+                              value={lote}
+                              onChange={handleLoteChange}
+                              className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold appearance-none cursor-pointer outline-none focus:border-cyan-500"
+                            >
                               <option value="" disabled hidden>Selec.</option>
                               {lotesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-500"><ChevronDown className="w-3 h-3" /></div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-cyan-500">
+                              <ChevronDown className="w-3 h-3" />
+                            </div>
                           </div>
                         ) : (
-                          <input type="text" value={lote} onChange={handleLoteChange} placeholder="Ej. 9" className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 outline-none focus:border-cyan-500" />
+                          <input
+                            type="text"
+                            value={lote}
+                            onChange={handleLoteChange}
+                            placeholder="Ej. 9"
+                            className="w-full bg-[#0b111b] border border-slate-700 text-white rounded-xl p-3 text-center text-xs sm:text-sm font-bold placeholder-slate-600 outline-none focus:border-cyan-500"
+                          />
                         )}
                       </div>
                     </div>
@@ -1169,7 +1592,12 @@ export default function App() {
                       <MapIcon className="w-4 h-4 shrink-0 text-cyan-500" /> Superficie <span className="text-slate-600 normal-case">(m²)</span>
                     </label>
                     <input 
-                      type="number" required step="0.01" value={superficie} onChange={e => setSuperficie(e.target.value)} placeholder="Ej. 300" 
+                      type="number"
+                      required
+                      step="0.01"
+                      value={superficie}
+                      onChange={e => setSuperficie(e.target.value)}
+                      placeholder="Ej. 300" 
                       className="w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 outline-none bg-[#0b111b] border border-slate-700 text-cyan-400 focus:border-cyan-500" 
                     />
                   </div>
@@ -1178,13 +1606,17 @@ export default function App() {
                       <DollarSign className="w-4 h-4 shrink-0 text-cyan-500" /> Precio <span className="text-slate-600 normal-case">/ m²</span>
                     </label>
                     <input 
-                      type="number" required step="0.01" value={precio} onChange={e => setPrecio(e.target.value)} placeholder="Ej. 45" 
+                      type="number"
+                      required
+                      step="0.01"
+                      value={precio}
+                      onChange={e => setPrecio(e.target.value)}
+                      placeholder="Ej. 45" 
                       className="w-full rounded-2xl p-3.5 sm:p-4 font-extrabold text-lg sm:text-xl placeholder-slate-600 outline-none bg-[#0b111b] border border-slate-700 text-cyan-400 focus:border-cyan-500" 
                     />
                   </div>
                 </div>
 
-                {/* CAMPAÑA NOVIEMBRE 2026: BLOQUE DE DESCUENTOS */}
                 <div className={`bg-[#0b111b]/80 border p-4 sm:p-5 rounded-xl relative overflow-hidden mt-4 ${tipoCotizacion === 'contado' ? 'border-sky-500/40' : 'border-cyan-500/40'}`}>
                   <div className={`text-[10px] sm:text-xs font-extrabold uppercase tracking-widest flex items-center gap-2 mb-4 ${tipoCotizacion === 'contado' ? 'text-sky-400' : 'text-cyan-400'}`}>
                     <div className="p-1.5 rounded-lg border bg-cyan-900/50 border-cyan-500/50 shrink-0">
@@ -1197,7 +1629,7 @@ export default function App() {
                     {tipoCotizacion === 'contado' ? (
                       <div className="space-y-3">
                         <label className="text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                          <Timer className="w-4 h-4 text-sky-400"/> Modalidad de Liquidación (Cliente Nuevo)
+                          <Timer className="w-4 h-4 text-sky-400" /> Modalidad de Liquidación (Cliente Nuevo)
                         </label>
                         <div className="relative">
                           <select 
@@ -1218,7 +1650,12 @@ export default function App() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
                           <label className="flex items-center gap-2 text-xs font-bold text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={aplicarDescuentoCredito} onChange={e => setAplicarDescuentoCredito(e.target.checked)} className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0" />
+                            <input
+                              type="checkbox"
+                              checked={aplicarDescuentoCredito}
+                              onChange={e => setAplicarDescuentoCredito(e.target.checked)}
+                              className="w-4 h-4 rounded bg-slate-900 border-slate-600 accent-cyan-500 shrink-0"
+                            />
                             Aplicar Beneficios Campaña Noviembre 2026
                           </label>
                           <span className="text-xs font-black text-cyan-400 bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/30">
@@ -1239,7 +1676,7 @@ export default function App() {
                             <div className="bg-[#080d15] p-3 rounded-xl border border-slate-800 space-y-2">
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-cyan-400 uppercase flex items-center gap-1">
-                                  <Sparkles className="w-3 h-3"/> 3. Anexo III · Incremento Cuota Inicial
+                                  <Sparkles className="w-3 h-3" /> 3. Anexo III · Incremento Cuota Inicial
                                 </span>
                                 <span className="text-sm font-black text-cyan-300">-$us {formatMoney(descuentoAnexoIIIActual)}</span>
                               </div>
@@ -1268,7 +1705,13 @@ export default function App() {
                 {tipoCotizacion === 'credito' && (
                   <label className="block text-xs text-slate-300 mt-4">
                     Primer mes de pago propuesto (confirmar con el cliente)
-                    <input type="month" min={fechaTC.slice(0, 7)} value={primerMesPago} onChange={e => setPrimerMesPago(e.target.value)} className="mt-2 w-full bg-slate-950 border border-slate-600 rounded-xl p-3 text-white" />
+                    <input
+                      type="month"
+                      min={fechaTC.slice(0, 7)}
+                      value={primerMesPago}
+                      onChange={e => setPrimerMesPago(e.target.value)}
+                      className="mt-2 w-full bg-slate-950 border border-slate-600 rounded-xl p-3 text-white"
+                    />
                   </label>
                 )}
 
@@ -1280,9 +1723,15 @@ export default function App() {
                           <Percent className="w-3.5 h-3.5 shrink-0" /> Inicial (%)
                         </label>
                         <input 
-                          type="number" step="0.01" min="0" value={inicialPorcentaje} 
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={inicialPorcentaje} 
                           onFocus={() => setModoInicial('porcentaje')}
-                          onChange={(e) => { setModoInicial('porcentaje'); setInicialPorcentaje(e.target.value); }} 
+                          onChange={(e) => {
+                            setModoInicial('porcentaje');
+                            setInicialPorcentaje(e.target.value);
+                          }} 
                           placeholder={modoInicial === 'monto' ? 'Auto' : 'Ej. 10'} 
                           className={`w-full bg-[#0b111b] border rounded-xl p-3 sm:p-3.5 outline-none font-bold text-sm sm:text-base placeholder-slate-600 ${modoInicial === 'porcentaje' ? 'border-cyan-500 text-white' : 'border-slate-700 text-slate-500'}`} 
                         />
@@ -1292,9 +1741,15 @@ export default function App() {
                           <DollarSign className="w-3.5 h-3.5 shrink-0" /> Monto ($us)
                         </label>
                         <input 
-                          type="number" step="0.01" min="0" value={inicialMonto} 
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={inicialMonto} 
                           onFocus={() => setModoInicial('monto')}
-                          onChange={(e) => { setModoInicial('monto'); setInicialMonto(e.target.value); }} 
+                          onChange={(e) => {
+                            setModoInicial('monto');
+                            setInicialMonto(e.target.value);
+                          }} 
                           placeholder={modoInicial === 'porcentaje' ? 'Auto' : 'Ej. 1000'} 
                           className={`w-full bg-[#0b111b] border rounded-xl p-3 sm:p-3.5 outline-none font-black text-sm sm:text-base placeholder-slate-600 ${modoInicial === 'monto' ? 'border-cyan-500 text-cyan-400' : 'border-slate-700 text-slate-500'}`} 
                         />
@@ -1307,11 +1762,15 @@ export default function App() {
                       </label>
                       <div className="relative h-[calc(100%-1.5rem)]">
                         <select 
-                          required value={años} onChange={e => setAños(e.target.value)} 
+                          required
+                          value={años}
+                          onChange={e => setAños(e.target.value)} 
                           className="w-full bg-[#0b111b]/50 border border-slate-700 text-white rounded-2xl p-3.5 outline-none font-bold text-sm sm:text-base appearance-none pr-10 cursor-pointer h-full min-h-[50px] focus:border-cyan-500"
                         >
                           <option value="" disabled hidden>Selec.</option>
-                          {[...Array(14)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>)}
+                          {[...Array(14)].map((_, i) => (
+                            <option key={i + 1} value={i + 1}>{i + 1} {i === 0 ? 'Año' : 'Años'}</option>
+                          ))}
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-cyan-500">
                           <ChevronRight className="w-5 h-5 rotate-90" />
@@ -1322,8 +1781,9 @@ export default function App() {
                 )}
 
                 <button 
-                  type="submit" disabled={isCalculating} 
-                  className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-sky-500 via-blue-500 to-sky-400' : 'from-cyan-500 via-blue-500 to-cyan-400'} text-[#06090f] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1 shadow-[0_0_30px_rgba(34,211,238,0.4)]'}`}
+                  type="submit"
+                  disabled={isCalculating} 
+                  className={`w-full mt-6 sm:mt-8 bg-gradient-to-r ${tipoCotizacion === 'contado' ? 'from-sky-500 via-blue-500 to-sky-400' : 'from-cyan-500 via-blue-500 to-cyan-400'} text-[#06090f] font-black py-4 sm:py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 uppercase tracking-widest text-sm sm:text-lg relative overflow-hidden group ${isCalculating ? 'opacity-80 scale-95' : 'hover:-translate-y-1'}`}
                 >
                   <span className="relative z-10 flex items-center gap-2 sm:gap-3">
                     {isCalculating ? (
@@ -1340,8 +1800,12 @@ export default function App() {
           <div ref={resultadosRef} className="lg:col-span-7 flex flex-col gap-5 sm:gap-6 scroll-mt-6 min-w-0 w-full">
             {!resultado || isCalculating ? (
               <div className="glass-panel rounded-2xl h-full min-h-[400px] sm:min-h-[600px] flex flex-col items-center justify-center text-slate-500 p-6 sm:p-10 text-center border border-slate-700/50 bg-[#0d1420]/60 backdrop-blur-xl">
-                <div className="bg-[#0b111b] p-6 sm:p-8 rounded-full mb-6 border border-cyan-500/50 shadow-[0_0_40px_rgba(14,165,233,0.3)]">
-                  {isCalculating ? <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 animate-spin text-cyan-400" /> : <Calculator className="w-12 h-12 sm:w-16 sm:h-16 text-cyan-400" />}
+                <div className="bg-[#0b111b] p-6 sm:p-8 rounded-full mb-6 border border-cyan-500/50">
+                  {isCalculating ? (
+                    <Loader2 className="w-12 h-12 sm:w-16 sm:h-16 animate-spin text-cyan-400" />
+                  ) : (
+                    <Calculator className="w-12 h-12 sm:w-16 sm:h-16 text-cyan-400" />
+                  )}
                 </div>
                 <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2">
                   {isCalculating ? "Calculando Escenarios..." : "Simulador Financiero Quantum"}
@@ -1376,7 +1840,9 @@ export default function App() {
                         <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Proyecto</div>
                         <div className="text-white font-black text-lg uppercase leading-none truncate">{resultado.proyecto}</div>
                         {resultado.categoria && resultado.categoria !== "ESTÁNDAR" && (
-                          <div className="text-[9px] text-cyan-400 font-bold mt-1 tracking-wider truncate bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/20 w-max">{resultado.categoria}</div>
+                          <div className="text-[9px] text-cyan-400 font-bold mt-1 tracking-wider truncate bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/20 w-max">
+                            {resultado.categoria}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1403,14 +1869,15 @@ export default function App() {
                       : 'El descuento promocional se aplica una sola vez: directo al precio en dólares o como TC equivalente en bolivianos.'}
                   </div>
 
-                  {/* BLOQUE AL CONTADO */}
                   {resultado.tipoCotizacion === 'contado' && (
                     <div className="space-y-6">
                       <div className="relative overflow-hidden bg-gradient-to-br from-sky-950 via-[#080d15] to-[#080d15] p-6 sm:p-10 rounded-xl border border-sky-500/50 text-center">
                         <div className="relative z-10 flex flex-col items-center justify-center">
                           <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-950/80 border border-sky-500/50 mb-5">
-                            <Timer className="w-4 h-4 text-sky-400"/>
-                            <span className="text-sky-200 text-xs font-black uppercase tracking-widest">{resultado.plazoLiquidacionVisual} (-{(resultado.descPctAplicado * 100).toFixed(0)}%)</span>
+                            <Timer className="w-4 h-4 text-sky-400" />
+                            <span className="text-sky-200 text-xs font-black uppercase tracking-widest">
+                              {resultado.plazoLiquidacionVisual} (-{(resultado.descPctAplicado * 100).toFixed(0)}%)
+                            </span>
                           </div>
 
                           <div className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-none mb-3">
@@ -1427,10 +1894,22 @@ export default function App() {
                                 <div className="text-sky-400 font-bold text-[10px] tracking-widest uppercase mb-3 text-center border-b border-sky-500/20 pb-2">
                                   Opción A: Descuento al Precio
                                 </div>
-                                <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">$us {resultado.valorOriginal}</span></div>
-                                <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-cyan-400 font-bold">-$us {resultado.ahorroTotal}</span></div>
-                                <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">Precio Final</span> <span className="font-black text-white">$us {resultado.valorFinal}</span></div>
-                                <div className="flex justify-between text-sm mb-3"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">x Bs {resultado.tcOriginal.toFixed(2)}</span></div>
+                                <div className="flex justify-between text-sm mb-1.5">
+                                  <span className="text-slate-400">Precio Lista</span>
+                                  <span className="font-bold text-slate-200">$us {resultado.valorOriginal}</span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-1.5">
+                                  <span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span>
+                                  <span className="text-cyan-400 font-bold">-$us {resultado.ahorroTotal}</span>
+                                </div>
+                                <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5">
+                                  <span className="text-slate-300 font-bold">Precio Final</span>
+                                  <span className="font-black text-white">$us {resultado.valorFinal}</span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-3">
+                                  <span className="text-slate-400">T.C. Referencial</span>
+                                  <span className="font-bold text-slate-200">x Bs {resultado.tcOriginal.toFixed(2)}</span>
+                                </div>
                                 <div className="flex justify-between text-base border-t border-sky-500/50 pt-3">
                                   <span className="text-sky-400 font-black">Total Bs.</span> 
                                   <span className="font-black text-sky-300">Bs. {resultado.totalBsA}</span>
@@ -1441,10 +1920,22 @@ export default function App() {
                                 <div className="text-cyan-400 font-bold text-[10px] tracking-widest uppercase mb-3 text-center border-b border-cyan-500/20 pb-2">
                                   Opción B: Descuento al T.C.
                                 </div>
-                                <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">T.C. Referencial</span> <span className="font-bold text-slate-200">Bs {resultado.tcOriginal.toFixed(2)}</span></div>
-                                <div className="flex justify-between text-sm mb-1.5"><span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span> <span className="text-cyan-400 font-bold">-{(resultado.descPctAplicado * 100).toFixed(0)}%</span></div>
-                                <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5"><span className="text-slate-300 font-bold">TC Equivalente</span> <span className="font-black text-white">Bs {resultado.tcEfectivo.toFixed(2)}</span></div>
-                                <div className="flex justify-between text-sm mb-3"><span className="text-slate-400">Precio Lista</span> <span className="font-bold text-slate-200">x $us {resultado.valorOriginal}</span></div>
+                                <div className="flex justify-between text-sm mb-1.5">
+                                  <span className="text-slate-400">T.C. Referencial</span>
+                                  <span className="font-bold text-slate-200">Bs {resultado.tcOriginal.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-1.5">
+                                  <span className="text-slate-400">Descuento ({(resultado.descPctAplicado * 100).toFixed(0)}%)</span>
+                                  <span className="text-cyan-400 font-bold">-{(resultado.descPctAplicado * 100).toFixed(0)}%</span>
+                                </div>
+                                <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2 mb-1.5">
+                                  <span className="text-slate-300 font-bold">TC Equivalente</span>
+                                  <span className="font-black text-white">Bs {resultado.tcEfectivo.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-3">
+                                  <span className="text-slate-400">Precio Lista</span>
+                                  <span className="font-bold text-slate-200">x $us {resultado.valorOriginal}</span>
+                                </div>
                                 <div className="flex justify-between text-base border-t border-cyan-500/50 pt-3">
                                   <span className="text-cyan-400 font-black">Total Bs.</span> 
                                   <span className="font-black text-cyan-300">Bs. {resultado.totalBsB}</span>
@@ -1457,7 +1948,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* BLOQUE A CRÉDITO */}
                   {resultado.tipoCotizacion === 'credito' && (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
@@ -1485,24 +1975,31 @@ export default function App() {
                           </div>
                           <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-baseline">
                             <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Cuota Mensual ({resultado.plazo}a):</span>
-                            <span className="text-lg font-black text-emerald-400">$us {resultado.mensual} <span className="text-xs text-slate-400">(Bs. {resultado.mensualBs})</span></span>
+                            <span className="text-lg font-black text-emerald-400">
+                              $us {resultado.mensual} <span className="text-xs text-slate-400">(Bs. {resultado.mensualBs})</span>
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* ACORDEÓN DE PAGOS */}
                       <div className="border border-cyan-500/40 rounded-2xl overflow-hidden bg-[#080d15] w-full">
                         <div className="p-5 border-b border-slate-800 bg-gradient-to-r from-cyan-950/40 to-transparent">
                           <h3 className="text-white font-black text-lg flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-cyan-400"/> Cronograma de Pagos ({resultado.plazo * 12} cuotas)
+                            <Calendar className="w-5 h-5 text-cyan-400" /> Cronograma de Pagos ({resultado.plazo * 12} cuotas)
                           </h3>
                           <p className="text-slate-400 text-xs mt-1">
                             Inicio proyectado: <strong className="text-cyan-400">{resultado.planPagosDetallado?.[0]?.mesLabel}</strong>.
                           </p>
                         </div>
                         
-                        <button type="button" onClick={() => setExpandedPlan(!expandedPlan)} className="w-full bg-[#101925] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800">
-                          <span className="text-cyan-400 font-bold text-xs sm:text-sm tracking-widest uppercase">Desplegar tabla de amortización</span>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPlan(!expandedPlan)}
+                          className="w-full bg-[#101925] p-4 flex justify-between items-center hover:bg-slate-900 transition-colors border-b border-slate-800"
+                        >
+                          <span className="text-cyan-400 font-bold text-xs sm:text-sm tracking-widest uppercase">
+                            Desplegar tabla de amortización
+                          </span>
                           <ChevronDown className={`w-5 h-5 text-cyan-400 transition-transform duration-300 ${expandedPlan ? 'rotate-180' : ''}`} />
                         </button>
 
@@ -1530,11 +2027,10 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* COMPARADOR DE PLAZOS ALTERNATIVOS (1 A 14 AÑOS) */}
                       <div className="border border-cyan-500/40 rounded-2xl overflow-hidden bg-[#101925] w-full">
                         <div className="bg-[#0b111b] p-4 border-b border-cyan-500/30">
                           <h3 className="text-slate-200 font-bold text-sm tracking-wide flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-cyan-500 shrink-0"/> Comparativa de Plazos (1 a 14 Años)
+                            <Activity className="w-4 h-4 text-cyan-500 shrink-0" /> Comparativa de Plazos (1 a 14 Años)
                           </h3>
                         </div>
                         <div className="p-3 sm:p-5 max-h-[320px] overflow-y-auto">
@@ -1545,7 +2041,10 @@ export default function App() {
                           </div>
                           <div className="pt-2 space-y-1">
                             {resultado.planPlazosAlternativos?.map((plan) => (
-                              <div key={plan.año} className={`grid grid-cols-3 gap-2 p-2.5 rounded-xl text-center text-xs sm:text-sm font-bold ${plan.isCurrent ? 'bg-cyan-950/80 border border-cyan-500/60 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800/60'}`}>
+                              <div
+                                key={plan.año}
+                                className={`grid grid-cols-3 gap-2 p-2.5 rounded-xl text-center text-xs sm:text-sm font-bold ${plan.isCurrent ? 'bg-cyan-950/80 border border-cyan-500/60 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800/60'}`}
+                              >
                                 <div>{plan.año} {plan.año === 1 ? 'Año' : 'Años'}</div>
                                 <div className="font-black text-cyan-300">$us {plan.cuotaUsd}</div>
                                 <div className="text-slate-400">Bs. {plan.cuotaBs}</div>
@@ -1563,12 +2062,13 @@ export default function App() {
                       onClick={copiarTexto} 
                       className="flex-1 bg-[#0b111b] border border-cyan-500/60 text-cyan-400 hover:bg-cyan-900/30 font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
                     >
-                      {copiado ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />} {copiado ? 'COPIADO' : 'COPIAR PROPUESTA'}
+                      {copiado ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                      {copiado ? 'COPIADO' : 'COPIAR PROPUESTA'}
                     </button>
                     <button 
                       type="button"
                       onClick={enviarWhatsApp} 
-                      className="flex-1 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#06090f] font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(37,211,102,0.4)] hover:-translate-y-0.5 text-sm uppercase tracking-wider"
+                      className="flex-1 bg-gradient-to-r from-[#25D366] to-[#1DA851] hover:from-[#1DA851] hover:to-[#15873e] text-[#06090f] font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg text-sm uppercase tracking-wider"
                     >
                       <Send className="w-5 h-5" /> Enviar por WhatsApp
                     </button>
