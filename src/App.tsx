@@ -489,7 +489,7 @@ export default function App() {
     const ans = tipoCotizacion === 'credito' ? (Number(años) || 0) : 0; 
     if (!Number.isFinite(sup) || !Number.isFinite(prec) || sup <= 0 || prec <= 0) { setResultado(null); showNotification('Ingresa superficie y precio mayores que cero.'); return; }
     if (!Number.isFinite(tcFlexible) || tcFlexible <= 0 || fechaTC !== fechaBolivia()) { setResultado(null); showNotification('Confirma el TC y su fecha para la cotización de hoy.'); return; }
-    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 06/10/2026.'); return; }
+    if (fechaTC < PROMOCION.desde) { setResultado(null); showNotification('La promoción empieza el 06/11/2026.'); return; }
     if (tipoCotizacion === 'credito' && (!Number.isInteger(ans) || ans < 1 || ans > 14)) { setResultado(null); return; }
     
     const valor_original = sup * prec;
