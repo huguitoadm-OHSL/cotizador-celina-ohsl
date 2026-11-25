@@ -538,7 +538,7 @@ export default function App() {
   const [cargandoBD, setCargandoBD] = useState(true);
   const [usarBD, setUsarBD] = useState(true);
   const [tipoCotizacion, setTipoCotizacion] = useState<"credito" | "contado">("credito"); 
-  const [tcFlexible, setTcFlexible] = useState(11.78);
+  const [tcFlexible, setTcFlexible] = useState(11.83);
   const [fechaTC, setFechaTC] = useState(fechaBolivia());
   const [primerMesPago, setPrimerMesPago] = useState(siguienteMes()); 
   
